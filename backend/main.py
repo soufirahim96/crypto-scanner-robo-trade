@@ -1879,6 +1879,7 @@ class LogoutIpRequest(BaseModel):
     client_ip: str
 
 @app.post("/api/login")
+@app.post("/api/auth/login")
 def admin_login(req: AdminLoginRequest, request: Request):
     """
     VERSION 95: MULTI-ADMIN AUTHENTICATION & 3-CONCURRENT ACTIVE IP LIMIT GUARD
