@@ -1485,6 +1485,14 @@ def run_robo_trade_loop():
     last_analysis_time = {p: 0 for p in participants}
     last_db_prune_time = 0
     last_daily_backtest_time = 0
+    # STAGE 7 LOOP 1 — BTC 180-SECOND FREEZE REGISTRY (per participant)
+    # If BTC drops > 2.5%, freeze new entries for 180s, then retry. Freeze again if still worsening.
+    btc_freeze_until = {p: 0.0 for p in participants}  # timestamp until which entries are frozen
+    btc_last_chg_at_freeze = {p: 0.0 for p in participants}  # BTC chg% recorded when freeze was set
+    # BTC CRASH EMERGENCY EXIT TRACKER
+    # Compares current BTC chg% against the previous sample to detect if crash is accelerating
+    btc_prev_chg_sample = 0.0  # Previous BTC chg% reading (updated every loop iteration)
+    btc_emergency_exit_active = False  # True when BTC crash confirmed and getting worse
     
     while True:
         try:
@@ -1522,6 +1530,20 @@ def run_robo_trade_loop():
             myt_hour = myt_now.hour
             is_golden_opportunity_window = (12 <= myt_hour < 14) or (18 <= myt_hour < 20) or (0 <= myt_hour < 2) or (6 <= myt_hour < 8)
 
+            # V97.2: LIVE BTC CRASH EMERGENCY SENSOR — Detect if BTC is crashing AND getting worse
+            # If BTC chg% < -2.5% AND more negative than previous reading, trigger emergency exit for ALL holdings
+            btc_now_ticker = scanner_engine.active_tickers.get("BTCUSDT")
+            btc_now_chg = btc_now_ticker.get("change_pct", 0) if btc_now_ticker else 0
+            if btc_now_chg < -2.5 and btc_now_chg < btc_prev_chg_sample:
+                if not btc_emergency_exit_active:
+                    btc_emergency_exit_active = True
+                    print(f"[V97.2 BTC CRASH EMERGENCY] ⚠️ BTC is crashing at {btc_now_chg:+.2f}% (prev: {btc_prev_chg_sample:+.2f}%) and getting WORSE! Triggering emergency exit for ALL holdings across BOTH groups!")
+            elif btc_now_chg >= -2.5 or btc_now_chg > btc_prev_chg_sample:
+                if btc_emergency_exit_active:
+                    btc_emergency_exit_active = False
+                    print(f"[V97.2 BTC CRASH RECOVERY] ✅ BTC recovered to {btc_now_chg:+.2f}%. Emergency exit mode deactivated.")
+            btc_prev_chg_sample = btc_now_chg  # Update sample for next iteration
+
             for participant in participants:
                 all_holdings = db_manager.get_all_active_holdings()
                 participant_holdings = [h for h in all_holdings if h['participant'] == participant]
@@ -1556,7 +1578,7 @@ def run_robo_trade_loop():
                         if vol < 5000000:
                             continue
 
-                        # STAGE 4: BEARISH PROTECTION SHIELD & BTC DUMP WARNING (V97)
+                        # STAGE 4: BEARISH PROTECTION SHIELD (V97.2)
                         sell_vol_ratio = 1.0
                         if chg < -1.5 and vol > 10000000:
                             sell_vol_ratio = 2.4  # Sell volume spike detected
@@ -1565,11 +1587,33 @@ def run_robo_trade_loop():
 
                         has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
                         has_volume_veto = (sell_vol_ratio > 2.0)
-                        
-                        # VERSION 97: LIVE BTC MACRO DUMP SENSOR
+
+                        # STAGE 7 LOOP 1: BTC 180-SECOND FREEZE ENGINE (V97.2)
+                        # Blueprint: If BTC drops > 2.5%, freeze all entries for 180s.
+                        # After 180s, recheck BTC. If still worsening → freeze again. Otherwise, allow entries to resume!
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
                         btc_chg = btc_ticker.get("change_pct", 0) if btc_ticker else 0
-                        btc_dump_warning = (btc_chg < -1.5)  # Hard Veto if BTC dumping > -1.5%
+                        now_check = time.time()
+                        if btc_chg < -2.5:
+                            # BTC dropped > 2.5%: Check if already frozen
+                            if now_check >= btc_freeze_until.get(participant, 0):
+                                # Not yet frozen OR previous freeze expired — set new 180s freeze
+                                btc_freeze_until[participant] = now_check + 180
+                                btc_last_chg_at_freeze[participant] = btc_chg
+                                print(f"[STAGE 7 LOOP 1 - BTC FREEZE] {participant}: BTC is {btc_chg:+.2f}% (< -2.5%). Freezing all new entries for 180 seconds. Will retry at {time.strftime('%H:%M:%S', time.localtime(now_check + 180))} MYT.")
+                        elif now_check >= btc_freeze_until.get(participant, 0) and btc_freeze_until.get(participant, 0) > 0:
+                            # Freeze expired and BTC has recovered above -2.5%
+                            if btc_chg > btc_last_chg_at_freeze.get(participant, -999):
+                                print(f"[STAGE 7 LOOP 1 - BTC UNFREEZE] {participant}: BTC recovered to {btc_chg:+.2f}% (was {btc_last_chg_at_freeze.get(participant, 0):+.2f}%). Entry freeze lifted — resuming scan!")
+                            btc_freeze_until[participant] = 0.0
+                            btc_last_chg_at_freeze[participant] = 0.0
+
+                        # Check if participant is currently in BTC freeze period
+                        is_btc_frozen = now_check < btc_freeze_until.get(participant, 0)
+
+                        # STAGE 7 LOOP 1: If freeze is still active, block entry (not a permanent veto — only time-based)
+                        # BTC Dump Hard Veto threshold raised to -2.5% (Blueprint spec) from previous -1.5%
+                        btc_dump_warning = is_btc_frozen  # Freeze-based veto (resumes after 180s when BTC recovers)
 
                         has_hard_veto = has_bearish_choch or has_volume_veto or btc_dump_warning
 
@@ -1578,7 +1622,13 @@ def run_robo_trade_loop():
                         cvd_pts = 2.5 if vol > 7500000 else 2.1     # Spot CVD Divergence (+2.5 pts)
                         funding_pts = 2.0 if chg >= 0 else 1.8      # Funding Rate < 0% Short Squeeze (+2.0 pts)
                         bos_pts = 1.5 if chg > 1.8 else 1.2         # 15M Market Structure Shift (BOS) (+1.5 pts)
-                        fvg_pts = 1.5                               # 15M FVG Entry Retest (+1.5 pts)
+                        # ITEM 3 — CONDITIONAL FVG SCORING (V97.2)
+                        # Blueprint: +1.5 pts ONLY if price is genuinely in a 15M FVG retest zone.
+                        # Approximation: price must be in a bullish pullback (coin is up overall but price has
+                        # retraced toward or below its 24h open, suggesting it is retesting the gap/discount zone).
+                        open_price = c.get("open", price)
+                        in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
+                        fvg_pts = 1.5 if in_fvg_retest else 0.0     # 15M FVG Entry Retest (+1.5 pts ONLY if in retest zone)
 
                         total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
 
@@ -1604,14 +1654,10 @@ def run_robo_trade_loop():
                         if price <= 0: continue
                         
                         if "GOD" in participant:
-                            # VERSION 97: STAGE 3 INSTITUTIONAL OTE RETEST ENTRY TARGET (-0.8% to -1.8% deep FVG retest floor)
-                            pullback_pct = random.uniform(0.008, 0.018)
-                            entry = price * (1.0 - pullback_pct)
-                            tier_str = "👑 GRADE S (9.5+ Pts) OTE FVG RETEST" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            entry = price * (1.0 - random.uniform(0.0005, 0.0025))
+                            tier_str = "👑 GRADE S (9.5+ Pts) FVG SCALE-IN" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
-                            # Group C OB Bot: Stage 3 Golden Pocket Retest (-1.2% to -2.2% deep retest)
-                            pullback_pct = random.uniform(0.012, 0.022)
-                            entry = price * (1.0 - pullback_pct)
+                            entry = price * (0.999 - random.uniform(0.001, 0.004))
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
                             
                         exit_price = entry * (1.05 + random.uniform(0.005, 0.05))
@@ -1688,16 +1734,14 @@ def run_robo_trade_loop():
                             low_1m = t.get("low", curr_price)
                             bounce_pct = ((curr_price - low_1m) / low_1m) * 100.0 if low_1m > 0 else 0.0
                             
-                            # VERSION 97: STAGE 4 PART 1 - 1M MICRO-WICK FLOOR REVERSAL GUARD (Bounce >= +0.15%)
-                            # Holds execution until price bounces +0.15% off micro floor to stop falling-knife entries
-                            if curr_price > 0 and curr_price <= entry and bounce_pct >= 0.15:
-                                # VERSION 92: STAGE 8 IRON RULE CHECK - 100% SPOT-ONLY ZERO-LEVERAGE HARD VETO GUARD
+                            if curr_price > 0 and curr_price <= entry:
+                                # STAGE 8 IRON RULE CHECK - 100% SPOT-ONLY ZERO-LEVERAGE HARD VETO GUARD
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     print(f"[STAGE 8 IRON RULE HARD VETO] {participant} BLOCKED entry on {sym}! Leverage requested: {requested_leverage}x > 1.0x (100% Spot-Only Prohibited).")
                                     continue
 
-                                # VERSION 92: STAGE 7 FORMULA #4 - 3 S/R PAIRS SCAN BEFORE ENTRY (GOD OF TRADE)
+                                # STAGE 7 FORMULA #4 - 3 S/R PAIRS SCAN BEFORE ENTRY (GOD OF TRADE)
                                 if "GOD" in participant:
                                     p1_s_strong = round(curr_price * 0.990, 5)
                                     p2_s_strong = round(curr_price * 0.975, 5)
@@ -1708,12 +1752,10 @@ def run_robo_trade_loop():
                                     print(f"[STAGE 7 FORMULA #4] 👑 SUPREME GOD AI BOT scanned 3 S/R Pairs for {sym} before entry -> Micro Floor: ${p1_s_strong}, Struct Floor: ${p2_s_strong}, Wholesale Floor: ${p3_s_strong}. Pullback Defense Ready!")
 
                                 db_manager.mark_robo_schedule_executed(sched['id'])
-                                # VERSION 97: STAGE 8 FRACTIONAL KELLY SIZING ($25.00 for Grade S setups >= 9.5 Pts, $20.00 standard)
-                                score_val = float(sched.get('confluence_score', 0) or 0)
-                                capital = 25.0 if score_val >= 9.5 else 20.0
+                                capital = 20.0  # Pure Uniform $20.00 USD Allocation per transaction (100% Spot Only)
                                 db_manager.add_active_holding(participant, sym, curr_price, capital/curr_price)
                                 open_count += 1
-                                print(f"[ROBO TRADE EXECUTED - VERSION 97 V97.0 STAGE 4 & 8] {participant} bought {sym} at {curr_price} (${capital:.2f} Spot Allocation, 1x Leverage, 1M Wick Bounce: +{bounce_pct:.2f}%)")
+                                print(f"[ROBO TRADE EXECUTED - PREVIOUS HIGH-FREQUENCY LOGIC RESTORED] {participant} bought {sym} at {curr_price} ($20.00 Spot Allocation, 1x Leverage)")
                                 if open_count >= 5:
                                     break
                 
@@ -1741,7 +1783,10 @@ def run_robo_trade_loop():
                         h_cvd = 2.5 if h_vol > 7500000 else 2.1
                         h_funding = 2.0 if h_chg >= 0 else 1.8
                         h_bos = 1.5 if h_chg > 1.8 else 1.2
-                        h_fvg = 1.5
+                        # ITEM 3 — CONDITIONAL FVG SCORING FOR HOLDING RE-EVALUATION (V97.2)
+                        h_open = t.get("open", curr_price)
+                        h_in_fvg = (h_chg > 0.3) and (curr_price <= h_open * 1.003) and (h_high > h_open * 1.008)
+                        h_fvg = 1.5 if h_in_fvg else 0.0
                         h_raw_score = round(h_sweep + h_cvd + h_funding + h_bos + h_fvg, 2)
 
                         h_score = 0.0 if h_hard_veto else (max(0.0, h_raw_score - 2.0) if h_chg < 0 else h_raw_score)
@@ -1780,6 +1825,13 @@ def run_robo_trade_loop():
                         h_net = round(trade_pnl - h_fee, 4)
                         min_required_net = round(h_cap * 0.0025, 4) # 0.25% Net Profit ($0.05 USD on $20 capital)
 
+                        # ★★★ V97.2 BTC CRASH EMERGENCY EXIT — HIGHEST PRIORITY ★★★
+                        # If BTC is crashing (< -2.5%) AND still getting worse, immediately exit ALL holdings
+                        # to protect capital before the macro crash drags all altcoins down!
+                        if btc_emergency_exit_active:
+                            should_exit = True
+                            exit_reason = f"⚠️ V97.2 BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}% and getting worse, prev: {btc_prev_chg_sample:+.2f}%) — Exiting ALL holdings to protect capital from macro crash contagion! (Gross PnL: ${trade_pnl:+.4f})"
+
                         # GOD OF TRADE STAGE 7 TRAILING EXIT & PROTECTION ENGINE:
                         # 1. Real-Time Invalidation Exit: If score < 8.5 Pts OR Hard Veto is True!
                         if h_hard_veto or h_score < 8.5:
@@ -1792,11 +1844,11 @@ def run_robo_trade_loop():
                             session_str = "12PM-2PM" if 12 <= myt_hour < 14 else ("6PM-8PM" if 18 <= myt_hour < 20 else ("12AM-2AM" if 0 <= myt_hour < 2 else "6AM-8AM"))
                             exit_reason = f"Golden Opportunity Exit [{session_str} MYT Window] (Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD [Covered 0.2% Fee + Profit])"
                         elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_required_net:
-                            # VERSION 97: STAGE 7 FORMULA #5 MASTER UPGRADE - SUPREME GOD AI VELOCITY EXIT & DYNAMIC CAPITAL RECYCLER
-                            # If Supreme God AI Bot holds a position for > 45 minutes (2700s) and Net PnL >= +$0.05 USD (covering 0.20% fee + net profit),
+                            # STAGE 7 FORMULA #5: GOD OF TRADE VELOCITY EXIT & CAPITAL RECYCLER (45-MIN EXIT PRIVILEGE)
+                            # If Supreme God AI Bot holds a position for > 45 minutes and Net PnL >= +$0.05 USD (covering 0.20% fee + net profit),
                             # God AI Bot executes Velocity Exit Privilege to recycle capital at 3x speed into explosive Grade S (9.5+ Pts) setups!
                             should_exit = True
-                            exit_reason = f"👑 God of Trade Velocity Exit & Capital Recycler (Formula #5 Master Upgrade) (Holding Time: {holding_sec/60.0:.1f}m >= 45m, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD)"
+                            exit_reason = f"👑 God of Trade 45-Min Velocity Exit & Capital Recycler (Formula #5) (Holding Time: {holding_sec/60.0:.1f}m >= 45m, Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD)"
                         elif peak_pnl_pct >= 4.0:
                             # Rule 2: If Profit reached >= +4.0% at peak, IMMEDIATELY Lock Stop Loss at +3.50% (Entry * 1.035) or higher trailing (Peak - 1.5%)!
                             trailing_sl_price = max(entry * 1.035, highest_p * 0.985)

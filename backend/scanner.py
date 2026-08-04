@@ -110,8 +110,7 @@ class CryptoScannerEngine:
                 async with websockets.connect(
                     uri, ssl=ssl_ctx,
                     ping_interval=180, ping_timeout=30, open_timeout=15,
-                    max_size=10 * 1024 * 1024,
-                    extra_headers={"User-Agent": "Mozilla/5.0 CryptoScanner/95.4"}
+                    max_size=10 * 1024 * 1024
                 ) as ws:
                     self.ws = ws
                     self.ws_connected = True
