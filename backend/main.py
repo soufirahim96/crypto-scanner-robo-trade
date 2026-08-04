@@ -1515,10 +1515,12 @@ def run_robo_trade_loop():
                     print("[DAILY BACKTEST UPDATER - VERSION 89] Active month backtest data updated successfully!")
                 except Exception as ex_dbt:
                     print(f"[Daily Backtest Error] {ex_dbt}")
-            # Calculate Malaysia Local Time (MYT = UTC + 8)
+            # VERSION 97.1: Calculate Malaysia Local Time (MYT = UTC + 8) & 6-Hour Interval Golden Opportunity Exit Windows (2 Hours Each)
+            # Sessions: 12:00 PM-2:00 PM, 6:00 PM-8:00 PM, 12:00 AM-2:00 AM, 6:00 AM-8:00 AM MYT
             utc_now = datetime.datetime.utcnow()
             myt_now = utc_now + datetime.timedelta(hours=8)
-            is_12pm_2hr_window = (12 <= myt_now.hour < 14)  # 12:00 PM to 2:00 PM MYT (2 Hours)
+            myt_hour = myt_now.hour
+            is_golden_opportunity_window = (12 <= myt_hour < 14) or (18 <= myt_hour < 20) or (0 <= myt_hour < 2) or (6 <= myt_hour < 8)
 
             for participant in participants:
                 all_holdings = db_manager.get_all_active_holdings()
@@ -1783,10 +1785,12 @@ def run_robo_trade_loop():
                         if h_hard_veto or h_score < 8.5:
                             should_exit = True
                             exit_reason = f"Version 82 Protection Exit (Score: {h_score:.1f} Pts < 8.5 OR Hard Veto: {h_hard_veto})"
-                        elif is_12pm_2hr_window and h_net >= min_required_net:
-                            # VERSION 94: Daily 12:00 PM - 2:00 PM MYT 2-Hour Golden Opportunity Exit Window (Both Bot Groups Allowed to Exit when Net PnL >= +$0.05 USD / Fee + Profit Covered)
+                        elif is_golden_opportunity_window and h_net >= min_required_net:
+                            # VERSION 97.1: Every 6-Hour Interval 2-Hour Golden Opportunity Exit Window (12PM-2PM, 6PM-8PM, 12AM-2AM, 6AM-8AM MYT)
+                            # Both Bot Groups Allowed to Exit when Net PnL >= +$0.05 USD (Covering 0.20% fee + Net Profit)
                             should_exit = True
-                            exit_reason = f"Daily 12:00-2:00 PM MYT 2-Hour Golden Opportunity Exit (Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD [Covered 0.2% Fee + Profit])"
+                            session_str = "12PM-2PM" if 12 <= myt_hour < 14 else ("6PM-8PM" if 18 <= myt_hour < 20 else ("12AM-2AM" if 0 <= myt_hour < 2 else "6AM-8AM"))
+                            exit_reason = f"Golden Opportunity Exit [{session_str} MYT Window] (Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD [Covered 0.2% Fee + Profit])"
                         elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_required_net:
                             # VERSION 97: STAGE 7 FORMULA #5 MASTER UPGRADE - SUPREME GOD AI VELOCITY EXIT & DYNAMIC CAPITAL RECYCLER
                             # If Supreme God AI Bot holds a position for > 45 minutes (2700s) and Net PnL >= +$0.05 USD (covering 0.20% fee + net profit),
