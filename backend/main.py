@@ -1518,7 +1518,7 @@ def run_robo_trade_loop():
             # Calculate Malaysia Local Time (MYT = UTC + 8)
             utc_now = datetime.datetime.utcnow()
             myt_now = utc_now + datetime.timedelta(hours=8)
-            is_12pm_5min_window = (myt_now.hour == 12 and 0 <= myt_now.minute < 5)
+            is_12pm_2hr_window = (12 <= myt_now.hour < 14)  # 12:00 PM to 2:00 PM MYT (2 Hours)
 
             for participant in participants:
                 all_holdings = db_manager.get_all_active_holdings()
@@ -1740,21 +1740,44 @@ def run_robo_trade_loop():
                         peak_pnl_pct = ((highest_p - entry) / entry) * 100.0 if entry > 0 else 0.0
                         curr_pnl_pct = ((curr_price - entry) / entry) * 100.0 if entry > 0 else 0.0
 
+                        # Calculate holding duration in seconds
+                        created_at_val = holding.get("created_at")
+                        holding_sec = 0
+                        if created_at_val:
+                            try:
+                                if isinstance(created_at_val, (int, float)):
+                                    holding_sec = time.time() - created_at_val
+                                else:
+                                    c_str = str(created_at_val).split(".")[0]
+                                    c_dt = datetime.datetime.strptime(c_str, "%Y-%m-%d %H:%M:%S")
+                                    holding_sec = (datetime.datetime.utcnow() - c_dt).total_seconds()
+                            except Exception:
+                                holding_sec = 0
+
                         # Exit Condition Check
                         should_exit = False
                         exit_reason = ""
+
+                        # Calculate net PnL and fee requirements
+                        h_cap = entry * amount
+                        h_fee = round(h_cap * 0.002, 4)  # 0.20% Commission Fee
+                        h_net = round(trade_pnl - h_fee, 4)
+                        min_required_net = round(h_cap * 0.0025, 4) # 0.25% Net Profit ($0.05 USD on $20 capital)
 
                         # GOD OF TRADE STAGE 7 TRAILING EXIT & PROTECTION ENGINE:
                         # 1. Real-Time Invalidation Exit: If score < 8.5 Pts OR Hard Veto is True!
                         if h_hard_veto or h_score < 8.5:
                             should_exit = True
                             exit_reason = f"Version 82 Protection Exit (Score: {h_score:.1f} Pts < 8.5 OR Hard Veto: {h_hard_veto})"
-                        elif is_12pm_5min_window and (trade_pnl >= (entry * amount * 0.003)):
-                            # Daily 12:00 PM - 12:05 PM MYT Golden 5-Minute Window: Requires Gross PnL >= +0.30% ($0.06 USD on $20 trade) to fully cover 0.20% fee + profit
-                            h_fee = round((entry * amount) * 0.002, 4)
-                            h_net = round(trade_pnl - h_fee, 4)
+                        elif is_12pm_2hr_window and h_net >= min_required_net:
+                            # VERSION 94: Daily 12:00 PM - 2:00 PM MYT 2-Hour Golden Opportunity Exit Window (Both Bot Groups Allowed to Exit when Net PnL >= +$0.05 USD / Fee + Profit Covered)
                             should_exit = True
-                            exit_reason = f"Daily 12:00-12:05 PM MYT Golden 5-Min Opportunity Exit (Gross PnL: +${trade_pnl:.4f} [>= +0.30%], Net PnL: +${h_net:.4f})"
+                            exit_reason = f"Daily 12:00-2:00 PM MYT 2-Hour Golden Opportunity Exit (Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD [Covered 0.2% Fee + Profit])"
+                        elif "GOD" in participant and holding_sec >= 7200 and h_net >= min_required_net:
+                            # STAGE 7 FORMULA #5: 2-HOUR HOLDING CAPITAL RECYCLE EXIT PRIVILEGE (ONLY FOR GOD OF TRADE)
+                            # If God AI Bot holds a position for > 2 hours and Net PnL >= +$0.05 USD (Capital * 0.25% after 0.20% fee), exit to recycle capital!
+                            should_exit = True
+                            exit_reason = f"👑 God of Trade 2-Hour Capital Recycle Exit (Formula #5) (Holding Time: {holding_sec/3600.0:.1f}h >= 2.0h, Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD)"
                         elif peak_pnl_pct >= 4.0:
                             # Rule 2: If Profit reached >= +4.0% at peak, IMMEDIATELY Lock Stop Loss at +3.50% (Entry * 1.035) or higher trailing (Peak - 1.5%)!
                             trailing_sl_price = max(entry * 1.035, highest_p * 0.985)

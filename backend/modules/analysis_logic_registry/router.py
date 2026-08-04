@@ -70,11 +70,11 @@ analysis_rules_db = [
     },
     {
         "id": "STAGE-7-GOD-PRIVILEGES",
-        "logic_name": "Stage 7 (Formula #3 & #4): Supreme God AI Exclusive Execution, Pullback Scan & Rotation Privileges",
-        "target_scope": "👑 God of Trade AI Exclusive Portfolio Scaling & Pullback Defense",
+        "logic_name": "Stage 7 (Formula #3, #4 & #5): Supreme God AI Exclusive Execution, Pullback Scan & 2-Hour Capital Recycle",
+        "target_scope": "👑 God of Trade AI Exclusive Portfolio Scaling & Capital Recycling",
         "assigned_agent": "👑 Supreme God AI (Master Strategy Architect)",
-        "rule_type": "Exclusive AI Privilege & 3 S/R Pairs Pullback Defense",
-        "description": "1. Grade S Priority Scale-In (Score >= 9.5 Pts): Immediately prioritizes Grade S setups for scale-in entries.\n2. Peak-Trailing Stop Lock (Peak >= +4.0%): Immediately locks Stop Loss at +3.50% (Entry * 1.035) or Peak - 1.5%.\n3. Grade S Position Rotation (Formula #3): If 5 holdings are open and a queued coin score is >= 9.0 Pts, Supreme God AI Bot automatically exits the lowest PnL holding position to scale into the higher-scoring Grade S setup!\n4. 3 S/R Pairs Pullback Scan (Formula #4): Before entry, scans 3 pairs of Weak/Strong Support & Resistance levels (5M Micro, 1H Structural, 4H Wholesale) for pullback defense.\n5. Golden Opportunity Window (12:00-12:05 PM MYT): Exits holding coins when Gross PnL >= +0.30% ($0.06 USD on $20 trade).\n6. Delisted Binance Safety Filter: Excludes delisted, inactive, currency, and meme coins universally."
+        "rule_type": "Exclusive AI Privilege & 2-Hour Capital Recycle Engine",
+        "description": "1. Grade S Priority Scale-In (Score >= 9.5 Pts): Immediately prioritizes Grade S setups for scale-in entries.\n2. Peak-Trailing Stop Lock (Peak >= +4.0%): Immediately locks Stop Loss at +3.50% (Entry * 1.035) or Peak - 1.5%.\n3. Grade S Position Rotation (Formula #3): If 5 holdings are open and a queued coin score is >= 9.0 Pts, Supreme God AI Bot automatically exits the lowest PnL holding position to scale into the higher-scoring Grade S setup!\n4. 3 S/R Pairs Pullback Scan (Formula #4): Before entry, scans 3 pairs of Weak/Strong Support & Resistance levels (5M Micro, 1H Structural, 4H Wholesale) for pullback defense.\n5. 2-Hour Capital Recycle Exit (Formula #5): If God AI Bot holds a position for > 2 hours and Net PnL >= +$0.05 USD (Capital * 0.25% after 0.20% fee), it automatically exits to recycle capital into fresh Grade S setups!\n6. Daily 12:00-2:00 PM MYT 2-Hour Golden Opportunity Window: BOTH bot groups (God AI & Group C) exit active holding positions when Net PnL >= +$0.05 USD (covering 0.20% fee + net profit).\n7. Delisted Binance Safety Filter: Excludes delisted, inactive, currency, and meme coins universally."
     },
     {
         "id": "STAGE-8-IRON-RULE",
