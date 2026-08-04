@@ -1,0 +1,28 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*.class
+*.so
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv
+
+# Environment & Credentials
+.env
+
+# Local SQLite Database & Local Binaries
+*.db
+*.sqlite
+*.sqlite3
+tursodb.exe
+auth
+auth-wal
+
+# Editor & OS Temp Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

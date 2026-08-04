@@ -1,0 +1,6 @@
+/* VERSION 50: SINGLE STREAM HUB MODULE STYLES */
+.pulse-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f0ff, transparent);
+  animation: pulse 2s infinite;
+}

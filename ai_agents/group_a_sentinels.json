@@ -1,0 +1,43 @@
+{
+  "group_name": "Group A - 30m Market Structure Sentinels",
+  "total_agents": 5,
+  "execution_interval": "30 Minutes",
+  "governance": "Supervised by 👑 God of Trade Supreme AI",
+  "agents": [
+    {
+      "id": 1,
+      "name": "🤖 DeepSeek-R1 Logic Sentinel",
+      "specialization": "Wyckoff Phase C Spring & Bearish Absorption Floor Audit",
+      "target_scope": "God List Selection & God Mode AI",
+      "connection": "Monitors 30m structural trend. Filters out bearish coins unless price touches strong support floor."
+    },
+    {
+      "id": 2,
+      "name": "🤖 Llama-3.3 Financial Master",
+      "specialization": "Minervini Volatility Contraction Pattern (VCP) & Pre-Breakout Compression",
+      "target_scope": "Pre-Breakout Trigger Detection",
+      "connection": "Identifies narrowing volatility contractions before explosive markup runs."
+    },
+    {
+      "id": 3,
+      "name": "🤖 Mistral Large Quant Sentinel",
+      "specialization": "Volume Profile (POC) & Volume Weighted Average Price (VWAP) Ratios",
+      "target_scope": "Institutional Flow Validation",
+      "connection": "Verifies that high-volume Point of Control supports current market structure."
+    },
+    {
+      "id": 4,
+      "name": "🤖 Qwen-2.5 Macro Scout",
+      "specialization": "24-Hour Volatility Expansion & Market Momentum Ranking",
+      "target_scope": "Top Yield Candidate Ranking",
+      "connection": "Sorts coins by 15%+ daily yield potential and momentum momentum spikes."
+    },
+    {
+      "id": 5,
+      "name": "🤖 Claude-3.5 Sonnet Emulator",
+      "specialization": "RSI / MACD Bullish & Bearish Divergence Confluence",
+      "target_scope": "Momentum Oscillator Divergence Audit",
+      "connection": "Detects early RSI/MACD bullish divergence at key structural demand zones."
+    }
+  ]
+}

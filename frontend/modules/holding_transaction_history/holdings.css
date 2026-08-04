@@ -1,0 +1,4 @@
+/* VERSION 50: HOLDING & TRANSACTION HISTORY MODULE STYLES */
+#activeHoldingsTableBody tr:hover, #transactionHistoryTableBody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}

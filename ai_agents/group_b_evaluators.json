@@ -1,0 +1,43 @@
+{
+  "group_name": "Group B - 15m Market Microstructure Evaluators",
+  "total_agents": 5,
+  "execution_interval": "15 Minutes",
+  "governance": "Supervised by 👑 God of Trade Supreme AI",
+  "agents": [
+    {
+      "id": 6,
+      "name": "🤖 Phi-4 SMC Auditor",
+      "specialization": "Fair Value Gaps (FVG) & Smart Money Order Block Mitigations",
+      "target_scope": "SMC Precision Entry Points",
+      "connection": "Identifies unmitigated order blocks and FVG liquidity imbalances on 15m candles."
+    },
+    {
+      "id": 7,
+      "name": "🤖 Yi-Lightning Momentum Analyst",
+      "specialization": "15m Impulse Wave Acceleration & Trend Continuation",
+      "target_scope": "Short-Term Momentum Confirmation",
+      "connection": "Validates that entry impulse wave has sufficient velocity to touch target exit price."
+    },
+    {
+      "id": 8,
+      "name": "🤖 Gemma-2 Microstructure Scout",
+      "specialization": "Liquidity Sweeps & Stop Runs Above/Below Key Swings",
+      "target_scope": "Liquidity Trap Filter",
+      "connection": "Ensures trade entry does not occur immediately prior to an institutional liquidity sweep."
+    },
+    {
+      "id": 9,
+      "name": "🤖 DeepSeek-V3 Order Flow Agent",
+      "specialization": "15m Order Flow Imbalances & Buy Wall vs Sell Wall Ratios",
+      "target_scope": "Order Book Liquidity Imbalance",
+      "connection": "Verifies buy pressure imbalance exceeds sell pressure by at least 2.5:1."
+    },
+    {
+      "id": 10,
+      "name": "🤖 DeepMind AlphaQuant Evaluator",
+      "specialization": "3 Pairs of Strong/Weak Support & Resistance Levels",
+      "target_scope": "Multi-Layer SR Mapping",
+      "connection": "Calculates exact target exit prices based on 3 tiers of resistance."
+    }
+  ]
+}

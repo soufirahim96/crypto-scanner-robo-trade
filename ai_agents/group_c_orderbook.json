@@ -1,0 +1,43 @@
+{
+  "group_name": "Group C - 1s Level-2 Order Book Executioners",
+  "total_agents": 5,
+  "execution_interval": "1 Second (Streaming)",
+  "governance": "Supervised by 👑 God of Trade Supreme AI",
+  "agents": [
+    {
+      "id": 11,
+      "name": "🤖 OB Depth Sentinel Alpha",
+      "specialization": "1-Second Level-2 Bid Queue & Limit Order Tracking",
+      "target_scope": "User & Bot Limit Queue Matching",
+      "connection": "Streams bid depth to confirm when price touches limit queued entry price."
+    },
+    {
+      "id": 12,
+      "name": "🤖 OB Depth Sentinel Beta",
+      "specialization": "1-Second Level-2 Ask Queue & Limit Order Tracking",
+      "target_scope": "Target Exit Queue Matching",
+      "connection": "Streams ask depth to confirm when price touches target exit price."
+    },
+    {
+      "id": 13,
+      "name": "🤖 Spread Delta Sentinel",
+      "specialization": "Cross-Exchange (Binance vs HTX) Arbitrage Spreads",
+      "target_scope": "Spread Friction Guard",
+      "connection": "Prevents execution if spread friction or exchange discrepancy exceeds 0.15%."
+    },
+    {
+      "id": 14,
+      "name": "🤖 Auto-Snipe Execution Agent",
+      "specialization": "Paper Trade Execution & Position Sizing ($20 USD Allocation)",
+      "target_scope": "Position Sizing & Holding Synchronization",
+      "connection": "Executes limit orders into active holdings table with exact token position sizing."
+    },
+    {
+      "id": 15,
+      "name": "🤖 Risk Guard & Stop Agent",
+      "specialization": "Trailing Breakeven Stops & Hard Risk Protection",
+      "target_scope": "Live Holding PnL Guard",
+      "connection": "Syncs real-time live PnL with Live Crypto Scanner dashboard."
+    }
+  ]
+}

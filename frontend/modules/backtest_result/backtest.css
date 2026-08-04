@@ -1,0 +1,5 @@
+/* VERSION 50: BACKTEST RESULT MODULE STYLES */
+#backtestCoinsList .backtest-coin-item:hover {
+  background: rgba(240, 185, 11, 0.2);
+  cursor: pointer;
+}

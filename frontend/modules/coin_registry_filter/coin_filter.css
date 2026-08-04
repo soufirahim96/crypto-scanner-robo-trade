@@ -1,0 +1,4 @@
+/* VERSION 50: COIN REGISTRY & FILTER MODULE STYLES */
+#coinsTableBody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}

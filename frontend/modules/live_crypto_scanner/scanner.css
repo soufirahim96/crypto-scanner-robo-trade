@@ -1,0 +1,8 @@
+/* VERSION 50: LIVE CRYPTO SCANNER & ROBO TRADE ARENA MODULE STYLES */
+#roboTradeArena {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(240, 185, 11, 0.5);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 15px rgba(240, 185, 11, 0.2);
+}

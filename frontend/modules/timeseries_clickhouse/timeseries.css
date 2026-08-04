@@ -1,0 +1,7 @@
+/* VERSION 50: TIMESERIES CLICKHOUSE MODULE STYLES */
+.stream-architecture-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}

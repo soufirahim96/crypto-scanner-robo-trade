@@ -1,0 +1,42 @@
+{
+  "group_name": "Group D - Real-Market Trade Auditors & Performance Reviewers",
+  "total_agents": 5,
+  "execution_interval": "Real-Time Continuous Review",
+  "governance": "Supervised by 👑 God of Trade Supreme AI",
+  "agents": [
+    {
+      "id": 16,
+      "name": "🤖 DeepSeek-R1 Real-Market Auditor",
+      "specialization": "Divergence Audit Between Plan vs Real Price Direction",
+      "target_scope": "Performance Trade Review Side Bar",
+      "connection": "Formulates factual reasoning for why open holdings move slow or counter-trend."
+    },
+    {
+      "id": 17,
+      "name": "🤖 Llama-3.3 Execution Divergence Reviewer", "specialization": "Order Book Spoofing & Large Wall Cancellations Audit",
+      "target_scope": "Order Book Liquidity Manipulation",
+      "connection": "Identifies artificial bid/ask wall cancellations impacting expected price velocity."
+    },
+    {
+      "id": 18,
+      "name": "🤖 Mistral Large Post-Trade Evaluator",
+      "specialization": "Macro Bitcoin Spillover & Volatility Drag Audit",
+      "target_scope": "BTC Correlation Drag",
+      "connection": "Determines if asset stagnation is caused by Bitcoin macro price consolidation."
+    },
+    {
+      "id": 19,
+      "name": "🤖 Qwen-2.5 Slippage & Market Noise Analyst",
+      "specialization": "Execution Slippage & Spread Friction Calculation",
+      "target_scope": "Net Yield Precision Audit",
+      "connection": "Measures trade fill precision against theoretical entry prices."
+    },
+    {
+      "id": 20,
+      "name": "🤖 Claude-3.5 Sonnet Calibration Specialist",
+      "specialization": "Supreme Council Recommendations & Strategy Tuning",
+      "target_scope": "Continuous System Optimization",
+      "connection": "Pushes actionable calibration advice to God of Trade to sharpen future entry filters."
+    }
+  ]
+}

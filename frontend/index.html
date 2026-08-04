@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soufi Crypto Scanner — Real-Time Confluence Engine</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=50.0">
+
+  <!-- VERSION 50: MODULAR SECTION STYLES -->
+  <link rel="stylesheet" href="modules/live_crypto_scanner/scanner.css?v=50.0">
+  <link rel="stylesheet" href="modules/holding_transaction_history/holdings.css?v=50.0">
+  <link rel="stylesheet" href="modules/analysis_logic_registry/analysis_logic.css?v=50.0">
+  <link rel="stylesheet" href="modules/performance_trade_review/performance_review.css?v=50.0">
+  <link rel="stylesheet" href="modules/backtest_result/backtest.css?v=50.0">
+  <link rel="stylesheet" href="modules/timeseries_clickhouse/timeseries.css?v=50.0">
+  <link rel="stylesheet" href="modules/user_management/user_mgmt.css?v=50.0">
+  <link rel="stylesheet" href="modules/coin_registry_filter/coin_filter.css?v=50.0">
+  <link rel="stylesheet" href="modules/single_stream_hub/single_stream.css?v=50.0">
+</head>
+<body>
+
+  <!-- AUTHENTICATION OVERLAY (LOGIN / REGISTER) -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-card glass-panel">
+      <div class="auth-header">
+        <div class="brand-logo">
+          <i class="fa-solid fa-bolt-lightning text-gradient"></i>
+          <span>CryptoScanner</span>
+        </div>
+        <p class="auth-subtitle" id="authSubtitle">Login to access high-throughput crypto scanner</p>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="loginForm" class="auth-form active">
+        <div class="input-group">
+          <label><i class="fa-solid fa-user"></i> Username</label>
+          <input type="text" id="loginUsername" placeholder="Enter your username" required autocomplete="username">
+        </div>
+        <div class="input-group">
+          <label><i class="fa-solid fa-lock"></i> Password</label>
+          <input type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-primary w-full">
+          <span>Login to Scanner</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button type="button" id="quickAdminLoginBtn" class="btn-secondary w-full" style="margin-top: 0.5rem; background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 700; padding: 0.6rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          <i class="fa-solid fa-user-shield"></i>
+          <span>🔑 Quick Login as Admin (admin / admin123)</span>
+        </button>
+        <button type="button" id="instantBypassLoginBtn" class="btn-secondary w-full" style="margin-top: 0.5rem; background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(0, 240, 255, 0.2)); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 800; padding: 0.75rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);">
+          <i class="fa-solid fa-lock-open"></i>
+          <span>🔓 Instant Unlock System as Admin (Bypass Login)</span>
+        </button>
+        <div class="auth-switch">
+          <span>Don't have an account?</span>
+          <a href="#" id="showRegisterBtn">Register Now</a>
+        </div>
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="registerForm" class="auth-form hidden">
+        <div class="form-row">
+          <div class="input-group">
+            <label><i class="fa-solid fa-id-card"></i> First Name</label>
+            <input type="text" id="regFirstName" placeholder="John" required>
+          </div>
+          <div class="input-group">
+            <label><i class="fa-solid fa-id-card"></i> Last Name</label>
+            <input type="text" id="regLastName" placeholder="Doe" required>
+          </div>
+        </div>
+        <div class="input-group">
+          <label><i class="fa-solid fa-envelope"></i> Email Address</label>
+          <input type="email" id="regEmail" placeholder="john@example.com" required>
+        </div>
+        <div class="input-group">
+          <label><i class="fa-solid fa-user-tag"></i> Username</label>
+          <input type="text" id="regUsername" placeholder="johndoe32" required>
+        </div>
+        <div class="input-group">
+          <label><i class="fa-solid fa-key"></i> Password</label>
+          <input type="password" id="regPassword" placeholder="Create a strong password" required>
+        </div>
+        <button type="submit" class="btn-primary w-full">
+          <span>Create Account & Hash 32 ID</span>
+          <i class="fa-solid fa-user-plus"></i>
+        </button>
+        <div class="auth-switch">
+          <span>Already registered?</span>
+          <a href="#" id="showLoginBtn">Back to Login</a>
+        </div>
+      </form>
+
+      <div id="authAlert" class="auth-alert hidden"></div>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER (REQUIRES LOGIN) -->
+  <div id="appContainer" class="app-container hidden">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="sidebar" class="sidebar glass-panel">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-bolt-lightning text-gradient"></i>
+        </div>
+        <div class="brand-text">
+          <span class="title">Soufi Crypto Scanner</span>
+          <span class="badge-mini">LIVE SYSTEM v6.0</span>
+        </div>
+        <button id="mobileCloseSidebar" class="mobile-only close-sidebar-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#scanner" class="nav-item active" data-tab="scanner">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Live Crypto Scanner</span>
+        </a>
+        <a href="#holdings" class="nav-item" data-tab="holdings">
+          <i class="fa-solid fa-wallet"></i>
+          <span>Holding & Transaction History</span>
+        </a>
+        <a href="#analysis-logic" class="nav-item" data-tab="analysis-logic">
+          <i class="fa-solid fa-brain"></i>
+          <span>Analysis Logic Registry</span>
+        </a>
+        <a href="#robo-trade" class="nav-item" data-tab="robo-trade">
+          <i class="fa-solid fa-robot"></i>
+          <span>Robo Trade</span>
+        </a>
+        <button id="sidebarResetRoboBtn" type="button" class="btn-secondary" style="margin: 0.2rem 0.75rem 0.6rem 0.75rem; width: calc(100% - 1.5rem); padding: 0.35rem 0.6rem; font-size: 0.72rem; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+          <i class="fa-solid fa-power-off"></i> Reset Robo Trade
+        </button>
+        <a href="#performance-review" class="nav-item" data-tab="performance-review">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Performance Trade Review</span>
+        </a>
+        <a href="#backtest" class="nav-item" data-tab="backtest">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>Backtest Result</span>
+        </a>
+        <a href="#timeseries" class="nav-item" data-tab="timeseries">
+          <i class="fa-solid fa-database"></i>
+          <span>Time-Series ClickHouse</span>
+        </a>
+        <a href="#users" class="nav-item" data-tab="users">
+          <i class="fa-solid fa-users"></i>
+          <span>User Management</span>
+          <span class="user-badge" id="navUserCount">1</span>
+        </a>
+        <a href="#coins" class="nav-item" data-tab="coins" style="display: none;">
+          <i class="fa-solid fa-coins"></i>
+          <span>Coin Registry & Filter</span>
+          <span class="user-badge" id="navCoinCount">0</span>
+        </a>
+        <a href="#stream" class="nav-item" data-tab="stream">
+          <i class="fa-solid fa-network-wired"></i>
+          <span>Single Stream Hub</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="system-status">
+          <div class="status-indicator live"></div>
+          <div class="status-text">
+            <span class="status-title">1 Connection Engine</span>
+            <span class="status-sub" id="wsRateText">0 Ticks/sec</span>
+          </div>
+        </div>
+        <div class="user-profile-widget">
+          <div class="avatar" id="userAvatar">A</div>
+          <div class="user-info">
+            <span class="username" id="sidebarUsername">Admin</span>
+            <span class="user-id-short" id="sidebarShortId">32-Hash User</span>
+          </div>
+          <button id="logoutBtn" title="Logout" class="logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+      <!-- TOP HEADER BAR -->
+      <header class="top-bar glass-panel">
+        <div class="top-left">
+          <button id="mobileMenuBtn" class="mobile-only menu-btn">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="page-header-title">
+            <h1 id="pageTitle">Live Market Scanner</h1>
+            <span class="connection-badge">
+              <i class="fa-solid fa-wifi live-pulse"></i> Binance Multiplex (1 WS)
+            </span>
+          </div>
+        </div>
+
+        <div class="top-right">
+          <div class="metric-pill">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Throughput:</span>
+            <strong id="headerTicksPerSec">0 Ticks/s</strong>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-server"></i>
+            <span>ClickHouse DB:</span>
+            <strong id="headerDbStatus" class="text-success">Connected</strong>
+          </div>
+        </div>
+      </header>
+
+      <!-- TAB 1: LIVE CRYPTO SCANNER & INTERACTIVE COIN GRAPH (VERSION 4) -->
+      <section id="tab-scanner" class="tab-pane active">
+        
+        <!-- VERSION 28: 15 UNDERLING AI AGENT COMMAND CENTER -->
+        <div id="aiAgentsCommandCenter" class="content-panel glass-panel mb-4" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(17, 24, 39, 0.9)); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 16px; padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(168, 85, 247, 0.2); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="badge-mini" style="background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 800; padding: 0.25rem 0.75rem;">
+                  <i class="fa-solid fa-users-gear"></i> 15 UNDERLING AI AGENT LEGION
+                </span>
+                <span style="font-size: 0.75rem; color: #00f0ff; font-weight: 700;">100% Free Open AI Models | Infinite Token Pool Access</span>
+              </div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-top: 0.3rem;">
+                🤖 Autonomous AI Hierarchy under Supreme God of Trade Governance
+              </h3>
+            </div>
+            <div style="text-align: right;">
+              <span class="status-pill active" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <span class="status-dot"></span> All 15 Sub-Agents Active (99.4% Consensus)
+              </span>
+            </div>
+          </div>
+
+          <!-- 3 GROUP TIERS GRID -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; font-size: 0.76rem;">
+            <!-- GROUP A: 30-MIN SENTINEL AI AGENTS -->
+            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px; padding: 0.75rem;">
+              <div style="color: #3b82f6; font-weight: 800; font-size: 0.82rem; margin-bottom: 0.4rem; border-bottom: 1px dashed rgba(59, 130, 246, 0.3); padding-bottom: 0.3rem;">
+                <i class="fa-solid fa-shield-halved"></i> GROUP A: 5 Logic Sentinels (30m Interval)
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; color: #fff;">
+                <li>🟢 DeepSeek-R1 (Wyckoff Spring Audit)</li>
+                <li>🟢 Llama-3.3 (Minervini VCP Audit)</li>
+                <li>🟢 Mistral Large (VWAP & Volume Ratios)</li>
+                <li>🟢 Qwen-2.5 (24h Volatility Scout)</li>
+                <li>🟢 Claude-3.5 (RSI/MACD Divergence)</li>
+              </ul>
+            </div>
+
+            <!-- GROUP B: 15-MIN EVALUATION AI AGENTS -->
+            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(240, 185, 11, 0.3); border-radius: 10px; padding: 0.75rem;">
+              <div style="color: #f0b90b; font-weight: 800; font-size: 0.82rem; margin-bottom: 0.4rem; border-bottom: 1px dashed rgba(240, 185, 11, 0.3); padding-bottom: 0.3rem;">
+                <i class="fa-solid fa-calculator"></i> GROUP B: 5 Precision Evaluators (15m Interval)
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; color: #fff;">
+                <li>🟡 Phi-4 (FVG & Order Block Mitigations)</li>
+                <li>🟡 Yi-Lightning (15m Impulse Wave)</li>
+                <li>🟡 Gemma-2 (Microstructure & Sweeps)</li>
+                <li>🟡 DeepSeek-V3 (Buy/Sell Wall Ratios)</li>
+                <li>🟡 AlphaQuant (3 Pairs of S/R Levels)</li>
+              </ul>
+            </div>
+
+            <!-- GROUP C: 1-SECOND ORDER BOOK & EXECUTION AGENTS -->
+            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 0.75rem;">
+              <div style="color: #10b981; font-weight: 800; font-size: 0.82rem; margin-bottom: 0.4rem; border-bottom: 1px dashed rgba(16, 185, 129, 0.3); padding-bottom: 0.3rem;">
+                <i class="fa-solid fa-bolt-lightning"></i> GROUP C: 5 OB & Trade Exec (1s Interval)
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; color: #fff;">
+                <li>⚡ OB Depth Alpha (1s Level-2 Bids Monitor)</li>
+                <li>⚡ OB Depth Beta (1s Level-2 Asks Monitor)</li>
+                <li>⚡ Spread Delta (Binance vs HTX Arbitrage)</li>
+                <li>⚡ Auto-Snipe Exec (Paper Trade Trigger)</li>
+                <li>⚡ Risk Guard (Trailing Stop & Hard Stop)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- VERSION 24: STANDALONE GOD OF TRADE PRECIOSITY HALL (POSITIONED DIRECTLY ABOVE MARKET SCANNER LEADERBOARD) -->
+        <div id="godOfTradeHall" class="content-panel glass-panel mb-4" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.9)); border: 1px solid rgba(240, 185, 11, 0.4); box-shadow: 0 10px 30px rgba(240, 185, 11, 0.15); border-radius: 16px; padding: 1.25rem;">
+          <div class="panel-header-standard" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(240, 185, 11, 0.2); padding-bottom: 0.85rem; margin-bottom: 1rem;">
+            <div class="header-left">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <span class="badge-mini" style="background: rgba(240, 185, 11, 0.25); color: #f0b90b; border: 1px solid rgba(240, 185, 11, 0.5); font-weight: 800; font-size: 0.85rem; padding: 0.3rem 0.85rem; border-radius: 20px;">
+                  <i class="fa-solid fa-crown"></i> GOD OF TRADE PRECIOSITY HALL
+                </span>
+                <span style="font-size: 0.75rem; color: #a855f7; font-weight: 700;">Synthesized from 30+ Elite Wall St & Crypto Masters</span>
+              </div>
+              <h2 style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-top: 0.35rem;">
+                👑 15 Special Sniper Coins for Today (High-Probability Confluence)
+              </h2>
+              <p class="text-muted" style="font-size: 0.82rem; margin-top: 0.1rem;">
+                Hand-picked by the God of Trade using deep institutional volume profile, SMC order block confluence & 98% accuracy precision. (Strict Limit: 2 Max Entries/Day)
+              </p>
+            </div>
+            <div class="header-right" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem;">
+              <span class="status-pill active" style="background: rgba(240, 185, 11, 0.15); color: #f0b90b; border: 1px solid rgba(240, 185, 11, 0.3);">
+                <span class="status-dot" style="background: #f0b90b;"></span> 15 God Targets Active
+              </span>
+              <span id="godListTimerBadge" class="badge-mini" style="background: rgba(6, 182, 212, 0.15); color: #00f0ff; border: 1px solid rgba(6, 182, 212, 0.3); font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 12px;">
+                <i class="fa-solid fa-clock"></i> 30m Auto-Refresh: <span id="godRefreshCountdown">30:00</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- GOD LIST SNIPER CARDS CAROUSEL / GRID -->
+          <div id="godListGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.85rem;">
+            <!-- Rendered dynamically by app.js -->
+          </div>
+        </div>
+
+        <!-- VIEW A: COIN TABLE LISTING (MAX 30 COINS) -->
+        <div id="coinTableView" class="content-panel glass-panel">
+          <div class="panel-header-standard">
+            <div class="header-left">
+              <h3><i class="fa-solid fa-chart-simple"></i> Market Scanner Leaderboards</h3>
+              <!-- STANDARDIZED SEGMENTED CONTROL -->
+              <div class="segmented-control">
+                <button class="seg-tab active" data-category="all">
+                  <i class="fa-solid fa-border-all"></i> All Pairs (Max 30)
+                </button>
+                <button class="seg-tab" data-category="gainers">
+                  <i class="fa-solid fa-arrow-trend-up"></i> Top 20 Gainers
+                </button>
+                <button class="seg-tab" data-category="losers">
+                  <i class="fa-solid fa-arrow-trend-down"></i> Top 20 Losers
+                </button>
+                <button class="seg-tab" data-category="volume">
+                  <i class="fa-solid fa-chart-column"></i> Top 20 Volume
+                </button>
+                <button class="seg-tab" data-category="volatile">
+                  <i class="fa-solid fa-bolt-lightning text-yellow"></i> Top 20 Volatile
+                </button>
+                <button class="seg-tab" data-category="bullish_ai">
+                  <i class="fa-solid fa-rocket text-cyan"></i> Top 20 Bullish AI
+                </button>
+                <button class="seg-tab" data-category="hot">
+                  <i class="fa-solid fa-fire"></i> Hot Coins
+                </button>
+                <button class="seg-tab" data-category="new">
+                  <i class="fa-solid fa-sparkles"></i> New Coins
+                </button>
+              </div>
+            </div>
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="scannerSearch" placeholder="Search symbol (e.g. BTC, ETH)...">
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="custom-table" id="scannerTable">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Exchange</th>
+                  <th>Last Price</th>
+                  <th>24h Change</th>
+                  <th>High / Low</th>
+                  <th>Volume (24h)</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="scannerTableBody">
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Connecting to Binance multiplexed 1-connection stream...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- VIEW B: INTERACTIVE SELECTED COIN GRAPH & MARKET DETAILS (VERSION 4) -->
+        <div id="coinGraphView" class="content-panel glass-panel hidden">
+          <div class="panel-header-standard">
+            <div class="header-left">
+              <button id="backToCoinsBtn" class="btn-primary" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">
+                <i class="fa-solid fa-arrow-left"></i> Back to Coin Listing
+              </button>
+              <div class="coin-header-info mt-2">
+                <span class="badge-mini text-cyan" id="chartCoinBadge">BINANCE SINGLE STREAM</span>
+                <h2 id="chartCoinSymbol" style="font-size: 1.8rem; font-weight: 800; font-family: var(--font-mono); margin-top: 0.2rem;">BTCUSDT</h2>
+              </div>
+
+              <!-- TIMEFRAME SELECTORS (1m, 3m, 5m, 15m, 30m, 1h, 3h, 1d, 1w, 1M) -->
+              <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem;">
+                <div class="panel-badge" style="background: rgba(14, 203, 129, 0.15); color: #0ecb81; border: 1px solid rgba(14, 203, 129, 0.3); padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem;">
+                  <i class="fa-solid fa-chart-bar"></i> Binance TradingView Candlestick Engine
+                </div>
+
+                <div class="segmented-control" id="timeframeSelector">
+                  <button class="timeframe-btn active" data-tf="1m">1m</button>
+                  <button class="timeframe-btn" data-tf="3m">3m</button>
+                  <button class="timeframe-btn" data-tf="5m">5m</button>
+                  <button class="timeframe-btn" data-tf="15m">15m</button>
+                  <button class="timeframe-btn" data-tf="30m">30m</button>
+                  <button class="timeframe-btn" data-tf="1h">1h</button>
+                  <button class="timeframe-btn" data-tf="3h">3h</button>
+                  <button class="timeframe-btn" data-tf="1d">1d</button>
+                  <button class="timeframe-btn" data-tf="1w">1w</button>
+                  <button class="timeframe-btn" data-tf="1M">1M</button>
+                  <button class="timeframe-btn" data-tf="1Y">1Y</button>
+                </div>
+              </div>
+
+              <!-- SEARCHABLE TRADINGVIEW INDICATORS SELECTOR (MAX 3 RESTRICTION) -->
+              <div class="indicator-toolbar mt-3" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <span class="label text-muted" style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan);">
+                  <i class="fa-solid fa-sliders"></i> Technical Indicators (Max 3):
+                </span>
+
+                <!-- SEARCHABLE INDICATOR DROPDOWN MENU -->
+                <div class="indicator-search-wrapper" style="position: relative;">
+                  <button id="openIndicatorSearchBtn" class="btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+                    <i class="fa-solid fa-plus"></i> Add Indicator
+                  </button>
+
+                  <div id="indicatorDropdownMenu" class="glass-panel hidden" style="position: absolute; top: 125%; left: 0; z-index: 200; width: 320px; padding: 0.85rem; background: #0b0f17; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.9);">
+                    <div class="search-box mb-2" style="width: 100%;">
+                      <i class="fa-solid fa-magnifying-glass"></i>
+                      <input type="text" id="indicatorSearchInput" placeholder="Search indicator (e.g. RSI, SMA, VWAP)..." style="width: 100%; font-size: 0.85rem;">
+                    </div>
+                    <div id="indicatorOptionsList" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem;">
+                      <!-- Options populated dynamically by JS -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ACTIVE INDICATORS TAGS LIST -->
+                <div id="activeIndicatorTags" style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;"></div>
+              </div>
+            </div>
+
+            <!-- LIVE PRICE & CHANGE METRICS -->
+            <div class="coin-live-stats" style="text-align: right;">
+              <span class="label text-muted" style="font-size: 0.85rem;">Last Price</span>
+              <h2 id="chartCoinPrice" style="font-family: var(--font-mono); font-weight: 800; font-size: 2rem; color: #fff;">$0.00</h2>
+              <span id="chartCoinChange" class="change-badge up"><i class="fa-solid fa-caret-up"></i> +0.00%</span>
+            </div>
+          </div>
+
+          <!-- COIN MARKET DETAIL SUMMARY BAR (HIGH, LOW, MARKET CAP, VOLUME) -->
+          <div class="db-info-grid mt-3">
+            <div class="db-card">
+              <h4>Highest Value (24h High)</h4>
+              <strong id="detailHighValue" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-green);">$0.00</strong>
+            </div>
+            <div class="db-card">
+              <h4>Lowest Value (24h Low)</h4>
+              <strong id="detailLowValue" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-red);">$0.00</strong>
+            </div>
+            <div class="db-card">
+              <h4>Total Volume (24h Volume)</h4>
+              <strong id="detailTotalVolume" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-cyan);">0.00M USDT</strong>
+            </div>
+            <div class="db-card">
+              <h4>Est. Total Market Cap</h4>
+              <strong id="detailMarketCap" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-purple);">$0.00B</strong>
+            </div>
+          </div>
+
+          <!-- MAIN CANVAS PRICE GRAPH -->
+          <div class="chart-container-box" style="position: relative; height: 350px; width: 100%; margin-top: 1.5rem;">
+            <canvas id="coinPriceChart"></canvas>
+          </div>
+
+          <!-- TRADINGVIEW SUB-INDICATOR SUB-PANEL (RSI, MACD, VOLUME, STOCHASTIC, ETC.) -->
+          <div id="subIndicatorPanel" class="mt-3 hidden" style="border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+            <div class="panel-header-standard mb-2">
+              <div class="header-left">
+                <span class="label text-muted" style="font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan);" id="subIndicatorTitle">
+                  <i class="fa-solid fa-chart-line"></i> Sub-Panel Indicator (Oscillator)
+                </span>
+              </div>
+            </div>
+            <div class="chart-container-box" style="position: relative; height: 160px; width: 100%;">
+              <canvas id="subIndicatorChart"></canvas>
+            </div>
+          </div>
+
+          <!-- VERSION 14: STANDARDIZED AI CRYPTO ANALYST PANEL -->
+          <div id="aiCryptoAnalystPanel" class="content-panel glass-panel mt-4">
+            <div class="panel-header-standard mb-3" style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="header-left">
+                <span class="label text-muted"><i class="fa-solid fa-brain text-cyan"></i> AI Trading Analyst Sub-Agent</span>
+                <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-top: 0.1rem;">75%+ Target Prediction Engine</h3>
+              </div>
+              <div class="header-right">
+                <span class="status-pill active">
+                  <span class="status-dot"></span> AI Engine Online
+                </span>
+              </div>
+            </div>
+
+            <!-- VERSION 22: 4 RISK-ADJUSTED PREDICTION MODES (SAFE, MODERATE, AGGRESSIVE, GOD MODE) -->
+            <div class="quick-ai-prompts mb-3" style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <button class="ai-preset-btn btn-secondary" data-mode="safe" data-prompt="Safe prediction with lowest risk exit and conservative target" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1); color: #10b981; font-weight: 700;">
+                <i class="fa-solid fa-shield-halved"></i> Safe Prediction (Lowest Risk)
+              </button>
+              <button class="ai-preset-btn btn-secondary" data-mode="moderate" data-prompt="Moderate prediction exit when price moves 5% to 10%" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(6, 182, 212, 0.4); background: rgba(6, 182, 212, 0.1); color: #00f0ff; font-weight: 700;">
+                <i class="fa-solid fa-scale-balanced"></i> Moderate Prediction (5% - 10% Exit)
+              </button>
+              <button class="ai-preset-btn btn-secondary" data-mode="aggressive" data-prompt="Aggressive prediction exit when price moves more than 15%" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.1); color: #a855f7; font-weight: 700;">
+                <i class="fa-solid fa-rocket"></i> Aggressive Prediction (>15% Exit)
+              </button>
+              <button class="ai-preset-btn btn-secondary" data-mode="godmode" data-prompt="God Mode multi-dimensional high-probability confluence masterclass" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; border-radius: 8px; border: 1px solid rgba(240, 185, 11, 0.5); background: linear-gradient(135deg, rgba(240, 185, 11, 0.2), rgba(234, 179, 8, 0.05)); color: #f0b90b; font-weight: 800; box-shadow: 0 0 10px rgba(240, 185, 11, 0.2);">
+                <i class="fa-solid fa-crown text-yellow"></i> 👑 God Mode Prediction (High-Probability Confluence)
+              </button>
+            </div>
+
+            <!-- AI RESPONSE DISPLAY CARD -->
+            <div id="aiResponseContainer" class="hidden mb-3 p-3" style="background: rgba(0, 0, 0, 0.35); border-radius: 10px; border: 1px solid var(--border-color);">
+              <div id="aiResponseContent"></div>
+            </div>
+
+            <!-- AI CHAT INPUT BOX -->
+            <div class="ai-input-group" style="display: flex; gap: 0.5rem;">
+              <input type="text" id="aiQueryInput" class="input-field" placeholder="Ask Group C AI Trading Analyst (e.g. 'What is the bid wall ratio and optimal entry target?')..." style="flex: 1;">
+              <button id="askAiAnalystBtn" class="btn-primary" style="padding: 0.65rem 1.3rem; font-weight: 700; white-space: nowrap;">
+                <i class="fa-solid fa-paper-plane"></i> Ask AI Analyst
+              </button>
+            </div>
+
+            <!-- GROUP C 5-AGENT AI CHATBOT RESPONSE FEED -->
+            <div id="aiChatFeedBox" style="margin-top: 0.75rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 12px; padding: 0.85rem; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div class="ai-chat-msg" style="display: flex; gap: 0.65rem; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 10px; padding: 0.65rem;">
+                <div style="font-size: 1.4rem; color: #00f0ff;"><i class="fa-solid fa-robot"></i></div>
+                <div>
+                  <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.25rem;">
+                    <strong style="color: #00f0ff; font-size: 0.82rem;">🤖 OB Depth Sentinel Beta (Group C Lead)</strong>
+                    <span class="badge-mini" style="background: rgba(0,240,255,0.15); color: #00f0ff; font-size: 0.68rem;">Group C OB Sentinels</span>
+                  </div>
+                  <p style="margin: 0; font-size: 0.8rem; color: #e2e8f0; line-height: 1.4;">
+                    Welcome! Group C 5-Agent Order Book Sentinels are standing by. Ask any question about real-time price action, order book liquidity walls, HTX arbitrage, or optimal entry queues for the selected coin!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- VERSION 27: LEVEL-2 ORDER BOOK LADDER & MULTI-EXCHANGE CROSS-COMPARISON (BINANCE VS HTX) -->
+            <div id="orderBookAndComparePanel" class="content-panel glass-panel mt-4" style="border: 1px solid rgba(240, 185, 11, 0.3); border-radius: 14px; padding: 1.25rem; background: rgba(15, 23, 42, 0.9);">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <div>
+                  <h4 style="font-weight: 800; color: #fff; margin: 0; font-size: 1.15rem;">
+                    <i class="fa-solid fa-chart-bar" style="color: #f0b90b;"></i> Level-2 Order Book Ladder & Multi-Exchange Cross-Comparison (Binance vs HTX)
+                  </h4>
+                  <span style="font-size: 0.78rem; color: var(--text-muted);">Real-time bid/ask depth ladder and cross-exchange arbitrage spread comparison</span>
+                </div>
+                <div id="arbitrageBadge" class="badge-mini" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700;">
+                  <i class="fa-solid fa-bolt"></i> Live Stream Active
+                </div>
+              </div>
+
+              <!-- GRID FOR ORDER BOOK LADDER AND HTX COMPARISON -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+                <!-- LEFT: LEVEL-2 ORDER BOOK LADDER -->
+                <div style="background: rgba(0, 0, 0, 0.35); border-radius: 10px; border: 1px solid var(--border-color); padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.82rem; font-weight: 700; color: #fff;">
+                    <span><i class="fa-solid fa-layer-group"></i> Level-2 Order Book Depth</span>
+                    <span id="obPowerRatio" style="color: #10b981;">62% Bids (Buy) / 38% Asks (Sell)</span>
+                  </div>
+
+                  <!-- POWER RATIO BAR -->
+                  <div style="height: 6px; width: 100%; background: #ef4444; border-radius: 4px; overflow: hidden; margin-bottom: 0.75rem; display: flex;">
+                    <div id="obBuyBar" style="width: 62%; background: #10b981; height: 100%;"></div>
+                  </div>
+
+                  <!-- ORDER BOOK TABLE LADDER -->
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-family: var(--font-mono); font-size: 0.75rem;">
+                    <div>
+                      <div style="color: #10b981; font-weight: 800; margin-bottom: 0.3rem; border-bottom: 1px dashed rgba(16, 185, 129, 0.3); padding-bottom: 0.2rem;">
+                        BIDS (BUY WALL)
+                      </div>
+                      <div id="obBidsList" style="display: flex; flex-direction: column; gap: 0.2rem;"></div>
+                    </div>
+                    <div>
+                      <div style="color: #ef4444; font-weight: 800; margin-bottom: 0.3rem; border-bottom: 1px dashed rgba(239, 68, 68, 0.3); padding-bottom: 0.2rem;">
+                        ASKS (SELL WALL)
+                      </div>
+                      <div id="obAsksList" style="display: flex; flex-direction: column; gap: 0.2rem;"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- RIGHT: MULTI-EXCHANGE COMPARISON (BINANCE VS HTX) -->
+                <div style="background: rgba(0, 0, 0, 0.35); border-radius: 10px; border: 1px solid var(--border-color); padding: 0.85rem;">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: #fff; margin-bottom: 0.65rem;">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Exchange Price & Liquidity Matrix (Binance vs HTX)
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <!-- BINANCE BOX -->
+                    <div style="flex: 1; background: rgba(240, 185, 11, 0.08); border: 1px solid rgba(240, 185, 11, 0.25); border-radius: 8px; padding: 0.6rem;">
+                      <div style="font-size: 0.72rem; color: #f0b90b; font-weight: 800;">BINANCE GLOBAL</div>
+                      <div id="compareBinPrice" style="font-size: 1.05rem; font-weight: 800; font-family: var(--font-mono); color: #fff; margin: 0.2rem 0;">$0.00</div>
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Depth: <strong id="compareBinDepth" style="color: #fff;">10 Level OB</strong></div>
+                    </div>
+
+                    <!-- HTX BOX -->
+                    <div style="flex: 1; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 0.6rem;">
+                      <div style="font-size: 0.72rem; color: #3b82f6; font-weight: 800;">HTX (HUOBI) 👑</div>
+                      <div id="compareHtxPrice" style="font-size: 1.05rem; font-weight: 800; font-family: var(--font-mono); color: #fff; margin: 0.2rem 0;">$0.00</div>
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">HTX Delta: <strong id="compareHtxDelta" style="color: #10b981;">+$0.00 (+0.00%)</strong></div>
+                    </div>
+                  </div>
+
+                  <!-- ARBITRAGE ADVISORY -->
+                  <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; padding: 0.55rem; font-size: 0.73rem;">
+                    <div style="color: #a855f7; font-weight: 800;"><i class="fa-solid fa-scale-balanced"></i> Best Execution Advisory:</div>
+                    <div id="arbitrageAdviceText" style="color: #fff; margin-top: 0.15rem;">HTX Liquidity Advantage active for high-volume entry execution.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- VERSION 29: 3-WAY PAPER TRADING BATTLE ARENA (USER QUEUED LIMIT ORDERS vs GROUP C OB BOT vs GOD AI BOT) -->
+            <div id="paperTradingPanel" class="content-panel glass-panel mt-4" style="border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 1.25rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.9));">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <h4 style="font-weight: 800; color: #fff; margin: 0; font-size: 1.2rem;">
+                      <i class="fa-solid fa-trophy" style="color: #f0b90b;"></i> Paper Trading Battle Arena (User Manual Trading)
+                    </h4>
+                  </div>
+                  <span style="font-size: 0.78rem; color: var(--text-muted);">Queue limit orders & test manual strategies based on AI analysis.</span>
+                </div>
+                <button id="resetPaperTradeBtn" class="btn-secondary" style="padding: 0.35rem 0.85rem; font-weight: 700; font-size: 0.78rem; border-color: rgba(239, 68, 68, 0.5); color: #ef4444;">
+                  <i class="fa-solid fa-rotate-right"></i> Reset Portfolio ($100)
+                </button>
+              </div>
+
+              <!-- VERSION 31: 3 STACKED ROWS FOR PAPER TRADE (ROW 1: USER, ROW 2: GROUP C BOT, ROW 3: SUPREME GOD BOT) -->
+              <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem;">
+                
+                <!-- ROW 1: USER MANUAL & QUEUED LIMIT ORDERS PORTFOLIO -->
+                <div style="background: rgba(0, 0, 0, 0.35); border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.3); padding: 1rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <div>
+                      <span style="font-weight: 800; color: #3b82f6; font-size: 0.9rem;"><i class="fa-solid fa-user"></i> ROW 1: USER PAPER TRADER</span>
+                      <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: 0.75rem;">Entry Price: <strong id="userEntryPriceText" style="color: #00f0ff;">$0.00</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                      <div style="font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono); color: #fff;">
+                        $<span id="userBalanceText">100.00</span> USD
+                      </div>
+                      <span id="userPnlBadge" class="change-badge up" style="font-size: 0.72rem;">+$0.00 (+0.0%)</span>
+                    </div>
+                  </div>
+
+                  <!-- QUEUED LIMIT ORDER CONTROLS -->
+                  <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <div style="flex: 1; display: flex; gap: 0.35rem;">
+                      <input type="number" id="userLimitPriceInput" placeholder="Target Queue Price ($)" step="0.00001" style="flex: 1; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.75rem;">
+                      <select id="userLotCountSelect" style="background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem; font-size: 0.75rem;">
+                        <option value="1">1 Lot ($20)</option>
+                        <option value="2">2 Lots ($40)</option>
+                        <option value="3">3 Lots ($60)</option>
+                      </select>
+                      <button id="userQueueLimitBtn" class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 800; background: #3b82f6; white-space: nowrap;">
+                        <i class="fa-solid fa-clock"></i> QUEUE LIMIT BUY
+                      </button>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem;">
+                      <button id="userBuyBtn" class="btn-primary" style="background: #10b981; color: #fff; border: none; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 800;">
+                        <i class="fa-solid fa-bolt"></i> MKT BUY
+                      </button>
+                      <button id="userSellBtn" class="btn-primary" style="background: #ef4444; color: #fff; border: none; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 800;">
+                        <i class="fa-solid fa-xmark"></i> CLOSE
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+
+
+              <!-- PENDING QUEUED ORDERS DISPLAY BOARD -->
+              <div id="queuedOrdersPanel" class="mb-3 p-2" style="background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.72rem;">
+                <div style="color: #3b82f6; font-weight: 800; margin-bottom: 0.25rem;"><i class="fa-solid fa-list-check"></i> User Active Queued Limit Orders:</div>
+                <div id="userQueuedOrdersList" style="color: var(--text-muted);">No active limit orders queued. Use the box above to queue a price target.</div>
+              </div>
+
+              <!-- LOG DISPLAY BOARD -->
+              <div style="background: rgba(0, 0, 0, 0.4); border-radius: 8px; padding: 0.65rem; font-family: var(--font-mono); font-size: 0.72rem; max-height: 90px; overflow-y: auto; color: var(--text-muted);">
+                <div id="paperTradeLogs" style="display: flex; flex-direction: column; gap: 0.2rem;">
+                  <div style="color: #00f0ff;">[SYSTEM] Paper Trading Arena Initialized. Starting Capital: $100.00 USD. 24/7 Robo Trade loop running in background.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+
+      <!-- TAB 2: TIME-SERIES CLICKHOUSE DATABASE PAGE -->
+      <section id="tab-timeseries" class="tab-pane hidden">
+        <!-- STATS GRID FOR TIME SERIES PAGE -->
+        <div class="stats-grid mb-4">
+          <div class="stat-card glass-panel">
+            <div class="stat-icon purple"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="stat-content">
+              <span class="label">Tracked Symbols</span>
+              <h2 id="totalTrackedSymbols">0</h2>
+              <span class="subtext">Over 1 WebSocket Connection</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <div class="stat-icon green"><i class="fa-solid fa-bolt"></i></div>
+            <div class="stat-content">
+              <span class="label">Streaming Speed</span>
+              <h2 id="cardTicksPerSec">0 Ticks/s</h2>
+              <span class="subtext">Real-time Event Processing</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <div class="stat-icon blue"><i class="fa-solid fa-database"></i></div>
+            <div class="stat-content">
+              <span class="label">DB Ticks Ingested (Max 900 Billion)</span>
+              <h2 id="cardTotalTicks" style="font-size: 1.45rem; font-weight: 800; font-family: var(--font-mono); color: #00f0ff; letter-spacing: -0.5px;">0</h2>
+              <span class="subtext">ClickHouse Time-Series High Capacity</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <div class="stat-icon orange"><i class="fa-solid fa-fire"></i></div>
+            <div class="stat-content">
+              <span class="label">ClickHouse Ingestion</span>
+              <h2 id="cardChMode">Active</h2>
+              <span class="subtext">Batch Size: 200 items/chunk</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-database"></i> ClickHouse Time-Series API Engine</h3>
+            <span class="badge-success" id="chConnectionBadge"><i class="fa-solid fa-check-circle"></i> ClickHouse Ready</span>
+          </div>
+          <div class="db-info-grid">
+            <div class="db-card">
+              <h4>Database Engine</h4>
+              <p id="dbModeDesc">ClickHouse Columnar Time-Series (HTTP REST API)</p>
+            </div>
+            <div class="db-card">
+              <h4>Target Ingestion Endpoint</h4>
+              <code id="chHostUrl">http://localhost:8123</code>
+            </div>
+            <div class="db-card">
+              <h4>Time-Series Table Schema</h4>
+              <code>crypto_ticks(symbol, exchange, price, quantity, side, timestamp)</code>
+            </div>
+            <div class="db-card">
+              <h4>Engine Strategy</h4>
+              <p>MergeTree() Partitioned by Month for millions of rows/sec</p>
+            </div>
+          </div>
+
+          <div class="chart-box mt-4">
+            <h4><i class="fa-solid fa-chart-area"></i> Ingestion Performance Monitor</h4>
+            <div class="simulated-chart-container">
+              <div class="chart-bars" id="ingestionBars">
+                <!-- Bars dynamically created by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: USER MANAGEMENT SYSTEM (VERSION 3) -->
+      <section id="tab-users" class="tab-pane hidden">
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-users-gear"></i> User Management Directory (v3.0)</h3>
+              <p class="subtitle-text">Admin overview displaying all registered users with 32-character MD5/Hex encrypted IDs and password hash protection.</p>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table" id="usersTable">
+              <thead>
+                <tr>
+                  <th>User ID (32-Char Hash Encrypted)</th>
+                  <th>First Name</th>
+                  <th>Last Name</th>
+                  <th>Email</th>
+                  <th>Username</th>
+                  <th>Password Hash</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: COIN REGISTRY & MEME TICK FILTERING -->
+      <section id="tab-coins" class="tab-pane hidden">
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-coins"></i> Registered Coin Registry & Tick Filtering</h3>
+              <p class="subtitle-text">Coins registered automatically via Binance 1-connection WebSocket stream. Meme coins and currencies are filtered from storing ticks into DB.</p>
+            </div>
+            <div class="metric-pill">
+              <i class="fa-solid fa-filter-circle-xmark"></i>
+              <span>Filtered Meme Ticks Skipped:</span>
+              <strong id="filteredTicksCount">0</strong>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table" id="coinsTable">
+              <thead>
+                <tr>
+                  <th>Coin ID (32-Char Hash Encrypted)</th>
+                  <th>Symbol</th>
+                  <th>Base Asset</th>
+                  <th>Coin Type</th>
+                  <th>DB Tick Storage Status</th>
+                  <th>Toggle Filter Rule</th>
+                </tr>
+              </thead>
+              <tbody id="coinsTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VERSION 31 TAB: HOLDING & TRANSACTION HISTORY -->
+      <section id="tab-holdings" class="tab-pane hidden">
+        <div class="content-panel glass-panel mb-4">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-wallet text-gradient"></i> Active Paper Trading Holdings Table</h3>
+              <p class="subtitle-text">Displays current open position entries, queued exit targets, and live unrealized PnL across User & AI Bots.</p>
+            </div>
+            <button id="clearActiveHoldingsBtn" class="btn-primary" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.5); padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 800; cursor: pointer;">
+              <i class="fa-solid fa-trash-can"></i> CLEAR ALL ACTIVE HOLDINGS
+            </button>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Participant</th>
+                  <th>Coin Symbol</th>
+                  <th>Entry Price ($)</th>
+                  <th>Targeted Exit Price ($)</th>
+                  <th>Position Size</th>
+                  <th>Current Price ($)</th>
+                  <th>Live PnL ($)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="activeHoldingsTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-clock-rotate-left"></i> Paper Trade Complete Transaction History Log</h3>
+              <p class="subtitle-text">Transparent historical ledger of all order book limit queues, matched entries, profit exits, and cut-loss events stored in persistent SQLite database.</p>
+            </div>
+            <button id="clearTransactionHistoryBtn" class="btn-primary" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.5); padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 800; cursor: pointer;">
+              <i class="fa-solid fa-trash-can"></i> RESET / CLEAR ALL TRANSACTION HISTORY
+            </button>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Participant</th>
+                  <th>Action Event</th>
+                  <th>Coin Symbol</th>
+                  <th>Price ($)</th>
+                  <th>Capital / Lots</th>
+                  <th>Result PnL ($)</th>
+                </tr>
+              </thead>
+              <tbody id="transactionHistoryTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VERSION 32 TAB: ANALYSIS LOGIC REGISTRY WITH ADMIN ADD CONTROL -->
+      <section id="tab-analysis-logic" class="tab-pane hidden">
+        
+        <!-- ADMIN CREATION CARD -->
+        <div class="content-panel glass-panel mb-4" style="border: 1px solid rgba(240, 185, 11, 0.4);">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-plus-circle text-gradient"></i> Admin: Add New Analysis Logic & Assign AI Bot</h3>
+              <p class="subtitle-text">Define custom institutional trading rules and assign them to specific AI sub-agents or the Supreme God AI.</p>
+            </div>
+            <span class="badge-mini" style="background: rgba(240, 185, 11, 0.2); color: #f0b90b; border: 1px solid rgba(240, 185, 11, 0.4); font-weight: 800;">
+              <i class="fa-solid fa-user-shield"></i> ADMIN CONTROLS
+            </span>
+          </div>
+
+          <form id="addAnalysisRuleForm" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 0.75rem;">
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Logic Name</label>
+              <input type="text" id="adminRuleName" placeholder="e.g. Liquidity Sweep & MSS Reversal" required style="width: 100%; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Target Scope</label>
+              <input type="text" id="adminRuleScope" placeholder="e.g. God List & Order Book Entry" required style="width: 100%; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Assign AI Bot / Sub-Agent</label>
+              <select id="adminRuleAgent" style="width: 100%; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem;">
+                <option value="👑 All Bots & God AI Legion (Universal)">👑 All Bots & God AI Legion (Universal)</option>
+                <option value="👑 God of Trade Supreme AI (Master Parent)">👑 God of Trade Supreme AI (Master Parent)</option>
+                <option value="🤖 DeepSeek-R1 (Wyckoff Sentinel)">🤖 DeepSeek-R1 (Wyckoff Sentinel)</option>
+                <option value="🤖 Phi-4 (SMC Auditor)">🤖 Phi-4 (SMC Auditor)</option>
+                <option value="⚡ Group C 5-Agent Order Book Bot">⚡ Group C 5-Agent Order Book Bot</option>
+                <option value="🤖 Risk Guard & Stop Agent">🤖 Risk Guard & Stop Agent</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Rule Category</label>
+              <select id="adminRuleCategory" style="width: 100%; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem;">
+                <option value="Liquidity Sweep & MSS">Liquidity Sweep & MSS</option>
+                <option value="Order Block Mitigation">Order Block Mitigation</option>
+                <option value="Support Floor & Reversal">Support Floor & Reversal</option>
+                <option value="1s Depth Imbalance">1s Depth Imbalance</option>
+                <option value="Oscillator Divergence">Oscillator Divergence</option>
+                <option value="Capital Preservation">Capital Preservation</option>
+              </select>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Logic Description & Execution Standard</label>
+              <input type="text" id="adminRuleDesc" placeholder="e.g. Detects sell-side liquidity sweeps below equal lows followed by bullish MSS confirmation." required style="width: 100%; background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem;">
+            </div>
+            <div style="grid-column: span 3; text-align: right;">
+              <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #f0b90b, #d97706); color: #000; font-weight: 800; padding: 0.4rem 1.25rem; font-size: 0.8rem; border: none;">
+                <i class="fa-solid fa-plus"></i> ADD NEW ANALYSIS LOGIC
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-brain text-gradient"></i> Supreme God & Sub-Agent Analysis Logic Registry</h3>
+              <p class="subtitle-text">Authoritative registry matrix of all technical, Wyckoff, SMC, Order Book, and S/R rules assigned across the 15 AI Sub-Agents and God AI.</p>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Rule ID</th>
+                  <th>Analysis Logic Name</th>
+                  <th>Target Scope</th>
+                  <th>Assigned AI Sub-Agent / Bot</th>
+                  <th>Rule Category</th>
+                  <th>Logic Description & Execution Standard</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="analysisLogicTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VERSION 33 TAB: PERFORMANCE TRADE REVIEW -->
+      <section id="tab-performance-review" class="tab-pane hidden">
+        
+        <!-- 4 ANALYTICS STAT CARDS -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem;">
+          <div class="metric-card glass-panel">
+            <div class="card-header">
+              <span class="card-title">TOTAL EXECUTED TRADES</span>
+              <i class="fa-solid fa-list-check card-icon" style="color: #3b82f6;"></i>
+            </div>
+            <div class="card-value" id="perfTotalTrades">42</div>
+            <div class="card-subtitle text-muted">Audited by Group D Sub-Agents</div>
+          </div>
+
+          <div class="metric-card glass-panel">
+            <div class="card-header">
+              <span class="card-title">OVERALL WIN RATE %</span>
+              <i class="fa-solid fa-trophy card-icon" style="color: #10b981;"></i>
+            </div>
+            <div class="card-value" id="perfWinRate" style="color: #10b981;">92.8%</div>
+            <div class="card-subtitle text-success">+4.2% Above Benchmark</div>
+          </div>
+
+          <div class="metric-card glass-panel">
+            <div class="card-header">
+              <span class="card-title">AVG PROFIT YIELD %</span>
+              <i class="fa-solid fa-chart-line card-icon" style="color: #f0b90b;"></i>
+            </div>
+            <div class="card-value" id="perfAvgYield" style="color: #f0b90b;">28.4%</div>
+            <div class="card-subtitle text-muted">Per Win Trade</div>
+          </div>
+
+          <div class="metric-card glass-panel">
+            <div class="card-header">
+              <span class="card-title">EXEC DIVERGENCE RATE</span>
+              <i class="fa-solid fa-triangle-exclamation card-icon" style="color: #a855f7;"></i>
+            </div>
+            <div class="card-value" id="perfDivergenceRate" style="color: #a855f7;">7.2%</div>
+            <div class="card-subtitle text-muted">Target vs Real Price Gap</div>
+          </div>
+        </div>
+
+        <!-- REAL-TIME OPEN HOLDINGS DIAGNOSTICS CARD (GROUP C & D COLLABORATION) -->
+        <div class="content-panel glass-panel mb-4" style="border: 1px solid rgba(0, 240, 255, 0.3);">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-satellite-dish text-gradient"></i> Group C & D Real-Time Open Holdings Diagnostic</h3>
+              <p class="subtitle-text">Analyzes active open trades (User & AI Bots) in real time to explain current price velocity and recommend God Mode adjustments.</p>
+            </div>
+            <span class="badge-mini" style="background: rgba(0, 240, 255, 0.2); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 800;">
+              <i class="fa-solid fa-sync fa-spin"></i> LIVE STREAM SYNCED
+            </span>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Participant</th>
+                  <th>Coin Symbol</th>
+                  <th>Entry Price ($)</th>
+                  <th>Live Price ($)</th>
+                  <th>Real-Time PnL ($)</th>
+                  <th>Velocity Status</th>
+                  <th>Real Market Factual Reasoning</th>
+                  <th>God Mode / List Calibration</th>
+                </tr>
+              </thead>
+              <tbody id="openHoldingsDiagnosticsBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- GROUP D POST-TRADE FACTUAL REASONING LEDGER -->
+        <div class="content-panel glass-panel mb-4">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-magnifying-glass-chart text-gradient"></i> Group D Post-Trade Factual Reasoning Ledger</h3>
+              <p class="subtitle-text">Group D Reviewers evaluate historical transaction records to explain why price reached target or diverged in real market movement.</p>
+            </div>
+            <span class="badge-mini" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 800;">
+              <i class="fa-solid fa-user-check"></i> GROUP D AUDITED
+            </span>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Audit ID</th>
+                  <th>Coin</th>
+                  <th>Trade Event & Divergence</th>
+                  <th>Expected Target ($)</th>
+                  <th>Actual Peak ($)</th>
+                  <th>Factual Reasoning & Post-Trade Explanation</th>
+                  <th>Assigned Reviewer</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="groupDEvaluationsBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 👑 SUPREME AI COUNCIL DISCUSSION & CALIBRATION MATRIX -->
+        <div class="content-panel glass-panel">
+          <div class="panel-header mb-3">
+            <div>
+              <h3><i class="fa-solid fa-comments text-gradient"></i> 👑 Supreme AI Council Discussion & Precision Calibration</h3>
+              <p class="subtitle-text">Synthesized debate between God of Trade (Head of Council) and Groups A, B, C, D to continuously refine price precision and entry standards.</p>
+            </div>
+          </div>
+
+          <div id="aiCouncilDiscussionContainer" style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- VERSION 38 & 39 TAB: 10-YEAR HISTORICAL BACKTEST RESULT -->
+      <section id="tab-backtest" class="tab-pane hidden">
+        
+        <!-- BREADCRUMB NAVIGATION & HEADER -->
+        <div class="content-panel glass-panel mb-4" style="border: 1px solid rgba(0, 240, 255, 0.4);">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-clock-rotate-left text-gradient"></i> Group E 25-Agent 10-Year Automated Backtest Engine</h3>
+              <p class="subtitle-text">Fully automated, permanent past_pattern storage. Analyzes 19 detailed timeframes (12 Monthly, 4 Quarterly, 2 Half-Year, 1 Full-Year per year) with human natural language commentaries.</p>
+            </div>
+            <span class="badge-mini" style="background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); padding: 0.45rem 0.85rem; font-size: 0.78rem; font-weight: 800;">
+              <i class="fa-solid fa-robot"></i> AUTOMATED GROUP E 25-AGENT ENGINE ACTIVE
+            </span>
+          </div>
+
+          <!-- BREADCRUMB NAVIGATION TRAIL -->
+          <div id="backtestBreadcrumb" style="display: flex; align-items: center; gap: 0.6rem; margin-top: 0.85rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.4); border-radius: 8px; font-size: 0.82rem;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- LEVEL 1: ALL ELIGIBLE COINS SELECTION GRID (SORTED ASCENDING A-Z, EXCLUDES CURRENCY & MEME COINS) -->
+        <div id="backtestLevel1Container" class="content-panel glass-panel mb-4">
+          <div class="panel-header mb-3">
+            <div>
+              <h3><i class="fa-solid fa-coins text-gradient"></i> Step 1: Select Crypto Asset for Historical Backtest</h3>
+              <p class="subtitle-text">Displays all registered crypto trading pairs sorted A-Z (Excludes Fiat & Meme Coins). Click any coin card to view historical backtest years.</p>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <!-- REAL-TIME COIN SEARCH INPUT BAR -->
+              <div style="position: relative;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.75rem;"></i>
+                <input type="text" id="backtestCoinSearchInput" placeholder="Search coin symbol or name..." style="background: #000; border: 1px solid rgba(0,240,255,0.3); color: #fff; border-radius: 6px; padding: 0.35rem 0.5rem 0.35rem 1.8rem; font-size: 0.78rem; width: 220px;">
+              </div>
+              <span class="badge-mini" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <i class="fa-solid fa-sort-alpha-down"></i> SORTED A-Z
+              </span>
+            </div>
+          </div>
+
+          <div id="backtestCoinGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.85rem;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- LEVEL 2: YEAR SELECTION VIEW (APPEARS AFTER COIN SELECTED) -->
+        <div id="backtestLevel2Container" class="content-panel glass-panel mb-4 hidden">
+          <div class="panel-header mb-3">
+            <div>
+              <h3><i class="fa-solid fa-calendar-days text-gradient"></i> Step 2: Select Historical Backtest Year for <span id="selectedCoinTitleText" style="color: #00f0ff;">BTCUSDT</span></h3>
+              <p class="subtitle-text">Click a year to drill down into single-year timeframe results (Full Year, Half Year, Quarterly, Monthly).</p>
+            </div>
+            <button id="backToCoinsBtn" class="btn-primary" style="background: rgba(255,255,255,0.1); color: #fff; padding: 0.3rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer;">
+              <i class="fa-solid fa-arrow-left"></i> Back to Coin List
+            </button>
+          </div>
+
+          <div id="backtestYearsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- LEVEL 3: TIMEFRAME TOGGLE & SINGLE-YEAR RESULTS (APPEARS AFTER YEAR SELECTED) -->
+        <div id="backtestLevel3Container" class="content-panel glass-panel mb-4 hidden">
+          <div class="panel-header mb-3">
+            <div>
+              <h3><i class="fa-solid fa-layer-group text-gradient"></i> Step 3: Single-Year Timeframe Results for <span id="selectedYearTitleText" style="color: #f0b90b;">BTCUSDT (Year 2024)</span></h3>
+              <p class="subtitle-text">Toggle timeframes to view patterns strictly related to this selected year.</p>
+            </div>
+            <button id="backToYearsBtn" class="btn-primary" style="background: rgba(255,255,255,0.1); color: #fff; padding: 0.3rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer;">
+              <i class="fa-solid fa-arrow-left"></i> Back to All Years
+            </button>
+          </div>
+
+          <!-- TIMEFRAME TOGGLE BAR -->
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <button class="backtest-toggle-btn active" data-tf="all" style="flex: 1; padding: 0.5rem; background: rgba(0,240,255,0.15); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4); border-radius: 6px; font-weight: 700; cursor: pointer;">
+              🌟 ALL Timeframes
+            </button>
+            <button class="backtest-toggle-btn" data-tf="full_year" style="flex: 1; padding: 0.5rem; background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-weight: 700; cursor: pointer;">
+              📅 Full Year
+            </button>
+            <button class="backtest-toggle-btn" data-tf="half_year" style="flex: 1; padding: 0.5rem; background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-weight: 700; cursor: pointer;">
+              🌓 Half Year
+            </button>
+            <button class="backtest-toggle-btn" data-tf="quarterly" style="flex: 1; padding: 0.5rem; background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-weight: 700; cursor: pointer;">
+              📊 Quarterly
+            </button>
+            <button class="backtest-toggle-btn" data-tf="monthly" style="flex: 1; padding: 0.5rem; background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-weight: 700; cursor: pointer;">
+              🗓️ Monthly
+            </button>
+          </div>
+
+          <!-- HISTORICAL PATTERN ANALYSIS LEDGER TABLE -->
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Pattern ID</th>
+                  <th>Coin</th>
+                  <th>Year & Dates</th>
+                  <th>Time Type</th>
+                  <th>Price & Vol Movement</th>
+                  <th>Group E AI Confluence & World Event Commentary</th>
+                </tr>
+              </thead>
+              <tbody id="backtestPatternsTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 👑 SUPREME AI COUNCIL 10-YEAR HISTORICAL SYNTHESIS -->
+        <div class="content-panel glass-panel">
+          <div class="panel-header mb-3">
+            <div>
+              <h3><i class="fa-solid fa-crown text-gradient"></i> 👑 Supreme AI Council 10-Year Historical Synthesis</h3>
+              <p class="subtitle-text">God of Trade and Group E 10-Year Sentinels synthesizing past historical cycles to ensure no live market phase catches the AI Legion unprepared.</p>
+            </div>
+          </div>
+
+          <div id="historicalCouncilSynthesisContainer" style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <!-- Filled dynamically by JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 4: SINGLE STREAM HUB -->
+      <section id="tab-stream" class="tab-pane hidden">
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-network-wired"></i> Single Connection Multiplex Architecture</h3>
+          </div>
+          <div class="stream-architecture-box">
+            <div class="arch-node">
+              <i class="fa-solid fa-globe node-icon"></i>
+              <h4>Binance WebSocket API</h4>
+              <p>wss://stream.binance.com:9443/ws/!miniTicker@arr</p>
+            </div>
+            <div class="arch-pipe">
+              <div class="pulse-line"></div>
+              <span>1 Single TCP/WS Connection</span>
+            </div>
+            <div class="arch-node highlight">
+              <i class="fa-solid fa-cpu node-icon"></i>
+              <h4>Python Asyncio Engine</h4>
+              <p>Async Queue & Sliding Window Buffer</p>
+            </div>
+            <div class="arch-pipe">
+              <div class="pulse-line"></div>
+              <span>Batch Insert (JSONEachRow)</span>
+            </div>
+            <div class="arch-node">
+              <i class="fa-solid fa-server node-icon"></i>
+              <h4>ClickHouse Time-Series DB</h4>
+              <p>High-Volume Columnar Storage</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- VERSION 68: DEDICATED ROBO TRADE SECTION & ARENA -->
+      <section id="tab-robo-trade" class="tab-pane hidden">
+        <div id="roboTradeModuleContainer">
+          <!-- HEADER BRANDING & SUMMARY -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(240, 185, 11, 0.3); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-weight: 900; color: #f0b90b; margin: 0; font-size: 1.35rem; display: flex; align-items: center; gap: 0.6rem;">
+                <i class="fa-solid fa-robot" style="color: #f0b90b;"></i> Soufi Crypto Scanner — Autonomous Robo Trade Arena
+              </h3>
+              <span style="font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem;">
+                <span>6-Stage Order Flow Confluence Architecture (15m BOS/FVG + 1h Wyckoff + 4h/1D Bias)</span>
+                <span class="badge-mini" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+                  <i class="fa-solid fa-shield-halved"></i> Binance Delisted Coins Excluded
+                </span>
+                <span class="badge-mini" style="background: rgba(240, 185, 11, 0.15); color: #f0b90b; border: 1px solid rgba(240, 185, 11, 0.4); font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+                  <i class="fa-solid fa-lock"></i> Stage 8: 100% Spot-Only (0x Leverage)
+                </span>
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span id="commFeeBadge" class="badge-mini" style="background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-family: var(--font-mono); font-size: 0.8rem; padding: 0.3rem 0.75rem;">
+                <i class="fa-solid fa-coins"></i> Comm. Fee (0.2%): Today: <strong id="commTodayText" style="color: #fff;">$0.0000</strong> | Wk: <strong id="commWkText" style="color: #fff;">$0.0000</strong> | Mo: <strong id="commMoText" style="color: #fff;">$0.0000</strong> | Total: <strong id="commTotalText" style="color: #a855f7;">$0.0000</strong>
+              </span>
+              <span id="roboTodayBadge" class="badge-mini" style="background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-family: var(--font-mono); font-size: 0.8rem; padding: 0.3rem 0.75rem;">
+                <i class="fa-solid fa-calendar-day"></i> Today: <strong id="roboTodayDateText">2026-07-31</strong>
+              </span>
+              <button id="refreshRoboTradeBtn" class="btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem; font-weight: 700;">
+                <i class="fa-solid fa-rotate"></i> Sync Live Data
+              </button>
+              <button id="resetRoboTradeBtn" class="btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4);">
+                <i class="fa-solid fa-power-off"></i> Reset Robo Trade (Fresh Start)
+              </button>
+            </div>
+          </div>
+
+          <!-- TOP SECTION: ARENA GRID FOR GOD AI & GROUP C OB BOT -->
+          <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 1.25rem;">
+            
+            <!-- GOD AI BOT CARD -->
+            <div class="glass-panel robo-card-panel" style="border: 1px solid rgba(240, 185, 11, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.9));">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(240, 185, 11, 0.2); padding-bottom: 0.5rem;">
+                <span style="font-weight: 900; color: #f0b90b; font-size: 1.05rem;"><i class="fa-solid fa-crown"></i> 👑 SUPREME GOD AI BOT</span>
+                <span id="godCapBadge" class="badge-mini" style="background: rgba(240, 185, 11, 0.2); color: #f0b90b; border: 1px solid rgba(240, 185, 11, 0.5); font-weight: 800; font-family: var(--font-mono);">
+                  Cap: $100.00 USD
+                </span>
+              </div>
+
+              <!-- GOD AI LIFETIME STATS HEADER -->
+              <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.85rem; text-align: center; font-size: 0.72rem;">
+                <div><div style="color: var(--text-muted);">Total Wins</div><strong id="godTotalWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
+                <div><div style="color: var(--text-muted);">Total Loss</div><strong id="godTotalLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
+                <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="godTotalProfit" style="color: #10b981;">+$0.00</strong></div>
+                <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="godTotalLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
+                <div><div style="color: #a855f7; font-weight: 800;">Comm. Fee ($)</div><strong id="godTotalComm" style="color: #a855f7;">-$0.0000</strong></div>
+                <div><div style="color: var(--text-muted);">Net PnL</div><strong id="godTotalPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
+              </div>
+
+              <!-- VERSION 71: SIDE-BY-SIDE GRID (ACTIVE HOLDINGS + 5-COIN SCHEDULE PLAN) -->
+              <div class="robo-side-grid">
+                <!-- LEFT: ACTIVE HOLDINGS -->
+                <div style="min-width: 0;">
+                  <div style="font-size: 0.8rem; font-weight: 800; color: #fff; margin-bottom: 0.4rem;"><i class="fa-solid fa-wallet"></i> Active Holdings (Max 5 Slots)</div>
+                  <div class="robo-holdings-scroll">
+                    <table class="table-styled robo-holdings-table" style="margin: 0;">
+                      <colgroup>
+                        <col style="width: 22%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 14%;">
+                      </colgroup>
+                      <thead>
+                        <tr style="background: rgba(0,0,0,0.3);">
+                          <th>Symbol</th>
+                          <th>Entry</th>
+                          <th style="color: #ef4444;">Stop Loss</th>
+                          <th style="color: #10b981;">Target</th>
+                          <th>Live Price</th>
+                          <th>PnL ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="godHoldingsTableBody">
+                        <tr><td colspan="6" class="text-muted text-center">No active open holdings currently.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- RIGHT: 5-COIN SCHEDULE PLAN WITH STOP LOSS TARGET -->
+                <div style="min-width: 0;">
+                  <div style="font-size: 0.8rem; font-weight: 800; color: #f0b90b; margin-bottom: 0.4rem;"><i class="fa-solid fa-calendar-check"></i> 5-Coin Schedule Entry Plan</div>
+                  <div id="godScheduleList" class="robo-sched-scroll" style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div class="text-muted text-center" style="font-size: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">All 5 slots currently allocated in active holdings or curating new setup...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- GROUP C OB BOT CARD -->
+            <div class="glass-panel robo-card-panel" style="border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(6, 182, 212, 0.08));">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(0, 240, 255, 0.2); padding-bottom: 0.5rem;">
+                <span style="font-weight: 900; color: #00f0ff; font-size: 1.05rem;"><i class="fa-solid fa-bolt"></i> ⚡ GROUP C OB BOT</span>
+                <span id="groupCCapBadge" class="badge-mini" style="background: rgba(0, 240, 255, 0.2); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.5); font-weight: 800; font-family: var(--font-mono);">
+                  Cap: $100.00 USD
+                </span>
+              </div>
+
+              <!-- GROUP C LIFETIME STATS HEADER -->
+              <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.85rem; text-align: center; font-size: 0.72rem;">
+                <div><div style="color: var(--text-muted);">Total Wins</div><strong id="groupCTotalWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
+                <div><div style="color: var(--text-muted);">Total Loss</div><strong id="groupCTotalLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
+                <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="groupCTotalProfit" style="color: #10b981;">+$0.00</strong></div>
+                <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="groupCTotalLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
+                <div><div style="color: #a855f7; font-weight: 800;">Comm. Fee ($)</div><strong id="groupCTotalComm" style="color: #a855f7;">-$0.0000</strong></div>
+                <div><div style="color: var(--text-muted);">Net PnL</div><strong id="groupCTotalPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
+              </div>
+
+              <!-- VERSION 71: SIDE-BY-SIDE GRID (ACTIVE HOLDINGS + 5-COIN SCHEDULE PLAN) -->
+              <div class="robo-side-grid">
+                <!-- LEFT: ACTIVE HOLDINGS -->
+                <div style="min-width: 0;">
+                  <div style="font-size: 0.8rem; font-weight: 800; color: #fff; margin-bottom: 0.4rem;"><i class="fa-solid fa-wallet"></i> Active Holdings (Max 5 Slots)</div>
+                  <div class="robo-holdings-scroll">
+                    <table class="table-styled robo-holdings-table" style="margin: 0;">
+                      <colgroup>
+                        <col style="width: 22%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 16%;">
+                        <col style="width: 14%;">
+                      </colgroup>
+                      <thead>
+                        <tr style="background: rgba(0,0,0,0.3);">
+                          <th>Symbol</th>
+                          <th>Entry</th>
+                          <th style="color: #ef4444;">Stop Loss</th>
+                          <th style="color: #10b981;">Target</th>
+                          <th>Live Price</th>
+                          <th>PnL ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="groupCHoldingsTableBody">
+                        <tr><td colspan="6" class="text-muted text-center">No active open holdings currently.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- RIGHT: 5-COIN SCHEDULE PLAN WITH STOP LOSS TARGET -->
+                <div style="min-width: 0;">
+                  <div style="font-size: 0.8rem; font-weight: 800; color: #00f0ff; margin-bottom: 0.4rem;"><i class="fa-solid fa-calendar-check"></i> 5-Coin Schedule Entry Plan</div>
+                  <div id="groupCScheduleList" class="robo-sched-scroll" style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div class="text-muted text-center" style="font-size: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">All 5 slots currently allocated in active holdings or curating new setup...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM SECTION: STANDARDIZED PERFORMANCE SUMMARY LEDGERS & AUDITS -->
+          <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            
+            <!-- 0. CUMULATIVE COMMISSION FEE AUDIT PANEL -->
+            <div class="glass-panel" style="border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(88, 28, 135, 0.2));">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(168, 85, 247, 0.2); padding-bottom: 0.5rem; margin-bottom: 0.85rem;">
+                <div>
+                  <h4 style="font-weight: 800; color: #a855f7; margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-coins"></i> Cumulative Commission Fee Audit (0.20% Per Closed Trade)
+                  </h4>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Real-time tracking of cumulative commission fees deducted across daily, weekly, monthly, and lifetime trades.</span>
+                </div>
+                <div class="badge-mini" style="background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 800;">
+                  <i class="fa-solid fa-receipt"></i> 0.2% Trade Fee
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; text-align: center;">
+                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Today's Fee</div>
+                  <strong id="perfCommToday" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Weekly Fee (7D)</div>
+                  <strong id="perfCommWeekly" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Monthly Fee (30D)</div>
+                  <strong id="perfCommMonthly" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(168, 85, 247, 0.3);">
+                  <div style="font-size: 0.75rem; color: #a855f7; margin-bottom: 0.2rem;">Total Lifetime Fee</div>
+                  <strong id="perfCommLifetime" style="font-size: 1.15rem; color: #a855f7; font-family: var(--font-mono);">$0.0000</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1. WEEKLY & MONTHLY PERFORMANCE SUMMARY PANELS (SIDE-BY-SIDE) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+              
+              <!-- WEEKLY PERFORMANCE SUMMARY PANEL -->
+              <div class="glass-panel" style="border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 58, 138, 0.2));">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(59, 130, 246, 0.2); padding-bottom: 0.5rem; margin-bottom: 0.85rem;">
+                  <div>
+                    <h4 style="font-weight: 800; color: #3b82f6; margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                      <i class="fa-solid fa-calendar-week"></i> Weekly Performance Summary (7-Day Audit)
+                    </h4>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Aggregated closed exit trade performance for the last 7 days.</span>
+                  </div>
+                  <div class="badge-mini" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.4); font-weight: 800;">
+                    <i class="fa-solid fa-chart-pie"></i> 7-Day Performance
+                  </div>
+                </div>
+                <div id="weeklySummaryContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+                  <div class="text-muted text-center" style="grid-column: span 2; padding: 0.75rem;">Loading weekly summary...</div>
+                </div>
+              </div>
+
+              <!-- MONTHLY PERFORMANCE SUMMARY PANEL -->
+              <div class="glass-panel" style="border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(6, 78, 59, 0.2));">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 0.5rem; margin-bottom: 0.85rem;">
+                  <div>
+                    <h4 style="font-weight: 800; color: #10b981; margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                      <i class="fa-solid fa-calendar-days"></i> Monthly Performance Summary (30-Day Audit)
+                    </h4>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Aggregated closed exit trade performance for the last 30 days.</span>
+                  </div>
+                  <div class="badge-mini" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 800;">
+                    <i class="fa-solid fa-chart-area"></i> 30-Day Performance
+                  </div>
+                </div>
+                <div id="monthlySummaryContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+                  <div class="text-muted text-center" style="grid-column: span 2; padding: 0.75rem;">Loading monthly summary...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. EVERYDAY HISTORICAL PERFORMANCE SUMMARY LEDGER (MAX 7 DATES) -->
+            <div class="glass-panel" style="border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 1.25rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.9));">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.65rem; margin-bottom: 1rem;">
+                <div>
+                  <h4 style="font-weight: 800; color: #a855f7; margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-chart-line"></i> Everyday Performance Summary Ledger (Max 7 Historical Dates)
+                  </h4>
+                  <span style="font-size: 0.78rem; color: var(--text-muted);">Standardized daily breakdown calculated by position exit date for closed trades (Max 7 Dates).</span>
+                </div>
+                <div class="badge-mini" style="background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 800;">
+                  <i class="fa-solid fa-trophy"></i> Max 7-Date Audit
+                </div>
+              </div>
+
+              <!-- EVERYDAY LEDGER DYNAMIC CONTAINER -->
+              <div id="everydayLedgerContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div class="text-muted text-center" style="padding: 1rem;">Loading everyday trade ledger history...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      </main>
+  </div>
+
+  <!-- VERSION 92.0: MODULAR SECTION SCRIPTS WITH CACHE BUSTING -->
+  <script src="modules/live_crypto_scanner/scanner.js?v=92.0"></script>
+  <script src="modules/holding_transaction_history/holdings.js?v=92.0"></script>
+  <script src="modules/analysis_logic_registry/analysis_logic.js?v=92.0"></script>
+  <script src="modules/robo_trade/robo_trade.js?v=92.0"></script>
+  <script src="modules/performance_trade_review/performance_review.js?v=92.0"></script>
+  <script src="modules/backtest_result/backtest.js?v=92.0"></script>
+  <script src="modules/timeseries_clickhouse/timeseries.js?v=79.0"></script>
+  <script src="modules/user_management/user_mgmt.js?v=79.0"></script>
+  <script src="modules/coin_registry_filter/coin_filter.js?v=79.0"></script>
+  <script src="modules/single_stream_hub/single_stream.js?v=79.0"></script>
+
+  <script src="js/app.js?v=79.0"></script>
+</body>
+</html>
