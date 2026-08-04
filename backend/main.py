@@ -1672,7 +1672,7 @@ def run_robo_trade_loop():
                         if sched['status'] != 'PENDING': continue
                         sym = sched['symbol']
                         t = scanner_engine.active_tickers.get(sym)
-                        if t:
+                        if t and t.get("is_live", False):  # CRITICAL V95.6: Only execute trade if real live price stream is active!
                             curr_price = t.get("price", 0)
                             entry = sched['entry_price_target']
                             
@@ -1705,7 +1705,7 @@ def run_robo_trade_loop():
                 for holding in participant_holdings:
                     sym = holding['symbol']
                     t = scanner_engine.active_tickers.get(sym)
-                    if t:
+                    if t and t.get("is_live", False):  # CRITICAL V95.6: Only evaluate stop loss/take profit if price is confirmed live
                         curr_price = t.get("price", 0)
                         entry = holding['entry_price']
                         amount = holding['amount']

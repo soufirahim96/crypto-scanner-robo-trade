@@ -71,7 +71,8 @@ class CryptoScannerEngine:
                 vol = float(12000000 + (hash(sym) % 45000000))
                 self.active_tickers[sym] = {
                     "symbol": sym,
-                    "exchange": "Binance (Seeding...)",
+                    "exchange": "Baseline (Pending Live Stream)",
+                    "is_live": False,  # CRITICAL V95.6: Prevents trading engine from executing on seeded synthetic prices
                     "price": base_p,
                     "open": round(base_p / (1 + chg/100), 4),
                     "high": round(base_p * 1.02, 4),
@@ -154,6 +155,7 @@ class CryptoScannerEngine:
                 change_pct = round(((close_price - open_price) / open_price) * 100, 2) if open_price > 0 else 0.0
                 self.active_tickers[symbol] = {
                     "symbol": symbol, "exchange": "Binance",
+                    "is_live": True,  # Real live stream data from Binance WS
                     "price": close_price, "open": open_price,
                     "high": float(item.get("h", close_price)),
                     "low": float(item.get("l", close_price)),
@@ -204,6 +206,7 @@ class CryptoScannerEngine:
                             chg = float(item.get("priceChangePercent", 0.0))
                             self.active_tickers[sym] = {
                                 "symbol": sym, "exchange": "Binance REST",
+                                "is_live": True,  # Real live stream data from Binance REST
                                 "price": p, "open": op,
                                 "high": float(item.get("highPrice", p)),
                                 "low": float(item.get("lowPrice", p)),
@@ -239,6 +242,7 @@ class CryptoScannerEngine:
                         chg = round(((p - op) / op) * 100, 2) if op > 0 else 0.0
                         self.active_tickers[raw_sym] = {
                             "symbol": raw_sym, "exchange": "HTX Fallback",
+                            "is_live": True,  # Real live stream data from HTX Fallback
                             "price": p, "open": op,
                             "high": float(item.get("high", p)),
                             "low": float(item.get("low", p)),
