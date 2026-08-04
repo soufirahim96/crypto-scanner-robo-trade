@@ -938,14 +938,19 @@ body {
 @media (max-width: 900px) {
   .sidebar {
     transform: translateX(-100%);
+    z-index: 9000;
+    width: 80vw;
+    max-width: 300px;
+    box-shadow: none;
   }
   .sidebar.mobile-open {
     transform: translateX(0);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.9);
   }
   .main-content {
     margin-left: 0;
     padding: 1rem;
+    width: 100%;
   }
   .mobile-only { display: block; }
   .close-sidebar-btn {
@@ -955,6 +960,12 @@ body {
     font-size: 1.2rem;
     margin-left: auto;
     cursor: pointer;
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .menu-btn {
     background: rgba(255, 255, 255, 0.05);
@@ -964,7 +975,32 @@ body {
     border-radius: 10px;
     font-size: 1.1rem;
     cursor: pointer;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
+  /* Enlarge tap targets for nav items on mobile */
+  .nav-item {
+    min-height: 48px;
+    padding: 0.9rem 1rem;
+    font-size: 0.95rem;
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
+    touch-action: manipulation;
+  }
+}
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 8999;
+}
+.sidebar-backdrop.visible {
+  display: block;
 }
 
 /* VERSION 70: ROBO TRADE ARENA RESPONSIVE SCREEN FIT & ZERO-STRETCH LAYOUT */

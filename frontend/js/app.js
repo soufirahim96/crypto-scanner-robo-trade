@@ -176,14 +176,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // LOGOUT
-  logoutBtn.addEventListener("click", () => {
-    localStorage.removeItem("apex_user");
-    localStorage.removeItem("apex_token");
-    if (ws) ws.close();
-    appContainer.classList.add("hidden");
-    authOverlay.style.display = "flex";
-  });
+  // LOGOUT — mobile safe
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      try { localStorage.removeItem("apex_user"); } catch(e) {}
+      try { localStorage.removeItem("apex_token"); } catch(e) {}
+      if (ws) try { ws.close(); } catch(e) {}
+      const appEl = document.getElementById("appContainer");
+      const overlayEl = document.getElementById("authOverlay");
+      if (appEl) { appEl.classList.add("hidden"); appEl.style.display = "none"; }
+      if (overlayEl) { overlayEl.style.display = "flex"; overlayEl.style.visibility = "visible"; overlayEl.classList.remove("hidden"); }
+    });
+  }
+
+  // MOBILE HAMBURGER MENU — fixed for phone browsers
+  const mobileMenuBtnEl = document.getElementById("mobileMenuBtn");
+  const mobileCloseSidebarEl = document.getElementById("mobileCloseSidebar");
+  const sidebarEl = document.getElementById("sidebar");
+  const backdropEl = document.getElementById("sidebarBackdrop");
+
+  function openMobileSidebar() {
+    if (sidebarEl) sidebarEl.classList.add("mobile-open");
+    if (backdropEl) backdropEl.classList.add("visible");
+  }
+  function closeMobileSidebar() {
+    if (sidebarEl) sidebarEl.classList.remove("mobile-open");
+    if (backdropEl) backdropEl.classList.remove("visible");
+  }
+
+  if (mobileMenuBtnEl) {
+    mobileMenuBtnEl.addEventListener("click", openMobileSidebar);
+    mobileMenuBtnEl.addEventListener("touchend", (e) => { e.preventDefault(); openMobileSidebar(); });
+  }
+  if (mobileCloseSidebarEl) {
+    mobileCloseSidebarEl.addEventListener("click", closeMobileSidebar);
+    mobileCloseSidebarEl.addEventListener("touchend", (e) => { e.preventDefault(); closeMobileSidebar(); });
+  }
+  if (backdropEl) {
+    backdropEl.addEventListener("click", closeMobileSidebar);
+    backdropEl.addEventListener("touchend", (e) => { e.preventDefault(); closeMobileSidebar(); });
+  }
 
   function checkAuthSession() {
     let savedUser = null;
@@ -290,57 +322,86 @@ document.addEventListener("DOMContentLoaded", () => {
     authAlert.classList.add("hidden");
   }
 
-  // NAVIGATION TABS
+  // ============================================================
+  // NAVIGATION TABS — FULLY FIXED FOR MOBILE & DESKTOP (V95.3)
+  // ============================================================
+  function switchTab(targetTab) {
+    if (!targetTab) return;
+
+    // 1. Update active nav item
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    const matchedNav = document.querySelector(`.nav-item[data-tab="${targetTab}"]`);
+    if (matchedNav) matchedNav.classList.add("active");
+
+    // 2. Show target pane, hide all others
+    document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.add("hidden"));
+    const activePane = document.getElementById(`tab-${targetTab}`);
+    if (activePane) activePane.classList.remove("hidden");
+
+    // 3. Update page title
+    const pageTitle = document.getElementById("pageTitle");
+    const titles = {
+      "scanner":            "Live Market Scanner — Soufi Crypto Scanner",
+      "holdings":           "Paper Trade Holding & Transaction Ledger",
+      "analysis-logic":     "Supreme God & Sub-Agent Analysis Logic Registry",
+      "robo-trade":         "Soufi Crypto Scanner — Autonomous Robo Trade Arena",
+      "performance-review": "Group D Performance Trade Review & Supreme AI Council",
+      "backtest":           "Group E 10-Year Historical Backtest Result & Supreme AI Council",
+      "timeseries":         "ClickHouse Time-Series Engine",
+      "users":              "Multi-Admin & Concurrent IP Sessions Management",
+      "coins":              "Coin Registry & Meme Filter",
+      "stream":             "Single Connection Stream Architecture"
+    };
+    if (pageTitle && titles[targetTab]) pageTitle.textContent = titles[targetTab];
+
+    // 4. Tab-specific data loaders
+    if (targetTab === "holdings" && typeof renderHoldingsAndHistoryTables === 'function') {
+      renderHoldingsAndHistoryTables();
+    }
+    if (targetTab === "analysis-logic" && typeof fetchAnalysisLogicRegistry === 'function') {
+      fetchAnalysisLogicRegistry();
+    }
+    if (targetTab === "robo-trade" && typeof window.initRoboTradeModule === 'function') {
+      window.initRoboTradeModule();
+    }
+    if (targetTab === "performance-review" && typeof window.fetchPerformanceTradeReview === 'function') {
+      window.fetchPerformanceTradeReview();
+    }
+    if (targetTab === "backtest" && typeof fetchBacktestPatterns === 'function') {
+      fetchBacktestPatterns();
+    }
+    if (targetTab === "users") {
+      if (typeof window.fetchActiveIpSessions === "function") window.fetchActiveIpSessions();
+      if (typeof window.fetchUsers === "function") window.fetchUsers();
+    }
+    if (targetTab === "coins" && typeof loadCoinsTable === 'function') {
+      loadCoinsTable();
+    }
+
+    // 5. Close mobile sidebar after nav click
+    const _sidebar = document.getElementById("sidebar");
+    const _backdrop = document.getElementById("sidebarBackdrop");
+    if (_sidebar) _sidebar.classList.remove("mobile-open");
+    if (_backdrop) _backdrop.classList.remove("visible");
+  }
+
+  // Attach click listeners to all nav items
   document.querySelectorAll(".nav-item").forEach(nav => {
     nav.addEventListener("click", (e) => {
       e.preventDefault();
       const targetTab = nav.getAttribute("data-tab");
-
-      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-      nav.classList.add("active");
-
-      document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.add("hidden"));
-      const activePane = document.getElementById(`tab-${targetTab}`);
-      if (activePane) activePane.classList.remove("hidden");
-
-      // Update Top Page Title
-      const pageTitle = document.getElementById("pageTitle");
-      if (targetTab === "scanner") pageTitle.textContent = "Live Market Scanner — Soufi Crypto Scanner";
-      if (targetTab === "holdings") {
-        pageTitle.textContent = "Paper Trade Holding & Transaction Ledger";
-        if (typeof renderHoldingsAndHistoryTables === 'function') renderHoldingsAndHistoryTables();
-      }
-      if (targetTab === "users") {
-        pageTitle.textContent = "Multi-Admin & Concurrent IP Sessions Management";
-        if (typeof window.fetchActiveIpSessions === "function") window.fetchActiveIpSessions();
-        if (typeof window.fetchUsers === "function") window.fetchUsers();
-      }
-        if (typeof fetchAnalysisLogicRegistry === 'function') fetchAnalysisLogicRegistry();
-      }
-      if (targetTab === "robo-trade") {
-        pageTitle.textContent = "Soufi Crypto Scanner — Autonomous Robo Trade Arena";
-        if (typeof window.initRoboTradeModule === 'function') window.initRoboTradeModule();
-      }
-      if (targetTab === "performance-review") {
-        pageTitle.textContent = "Group D Performance Trade Review & Supreme AI Council";
-        if (typeof window.fetchPerformanceTradeReview === 'function') window.fetchPerformanceTradeReview();
-      }
-      if (targetTab === "backtest") {
-        pageTitle.textContent = "Group E 10-Year Historical Backtest Result & Supreme AI Council";
-        if (typeof fetchBacktestPatterns === 'function') fetchBacktestPatterns();
-      }
-      if (targetTab === "timeseries") pageTitle.textContent = "ClickHouse Time-Series Engine";
-      if (targetTab === "users") pageTitle.textContent = "User Management Table";
-      if (targetTab === "coins") {
-        pageTitle.textContent = "Coin Registry & Meme Filter";
-        loadCoinsTable();
-      }
-      if (targetTab === "stream") pageTitle.textContent = "Single Connection Stream Architecture";
-
-      // Mobile sidebar close on nav
-      sidebar.classList.remove("mobile-open");
+      switchTab(targetTab);
+    });
+    // Also handle touchend for mobile phone browsers
+    nav.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      const targetTab = nav.getAttribute("data-tab");
+      switchTab(targetTab);
     });
   });
+
+  // Expose switchTab globally for use from inline onclick handlers
+  window.switchTab = switchTab;
 
   const coinsTableBody = document.getElementById("coinsTableBody");
   const navCoinCount = document.getElementById("navCoinCount");
