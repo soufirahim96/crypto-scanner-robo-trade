@@ -189,32 +189,53 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // MOBILE HAMBURGER MENU — fixed for phone browsers
-  const mobileMenuBtnEl = document.getElementById("mobileMenuBtn");
-  const mobileCloseSidebarEl = document.getElementById("mobileCloseSidebar");
+  // MOBILE HAMBURGER MENU — fixed for phone browsers & Chrome mobile (V95.5)
   const sidebarEl = document.getElementById("sidebar");
   const backdropEl = document.getElementById("sidebarBackdrop");
 
   function openMobileSidebar() {
-    if (sidebarEl) sidebarEl.classList.add("mobile-open");
-    if (backdropEl) backdropEl.classList.add("visible");
+    const s = sidebarEl || document.getElementById("sidebar");
+    const b = backdropEl || document.getElementById("sidebarBackdrop");
+    if (s) {
+      s.classList.add("mobile-open");
+      s.style.transform = "translateX(0)";
+      s.style.display = "flex";
+      s.style.visibility = "visible";
+    }
+    if (b) {
+      b.classList.add("visible");
+      b.style.display = "block";
+    }
   }
+
   function closeMobileSidebar() {
-    if (sidebarEl) sidebarEl.classList.remove("mobile-open");
-    if (backdropEl) backdropEl.classList.remove("visible");
+    const s = sidebarEl || document.getElementById("sidebar");
+    const b = backdropEl || document.getElementById("sidebarBackdrop");
+    if (s) {
+      s.classList.remove("mobile-open");
+      s.style.transform = "";
+    }
+    if (b) {
+      b.classList.remove("visible");
+      b.style.display = "";
+    }
   }
+
+  // Expose globally for inline HTML event handlers
+  window.openMobileSidebar = openMobileSidebar;
+  window.closeMobileSidebar = closeMobileSidebar;
+
+  const mobileMenuBtnEl = document.getElementById("mobileMenuBtn");
+  const mobileCloseSidebarEl = document.getElementById("mobileCloseSidebar");
 
   if (mobileMenuBtnEl) {
     mobileMenuBtnEl.addEventListener("click", openMobileSidebar);
-    mobileMenuBtnEl.addEventListener("touchend", (e) => { e.preventDefault(); openMobileSidebar(); });
   }
   if (mobileCloseSidebarEl) {
     mobileCloseSidebarEl.addEventListener("click", closeMobileSidebar);
-    mobileCloseSidebarEl.addEventListener("touchend", (e) => { e.preventDefault(); closeMobileSidebar(); });
   }
   if (backdropEl) {
     backdropEl.addEventListener("click", closeMobileSidebar);
-    backdropEl.addEventListener("touchend", (e) => { e.preventDefault(); closeMobileSidebar(); });
   }
 
   function checkAuthSession() {
