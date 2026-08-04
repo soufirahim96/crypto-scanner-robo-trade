@@ -44,7 +44,7 @@ class CryptoScannerEngine:
         if self.running:
             return
         self.running = True
-        logger.info("Starting Binance-Primary Scanner V97.0 (God of Trade Master Architecture)...")
+        logger.info("Starting Binance-Primary Scanner V95.4...")
         self._seed_baseline_tickers()
         asyncio.create_task(self._rate_calculator_loop())
         asyncio.create_task(self._db_batch_writer_loop())

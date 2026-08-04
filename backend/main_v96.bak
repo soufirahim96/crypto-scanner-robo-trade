@@ -1554,7 +1554,7 @@ def run_robo_trade_loop():
                         if vol < 5000000:
                             continue
 
-                        # STAGE 4: BEARISH PROTECTION SHIELD & BTC DUMP WARNING (V97)
+                        # STAGE 4: BEARISH PROTECTION SHIELD (5M CHoCH & 6-Candle 5M Sell Vol Ratio)
                         sell_vol_ratio = 1.0
                         if chg < -1.5 and vol > 10000000:
                             sell_vol_ratio = 2.4  # Sell volume spike detected
@@ -1563,11 +1563,7 @@ def run_robo_trade_loop():
 
                         has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
                         has_volume_veto = (sell_vol_ratio > 2.0)
-                        
-                        # VERSION 97: LIVE BTC MACRO DUMP SENSOR
-                        btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
-                        btc_chg = btc_ticker.get("change_pct", 0) if btc_ticker else 0
-                        btc_dump_warning = (btc_chg < -1.5)  # Hard Veto if BTC dumping > -1.5%
+                        btc_dump_warning = False
 
                         has_hard_veto = has_bearish_choch or has_volume_veto or btc_dump_warning
 
@@ -1602,14 +1598,10 @@ def run_robo_trade_loop():
                         if price <= 0: continue
                         
                         if "GOD" in participant:
-                            # VERSION 97: STAGE 3 INSTITUTIONAL OTE RETEST ENTRY TARGET (-0.8% to -1.8% deep FVG retest floor)
-                            pullback_pct = random.uniform(0.008, 0.018)
-                            entry = price * (1.0 - pullback_pct)
-                            tier_str = "👑 GRADE S (9.5+ Pts) OTE FVG RETEST" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            entry = price * (1.0 - random.uniform(0.0005, 0.0025))
+                            tier_str = "👑 GRADE S (9.5+ Pts) FVG SCALE-IN" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
-                            # Group C OB Bot: Stage 3 Golden Pocket Retest (-1.2% to -2.2% deep retest)
-                            pullback_pct = random.uniform(0.012, 0.022)
-                            entry = price * (1.0 - pullback_pct)
+                            entry = price * (0.999 - random.uniform(0.001, 0.004))
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
                             
                         exit_price = entry * (1.05 + random.uniform(0.005, 0.05))
@@ -1683,12 +1675,8 @@ def run_robo_trade_loop():
                         if t and t.get("is_live", False):  # CRITICAL V95.6: Only execute trade if real live price stream is active!
                             curr_price = t.get("price", 0)
                             entry = sched['entry_price_target']
-                            low_1m = t.get("low", curr_price)
-                            bounce_pct = ((curr_price - low_1m) / low_1m) * 100.0 if low_1m > 0 else 0.0
                             
-                            # VERSION 97: STAGE 4 PART 1 - 1M MICRO-WICK FLOOR REVERSAL GUARD (Bounce >= +0.15%)
-                            # Holds execution until price bounces +0.15% off micro floor to stop falling-knife entries
-                            if curr_price > 0 and curr_price <= entry and bounce_pct >= 0.15:
+                            if curr_price > 0 and curr_price <= entry:
                                 # VERSION 92: STAGE 8 IRON RULE CHECK - 100% SPOT-ONLY ZERO-LEVERAGE HARD VETO GUARD
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
@@ -1706,12 +1694,10 @@ def run_robo_trade_loop():
                                     print(f"[STAGE 7 FORMULA #4] 👑 SUPREME GOD AI BOT scanned 3 S/R Pairs for {sym} before entry -> Micro Floor: ${p1_s_strong}, Struct Floor: ${p2_s_strong}, Wholesale Floor: ${p3_s_strong}. Pullback Defense Ready!")
 
                                 db_manager.mark_robo_schedule_executed(sched['id'])
-                                # VERSION 97: STAGE 8 FRACTIONAL KELLY SIZING ($25.00 for Grade S setups >= 9.5 Pts, $20.00 standard)
-                                score_val = float(sched.get('confluence_score', 0) or 0)
-                                capital = 25.0 if score_val >= 9.5 else 20.0
+                                capital = 20.0  # Pure Uniform $20.00 USD Allocation per transaction for Binance Sandbox (Spot Only)
                                 db_manager.add_active_holding(participant, sym, curr_price, capital/curr_price)
                                 open_count += 1
-                                print(f"[ROBO TRADE EXECUTED - VERSION 97 V97.0 STAGE 4 & 8] {participant} bought {sym} at {curr_price} (${capital:.2f} Spot Allocation, 1x Leverage, 1M Wick Bounce: +{bounce_pct:.2f}%)")
+                                print(f"[ROBO TRADE EXECUTED - VERSION 92 STAGE 8 SPOT ONLY] {participant} bought {sym} at {curr_price} ($20.00 Spot Allocation, 1x Leverage, Position Active in Holdings)")
                                 if open_count >= 5:
                                     break
                 
@@ -1787,12 +1773,11 @@ def run_robo_trade_loop():
                             # VERSION 94: Daily 12:00 PM - 2:00 PM MYT 2-Hour Golden Opportunity Exit Window (Both Bot Groups Allowed to Exit when Net PnL >= +$0.05 USD / Fee + Profit Covered)
                             should_exit = True
                             exit_reason = f"Daily 12:00-2:00 PM MYT 2-Hour Golden Opportunity Exit (Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD [Covered 0.2% Fee + Profit])"
-                        elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_required_net:
-                            # VERSION 97: STAGE 7 FORMULA #5 MASTER UPGRADE - SUPREME GOD AI VELOCITY EXIT & DYNAMIC CAPITAL RECYCLER
-                            # If Supreme God AI Bot holds a position for > 45 minutes (2700s) and Net PnL >= +$0.05 USD (covering 0.20% fee + net profit),
-                            # God AI Bot executes Velocity Exit Privilege to recycle capital at 3x speed into explosive Grade S (9.5+ Pts) setups!
+                        elif "GOD" in participant and holding_sec >= 7200 and h_net >= min_required_net:
+                            # STAGE 7 FORMULA #5: 2-HOUR HOLDING CAPITAL RECYCLE EXIT PRIVILEGE (ONLY FOR GOD OF TRADE)
+                            # If God AI Bot holds a position for > 2 hours and Net PnL >= +$0.05 USD (Capital * 0.25% after 0.20% fee), exit to recycle capital!
                             should_exit = True
-                            exit_reason = f"👑 God of Trade Velocity Exit & Capital Recycler (Formula #5 Master Upgrade) (Holding Time: {holding_sec/60.0:.1f}m >= 45m, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD)"
+                            exit_reason = f"👑 God of Trade 2-Hour Capital Recycle Exit (Formula #5) (Holding Time: {holding_sec/3600.0:.1f}h >= 2.0h, Gross PnL: +${trade_pnl:.4f}, Net PnL: +${h_net:.4f} >= +${min_required_net:.2f} USD)"
                         elif peak_pnl_pct >= 4.0:
                             # Rule 2: If Profit reached >= +4.0% at peak, IMMEDIATELY Lock Stop Loss at +3.50% (Entry * 1.035) or higher trailing (Peak - 1.5%)!
                             trailing_sl_price = max(entry * 1.035, highest_p * 0.985)

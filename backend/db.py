@@ -748,7 +748,17 @@ class DatabaseManager:
             conn.commit()
             return True
 
-    # VERSION 63: FRESH START RESET ALL ROBO & PAPER TRADING DATA
+    # VERSION 97: FRESH START RESET ALL ROBO & PAPER TRADING DATA
+    def clear_all_robo_data_v97(self) -> bool:
+        """VERSION 97: Pure Fresh Start Reset — wipes all legacy active holdings, transaction history, and pending robo schedules"""
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM active_holdings")
+            cursor.execute("DELETE FROM transaction_history")
+            cursor.execute("DELETE FROM robo_schedules")
+            conn.commit()
+            return True
+
     def clear_all_robo_data(self) -> bool:
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
