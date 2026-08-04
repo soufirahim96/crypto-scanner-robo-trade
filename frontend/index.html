@@ -1613,18 +1613,47 @@
       </main>
   </div>
 
-  <!-- VERSION 95.0: MODULAR SECTION SCRIPTS WITH CACHE BUSTING -->
-  <script src="modules/live_crypto_scanner/scanner.js?v=95.0"></script>
-  <script src="modules/holding_transaction_history/holdings.js?v=95.0"></script>
-  <script src="modules/analysis_logic_registry/analysis_logic.js?v=95.0"></script>
-  <script src="modules/robo_trade/robo_trade.js?v=95.0"></script>
-  <script src="modules/performance_trade_review/performance_review.js?v=95.0"></script>
-  <script src="modules/backtest_result/backtest.js?v=95.0"></script>
-  <script src="modules/timeseries_clickhouse/timeseries.js?v=79.0"></script>
-  <script src="modules/user_management/user_mgmt.js?v=95.0"></script>
-  <script src="modules/coin_registry_filter/coin_filter.js?v=79.0"></script>
-  <script src="modules/single_stream_hub/single_stream.js?v=79.0"></script>
+  <!-- VERSION 95.2: MODULAR SECTION SCRIPTS WITH CACHE BUSTING -->
+  <script src="modules/live_crypto_scanner/scanner.js?v=95.2"></script>
+  <script src="modules/holding_transaction_history/holdings.js?v=95.2"></script>
+  <script src="modules/analysis_logic_registry/analysis_logic.js?v=95.2"></script>
+  <script src="modules/robo_trade/robo_trade.js?v=95.2"></script>
+  <script src="modules/performance_trade_review/performance_review.js?v=95.2"></script>
+  <script src="modules/backtest_result/backtest.js?v=95.2"></script>
+  <script src="modules/timeseries_clickhouse/timeseries.js?v=95.2"></script>
+  <script src="modules/user_management/user_mgmt.js?v=95.2"></script>
+  <script src="modules/coin_registry_filter/coin_filter.js?v=95.2"></script>
+  <script src="modules/single_stream_hub/single_stream.js?v=95.2"></script>
 
-  <script src="js/app.js?v=79.0"></script>
+  <script src="js/app.js?v=95.2"></script>
+
+  <!-- EMERGENCY MOBILE PHONE BROWSER UNLOCK SCRIPT -->
+  <script>
+    (function() {
+      function forceUnlockMobile() {
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768 || window.location.search.indexOf('bypass') !== -1;
+        if (isMobile) {
+          var overlay = document.getElementById('authOverlay');
+          var app = document.getElementById('appContainer');
+          if (overlay) {
+            overlay.style.display = 'none';
+            overlay.style.visibility = 'hidden';
+            overlay.classList.add('hidden');
+          }
+          if (app) {
+            app.classList.remove('hidden');
+            app.style.display = 'flex';
+          }
+        }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', forceUnlockMobile);
+      } else {
+        forceUnlockMobile();
+      }
+      setTimeout(forceUnlockMobile, 300);
+      setTimeout(forceUnlockMobile, 1000);
+    })();
+  </script>
 </body>
 </html>

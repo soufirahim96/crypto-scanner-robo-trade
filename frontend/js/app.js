@@ -219,8 +219,18 @@ document.addEventListener("DOMContentLoaded", () => {
   function onAuthSuccess(user) {
     try {
       currentUser = user || adminDefaultUser;
-      if (authOverlay) authOverlay.style.display = "none";
-      if (appContainer) appContainer.classList.remove("hidden");
+      const overlayEl = document.getElementById("authOverlay") || authOverlay;
+      const appEl = document.getElementById("appContainer") || appContainer;
+
+      if (overlayEl) {
+        overlayEl.style.display = "none";
+        overlayEl.style.visibility = "hidden";
+        overlayEl.classList.add("hidden");
+      }
+      if (appEl) {
+        appEl.classList.remove("hidden");
+        appEl.style.display = "flex";
+      }
 
       // Display user profile in sidebar
       if (sidebarUsername) sidebarUsername.textContent = `${currentUser.first_name || 'Admin'} ${currentUser.last_name || 'User'}`;
