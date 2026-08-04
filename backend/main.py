@@ -5,7 +5,7 @@ import asyncio
 import requests
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
@@ -1858,6 +1858,85 @@ def get_performance_review_data():
 
     comm_today = 0.0
     comm_weekly = 0.0
+
+# VERSION 95: MULTI-ADMIN AUTHENTICATION & CONCURRENT IP SESSION GUARD (MAX 3 ACTIVE IPS)
+def get_client_ip(request: Request) -> str:
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LogoutIpRequest(BaseModel):
+    client_ip: str
+
+@app.post("/api/login")
+def admin_login(req: AdminLoginRequest, request: Request):
+    """
+    VERSION 95: MULTI-ADMIN AUTHENTICATION & 3-CONCURRENT ACTIVE IP LIMIT GUARD
+    Supports multi-admin accounts (admin, admin1, admin2, admin3, soufi_admin -> password: admin123).
+    Enforces maximum 3 distinct active client IPs!
+    """
+    client_ip = get_client_ip(request)
+    user = db_manager.get_user_by_username(req.username)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+    if not verify_password(req.password, user["password_hash"], user["password_salt"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+    reg_res = db_manager.register_ip_session(req.username, client_ip)
+    if not reg_res["allowed"]:
+        raise HTTPException(status_code=403, detail=reg_res["message"])
+        
+    return {
+        "status": "success",
+        "message": f"Welcome {user['first_name']}! Login successful.",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
+            "email": user["email"]
+        },
+        "client_ip": client_ip,
+        "active_ip_slots": f"{reg_res['active_count']} / {reg_res['max_limit']} Active IPs"
+    }
+
+@app.get("/api/admin/active_sessions")
+def get_active_admin_sessions(request: Request):
+    """VERSION 95: GET ACTIVE ADMIN IP SESSIONS (MAX 3)"""
+    current_ip = get_client_ip(request)
+    active_sessions = db_manager.get_active_ip_sessions()
+    return {
+        "status": "success",
+        "current_client_ip": current_ip,
+        "active_count": len(active_sessions),
+        "max_limit": 3,
+        "ip_slots_text": f"{len(active_sessions)} / 3 Active IPs",
+        "sessions": active_sessions
+    }
+
+@app.post("/api/admin/logout_ip")
+def logout_admin_ip(req: LogoutIpRequest):
+    """VERSION 95: TERMINATE AN ACTIVE ADMIN IP SESSION TO FREE UP A SLOT"""
+    success = db_manager.terminate_ip_session(req.client_ip)
+    active_sessions = db_manager.get_active_ip_sessions()
+    return {
+        "status": "success" if success else "error",
+        "message": f"Session for IP {req.client_ip} terminated." if success else f"IP {req.client_ip} not found in active sessions.",
+        "active_count": len(active_sessions),
+        "max_limit": 3
+    }
     comm_monthly = 0.0
     comm_lifetime = 0.0
 

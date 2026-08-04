@@ -43,21 +43,29 @@ class DatabaseManager:
                 )
             """)
 
-            # VERSION 65: ENSURE ADMIN USER CREDENTIALS (username=admin, password=admin123)
+            # VERSION 95: ENSURE MULTI-ADMIN USER CREDENTIALS (admin, admin1, admin2, admin3, soufi_admin -> password=admin123)
+            default_admins = [
+                ("admin", "Admin", "Master", "admin@cryptoscanner.io"),
+                ("admin1", "Admin", "One", "admin1@cryptoscanner.io"),
+                ("admin2", "Admin", "Two", "admin2@cryptoscanner.io"),
+                ("admin3", "Admin", "Three", "admin3@cryptoscanner.io"),
+                ("soufi_admin", "Soufi", "Admin", "soufi_admin@cryptoscanner.io")
+            ]
             cred = hash_password("admin123")
-            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
-            admin_row = cursor.fetchone()
-            if admin_row:
-                cursor.execute(
-                    "UPDATE users SET password_hash = ?, password_salt = ? WHERE username = 'admin'",
-                    (cred["hash"], cred["salt"])
-                )
-            else:
-                admin_id = generate_32_hash_id()
-                cursor.execute(
-                    "INSERT INTO users (id, first_name, last_name, email, username, password_hash, password_salt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (admin_id, "Admin", "User", "admin@cryptoscanner.io", "admin", cred["hash"], cred["salt"])
-                )
+            for uname, fname, lname, email in default_admins:
+                cursor.execute("SELECT id FROM users WHERE username = ?", (uname,))
+                row = cursor.fetchone()
+                if row:
+                    cursor.execute(
+                        "UPDATE users SET password_hash = ?, password_salt = ? WHERE username = ?",
+                        (cred["hash"], cred["salt"], uname)
+                    )
+                else:
+                    u_id = generate_32_hash_id()
+                    cursor.execute(
+                        "INSERT INTO users (id, first_name, last_name, email, username, password_hash, password_salt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (u_id, fname, lname, email, uname, cred["hash"], cred["salt"])
+                    )
             
             # Coin Registry table with 32-character hash ID
             cursor.execute("""
@@ -815,5 +823,58 @@ class DatabaseManager:
         except Exception as e:
             print("[DB Pruning Error]", e)
         return 0
+
+    # VERSION 95: MULTI-ADMIN CONCURRENT IP SESSION GUARD (MAX 3 ACTIVE IPS)
+    def init_ip_sessions(self):
+        if not hasattr(self, "_active_ip_sessions"):
+            self._active_ip_sessions: Dict[str, Dict[str, Any]] = {}
+
+    def get_active_ip_sessions(self) -> List[Dict[str, Any]]:
+        self.init_ip_sessions()
+        now = time.time()
+        # Auto-expire sessions idle for > 3600s (1 hour)
+        expired = [ip for ip, s in self._active_ip_sessions.items() if now - s.get("last_active", 0) > 3600]
+        for ip in expired:
+            del self._active_ip_sessions[ip]
+        return list(self._active_ip_sessions.values())
+
+    def register_ip_session(self, username: str, client_ip: str) -> Dict[str, Any]:
+        self.init_ip_sessions()
+        active_list = self.get_active_ip_sessions()
+        now = time.time()
+        
+        # If IP is already active, update last_active timestamp
+        if client_ip in self._active_ip_sessions:
+            self._active_ip_sessions[client_ip]["last_active"] = now
+            self._active_ip_sessions[client_ip]["username"] = username
+            return {"allowed": True, "message": "IP session active & refreshed", "active_count": len(self._active_ip_sessions), "max_limit": 3}
+            
+        # If IP is NEW and active IP count >= 3, BLOCK LOGIN!
+        if len(self._active_ip_sessions) >= 3:
+            active_ips = [s["client_ip"] for s in self._active_ip_sessions.values()]
+            return {
+                "allowed": False,
+                "message": f"Maximum 3 Concurrent Admin IP Login Limit Reached. Active IPs: {len(self._active_ip_sessions)}/3 ({', '.join(active_ips)}). Please logout from another device.",
+                "active_count": len(self._active_ip_sessions),
+                "max_limit": 3
+            }
+
+        # Register new IP session
+        import datetime
+        self._active_ip_sessions[client_ip] = {
+            "client_ip": client_ip,
+            "username": username,
+            "login_time": now,
+            "last_active": now,
+            "login_time_str": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        return {"allowed": True, "message": "IP session successfully registered", "active_count": len(self._active_ip_sessions), "max_limit": 3}
+
+    def terminate_ip_session(self, client_ip: str) -> bool:
+        self.init_ip_sessions()
+        if client_ip in self._active_ip_sessions:
+            del self._active_ip_sessions[client_ip]
+            return True
+        return False
 
 db_manager = DatabaseManager()

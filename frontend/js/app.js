@@ -261,8 +261,11 @@ document.addEventListener("DOMContentLoaded", () => {
         pageTitle.textContent = "Paper Trade Holding & Transaction Ledger";
         if (typeof renderHoldingsAndHistoryTables === 'function') renderHoldingsAndHistoryTables();
       }
-      if (targetTab === "analysis-logic") {
-        pageTitle.textContent = "Supreme God & Sub-Agent Analysis Logic Registry";
+      if (targetTab === "users") {
+        pageTitle.textContent = "Multi-Admin & Concurrent IP Sessions Management";
+        if (typeof window.fetchActiveIpSessions === "function") window.fetchActiveIpSessions();
+        if (typeof window.fetchUsers === "function") window.fetchUsers();
+      }
         if (typeof fetchAnalysisLogicRegistry === 'function') fetchAnalysisLogicRegistry();
       }
       if (targetTab === "robo-trade") {

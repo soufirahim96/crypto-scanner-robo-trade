@@ -83,6 +83,14 @@ analysis_rules_db = [
         "assigned_agent": "🛡️ Unanimous AI Council & Risk Sentinel",
         "rule_type": "Spot-Only Capital Allocation & Leverage Hard Veto",
         "description": "All trades for both Robo Trade groups must strictly use raw capital (1x Spot-only, e.g. $20.00 USD allocation per trade) without using any leverage. If any order attempt detects leverage > 1x, all 5 AI Council members cast an immediate UNANIMOUS HARD VETO to block trade entry!"
+    },
+    {
+        "id": "STAGE-9-MULTI-ADMIN-IP-GUARD",
+        "logic_name": "Stage 9: Multi-Admin Authentication & 3-Concurrent Active IP Limit Guard",
+        "target_scope": "Security Access Control & Concurrent IP Session Management",
+        "assigned_agent": "🔐 Multi-Admin Security Sentinel",
+        "rule_type": "Multi-Admin Provisioning & 3-IP Concurrent Session Limit",
+        "description": "Supports multiple admin credentials (admin, admin1, admin2, admin3, soufi_admin -> password: admin123). Tracks active sessions strictly by Client IP Address. Allows a maximum of 3 distinct active IP sessions concurrently. If a 4th distinct IP attempts to log in, entry is strictly BLOCKED (HTTP 403) until an existing session is logged out or expires!"
     }
 ]
 

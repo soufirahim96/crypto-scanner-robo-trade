@@ -1286,6 +1286,71 @@
           </div>
         </div>
       </section>
+
+      <!-- VERSION 95 TAB: MULTI-ADMIN & CONCURRENT IP SESSION MANAGEMENT -->
+      <section id="tab-users" class="tab-pane hidden">
+        <!-- CONCURRENT IP SESSIONS PANEL -->
+        <div class="content-panel glass-panel mb-4" style="border: 1px solid rgba(0, 240, 255, 0.4);">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3><i class="fa-solid fa-network-wired text-cyan"></i> Concurrent Admin IP Sessions Guard (Max 3 Active IPs)</h3>
+              <p class="subtitle-text">Tracks active admin login sessions by Client IP Address. Enforces maximum 3 concurrent active IPs.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span id="activeIpSlotsText" class="badge-mini" style="background: rgba(0, 240, 255, 0.2); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 800; font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+                <i class="fa-solid fa-shield-halved"></i> 1 / 3 Active IPs
+              </span>
+              <button onclick="fetchActiveIpSessions()" class="btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                <i class="fa-solid fa-rotate"></i> Refresh IPs
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Client IP Address</th>
+                  <th>Admin Username</th>
+                  <th>Login Time</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="activeIpSessionsTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- MULTI-ADMIN USERS LIST PANEL -->
+        <div class="content-panel glass-panel">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-users text-gradient"></i> Multi-Admin Credentials Registry</h3>
+              <p class="subtitle-text">Registered admin accounts authorized for system login (admin, admin1, admin2, admin3, soufi_admin).</p>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>User ID</th>
+                  <th>Full Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role Status</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Filled dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
       <!-- VERSION 68: DEDICATED ROBO TRADE SECTION & ARENA -->
       <section id="tab-robo-trade" class="tab-pane hidden">
         <div id="roboTradeModuleContainer">
@@ -1548,15 +1613,15 @@
       </main>
   </div>
 
-  <!-- VERSION 94.0: MODULAR SECTION SCRIPTS WITH CACHE BUSTING -->
-  <script src="modules/live_crypto_scanner/scanner.js?v=94.0"></script>
-  <script src="modules/holding_transaction_history/holdings.js?v=94.0"></script>
-  <script src="modules/analysis_logic_registry/analysis_logic.js?v=94.0"></script>
-  <script src="modules/robo_trade/robo_trade.js?v=94.0"></script>
-  <script src="modules/performance_trade_review/performance_review.js?v=94.0"></script>
-  <script src="modules/backtest_result/backtest.js?v=94.0"></script>
+  <!-- VERSION 95.0: MODULAR SECTION SCRIPTS WITH CACHE BUSTING -->
+  <script src="modules/live_crypto_scanner/scanner.js?v=95.0"></script>
+  <script src="modules/holding_transaction_history/holdings.js?v=95.0"></script>
+  <script src="modules/analysis_logic_registry/analysis_logic.js?v=95.0"></script>
+  <script src="modules/robo_trade/robo_trade.js?v=95.0"></script>
+  <script src="modules/performance_trade_review/performance_review.js?v=95.0"></script>
+  <script src="modules/backtest_result/backtest.js?v=95.0"></script>
   <script src="modules/timeseries_clickhouse/timeseries.js?v=79.0"></script>
-  <script src="modules/user_management/user_mgmt.js?v=79.0"></script>
+  <script src="modules/user_management/user_mgmt.js?v=95.0"></script>
   <script src="modules/coin_registry_filter/coin_filter.js?v=79.0"></script>
   <script src="modules/single_stream_hub/single_stream.js?v=79.0"></script>
 
