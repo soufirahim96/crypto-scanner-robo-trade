@@ -7,7 +7,30 @@ import threading
 from typing import List, Dict, Any, Optional
 from backend.auth import generate_32_hash_id, hash_password
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "crypto_scanner.db")
+# ─────────────────────────────────────────────────────────────────────────────
+# PERSISTENT DATABASE PATH — Survives Railway Redeploys
+# ─────────────────────────────────────────────────────────────────────────────
+# On Railway: Set env variable RAILWAY_VOLUME_MOUNT_PATH (e.g. /data) via
+#   Railway Dashboard → Your Service → Variables → Add:
+#     RAILWAY_VOLUME_MOUNT_PATH = /data
+# On Localhost: Falls back to backend/crypto_scanner.db (unchanged behaviour)
+#
+# HOW IT WORKS:
+#   - Railway containers are ephemeral (destroyed on every deploy)
+#   - Files inside the container are wiped on redeploy
+#   - A Railway Volume is a permanent disk mounted at /data (or your chosen path)
+#   - By storing the .db file on the Volume, it NEVER gets wiped on redeploy
+#   - All holdings, transaction history, and robo trade data survive every update
+# ─────────────────────────────────────────────────────────────────────────────
+_VOLUME_PATH = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "")
+if _VOLUME_PATH and os.path.isdir(_VOLUME_PATH):
+    # Running on Railway with a persistent volume mounted — store DB there
+    DB_FILE = os.path.join(_VOLUME_PATH, "crypto_scanner.db")
+    print(f"[DB] Using Railway Persistent Volume: {DB_FILE}")
+else:
+    # Running on localhost — use the default local path
+    DB_FILE = os.path.join(os.path.dirname(__file__), "crypto_scanner.db")
+
 CLICKHOUSE_HOST = os.environ.get("CLICKHOUSE_HOST", "http://localhost:8123")
 
 class DatabaseManager:
