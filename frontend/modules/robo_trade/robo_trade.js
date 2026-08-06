@@ -1,3 +1,19 @@
+// Autonomous Robo Trade Arena — Complete Bulletproof Data Renderer (V99.5)
+
+function setTxt(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = String(val !== undefined && val !== null ? val : "");
+}
+
+function findStats(data, keyword) {
+  if (!data || typeof data !== "object") return {};
+  const kw = String(keyword).toUpperCase();
+  for (let k in data) {
+    if (k.toUpperCase().includes(kw)) return data[k] || {};
+  }
+  return {};
+}
+
 window.initRoboTradeModule = function () {
   const container = document.getElementById("roboTradeModuleContainer");
   if (!container) return;
@@ -11,7 +27,7 @@ window.initRoboTradeModule = function () {
       const data = await res.json();
       if (data.status === "success") {
         alert("✅ Robo Trade Arena successfully reset to a fresh start! Both bots have restarted with $0.00 PnL metrics.");
-        updateRoboTradeModule();
+        window.updateRoboTradeModule();
       }
     } catch (err) {
       console.error("Reset Robo Trade Error:", err);
@@ -19,15 +35,28 @@ window.initRoboTradeModule = function () {
     }
   };
 
-  document.getElementById("refreshRoboTradeBtn")?.addEventListener("click", updateRoboTradeModule);
-  document.getElementById("resetRoboTradeBtn")?.addEventListener("click", handleResetClick);
-  document.getElementById("sidebarResetRoboBtn")?.addEventListener("click", handleResetClick);
-  updateRoboTradeModule();
+  const refreshBtn = document.getElementById("refreshRoboTradeBtn");
+  if (refreshBtn) {
+    refreshBtn.onclick = () => window.updateRoboTradeModule();
+  }
+
+  const resetBtn = document.getElementById("resetRoboTradeBtn");
+  if (resetBtn) {
+    resetBtn.onclick = handleResetClick;
+  }
+
+  const sidebarResetBtn = document.getElementById("sidebarResetRoboBtn");
+  if (sidebarResetBtn) {
+    sidebarResetBtn.onclick = handleResetClick;
+  }
+
+  window.updateRoboTradeModule();
 
   if (!window.roboTradeTimerInterval) {
     window.roboTradeTimerInterval = setInterval(() => {
-      if (document.getElementById("tab-robo-trade") && !document.getElementById("tab-robo-trade").classList.contains("hidden")) {
-        updateRoboTradeModule();
+      const roboTab = document.getElementById("tab-robo-trade");
+      if (roboTab && !roboTab.classList.contains("hidden")) {
+        window.updateRoboTradeModule();
       }
     }, 3000);
   }
@@ -36,135 +65,79 @@ window.initRoboTradeModule = function () {
 window.updateRoboTradeModule = async function () {
   try {
     const [hRes, sRes, stRes] = await Promise.all([
-      fetch("/api/paper/holdings").then(r => r.json()).catch(() => ({ holdings: [] })),
-      fetch("/api/robo/schedules").then(r => r.json()).catch(() => ({ schedules: [] })),
-      fetch("/api/robo/trade_stats").then(r => r.json()).catch(() => ({ stats: {} }))
+      fetch("/api/paper/holdings").then(r => r.json()).catch(e => ({ holdings: [] })),
+      fetch("/api/robo/schedules").then(r => r.json()).catch(e => ({ schedules: [] })),
+      fetch("/api/robo/trade_stats").then(r => r.json()).catch(e => ({ stats: {} }))
     ]);
 
-    const holdings = hRes.holdings || [];
-    const schedules = sRes.schedules || [];
-    const statsData = stRes.stats || {};
-    const todayDate = stRes.today_date || new Date().toISOString().split("T")[0];
+    const holdings = (hRes && hRes.holdings) || [];
+    const schedules = (sRes && sRes.schedules) || [];
+    const statsData = (stRes && stRes.stats) || {};
+    const todayDate = (stRes && stRes.today_date) || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
 
-    const todayEl = document.getElementById("roboTodayDateText");
-    if (todayEl) todayEl.innerText = todayDate;
+    // 0. Update Date
+    setTxt("roboTodayDateText", todayDate);
 
-    // Render Cumulative Commission Fees (Global)
-    const commSummary = stRes.commission_summary || {};
+    // 1. Render Cumulative Commission Fees (Global)
+    const commSummary = (stRes && stRes.commission_summary) || {};
     const totComm = commSummary.total || {};
-    setTxt("commTodayText", "$" + (totComm.today || 0).toFixed(4));
-    setTxt("commWkText", "$" + (totComm.weekly || 0).toFixed(4));
-    setTxt("commMoText", "$" + (totComm.monthly || 0).toFixed(4));
-    setTxt("commTotalText", "$" + (totComm.lifetime || 0).toFixed(4));
+    setTxt("commTodayText", "$" + (Number(totComm.today) || 0).toFixed(4));
+    setTxt("commWkText", "$" + (Number(totComm.weekly) || 0).toFixed(4));
+    setTxt("commMoText", "$" + (Number(totComm.monthly) || 0).toFixed(4));
+    setTxt("commTotalText", "$" + (Number(totComm.lifetime) || 0).toFixed(4));
 
-    function setTxt(id, val) {
-      const el = document.getElementById(id);
-      if (el) el.innerText = String(val);
-    }
+    // 2. SUPREME GOD AI BOT STATS
+    const godStats = findStats(statsData, "GOD");
+    setTxt("godTodayWins", Number(godStats.today_wins) || 0);
+    setTxt("godTodayLosses", Number(godStats.today_losses) || 0);
+    setTxt("godTodayProfit", "+$" + (Number(godStats.today_profit) || 0).toFixed(2));
+    setTxt("godTodayLossIncurred", "-$" + (Number(godStats.today_loss) || 0).toFixed(2));
+    setTxt("godTodayComm", "-$" + (Number(godStats.today_commission_fee) || 0).toFixed(4));
 
-    // ─────────────────────────────────────────────────────────────
-    // 1. SUPREME GOD AI BOT STATS
-    // ─────────────────────────────────────────────────────────────
-    let godStats = statsData["👑 SUPREME GOD AI BOT"] || {};
-    if (!godStats.today_wins && !godStats.total_wins && !godStats.total_profit) {
-      for (let k in statsData) {
-        if (k.includes("GOD") || k.includes("God")) { godStats = statsData[k]; break; }
-      }
-    }
-
-    // Today Stats (Resets 12:00 AM MYT - Requirement 2 & 3)
-    setTxt("godTodayWins", godStats.today_wins || 0);
-    setTxt("godTodayLosses", godStats.today_losses || 0);
-    setTxt("godTodayProfit", "+$" + (godStats.today_profit || 0).toFixed(2));
-    setTxt("godTodayLossIncurred", "-$" + (godStats.today_loss || 0).toFixed(2));
-    setTxt("godTodayComm", "-$" + (godStats.today_commission_fee || 0).toFixed(4));
-    
-    const godTodayNet = godStats.today_pnl || 0;
+    const godTodayNet = Number(godStats.today_pnl) || 0;
     const godTodayNetEl = document.getElementById("godTodayPnL");
     if (godTodayNetEl) {
       godTodayNetEl.innerText = (godTodayNet >= 0 ? "+" : "") + "$" + godTodayNet.toFixed(2);
       godTodayNetEl.style.color = godTodayNet >= 0 ? "#10b981" : "#ef4444";
     }
 
-    // Cumulative Lifetime Stats (Requirement 5)
-    setTxt("godCumProfit", "+$" + (godStats.total_profit || 0).toFixed(2));
-    setTxt("godCumLoss", "-$" + (godStats.total_loss || 0).toFixed(2));
-    setTxt("godCumComm", "-$" + (godStats.total_commission_fee || 0).toFixed(4));
-    const godCumNet = godStats.total_pnl || 0;
+    setTxt("godCumProfit", "+$" + (Number(godStats.total_profit) || 0).toFixed(2));
+    setTxt("godCumLoss", "-$" + (Number(godStats.total_loss) || 0).toFixed(2));
+    setTxt("godCumComm", "-$" + (Number(godStats.total_commission_fee) || 0).toFixed(4));
+    const godCumNet = Number(godStats.total_pnl) || 0;
     const godCumNetEl = document.getElementById("godCumNetPnL");
     if (godCumNetEl) {
       godCumNetEl.innerText = (godCumNet >= 0 ? "+" : "") + "$" + godCumNet.toFixed(2);
       godCumNetEl.style.color = godCumNet >= 0 ? "#10b981" : "#ef4444";
     }
 
-    setTxt("godTodayWinsText", godStats.today_wins || 0);
-    setTxt("godTodayLossesText", godStats.today_losses || 0);
-    const godTPnl = godStats.today_pnl || 0;
-    const godTPct = godStats.today_pnl_pct || 0;
-    setTxt("godTodayPnlText", (godTPnl >= 0 ? "+" : "") + "$" + godTPnl.toFixed(2));
-    setTxt("godTodayPctText", (godTPct >= 0 ? "+" : "") + godTPct.toFixed(2) + "%");
-    const godBadge = document.getElementById("godTodayPnlBadge");
-    if (godBadge) {
-      godBadge.innerText = (godTPnl >= 0 ? "+" : "") + "$" + godTPnl.toFixed(2) + " (" + (godTPct >= 0 ? "+" : "") + godTPct.toFixed(1) + "%)";
-      godBadge.className = "change-badge " + (godTPnl >= 0 ? "up" : "down");
-    }
+    // 3. GROUP C OB BOT STATS
+    const cStats = findStats(statsData, "GROUP C") || findStats(statsData, "C BOT");
+    setTxt("groupCTodayWins", Number(cStats.today_wins) || 0);
+    setTxt("groupCTodayLosses", Number(cStats.today_losses) || 0);
+    setTxt("groupCTodayProfit", "+$" + (Number(cStats.today_profit) || 0).toFixed(2));
+    setTxt("groupCTodayLossIncurred", "-$" + (Number(cStats.today_loss) || 0).toFixed(2));
+    setTxt("groupCTodayComm", "-$" + (Number(cStats.today_commission_fee) || 0).toFixed(4));
 
-    // ─────────────────────────────────────────────────────────────
-    // 2. GROUP C OB BOT STATS
-    // ─────────────────────────────────────────────────────────────
-    let cStats = statsData["⚡ GROUP C OB BOT"] || {};
-    if (!cStats.today_wins && !cStats.total_wins && !cStats.total_profit) {
-      for (let k in statsData) {
-        if (k.includes("GROUP C") || k.includes("Group C") || k.includes("C BOT")) { cStats = statsData[k]; break; }
-      }
-    }
-
-    // Today Stats (Resets 12:00 AM MYT - Requirement 2 & 3)
-    setTxt("groupCTodayWins", cStats.today_wins || 0);
-    setTxt("groupCTodayLosses", cStats.today_losses || 0);
-    setTxt("groupCTodayProfit", "+$" + (cStats.today_profit || 0).toFixed(2));
-    setTxt("groupCTodayLossIncurred", "-$" + (cStats.today_loss || 0).toFixed(2));
-    setTxt("groupCTodayComm", "-$" + (cStats.today_commission_fee || 0).toFixed(4));
-    
-    const cTodayNet = cStats.today_pnl || 0;
+    const cTodayNet = Number(cStats.today_pnl) || 0;
     const cTodayNetEl = document.getElementById("groupCTodayPnL");
     if (cTodayNetEl) {
       cTodayNetEl.innerText = (cTodayNet >= 0 ? "+" : "") + "$" + cTodayNet.toFixed(2);
       cTodayNetEl.style.color = cTodayNet >= 0 ? "#10b981" : "#ef4444";
     }
 
-    // Cumulative Lifetime Stats (Requirement 5)
-    setTxt("groupCCumProfit", "+$" + (cStats.total_profit || 0).toFixed(2));
-    setTxt("groupCCumLoss", "-$" + (cStats.total_loss || 0).toFixed(2));
-    setTxt("groupCCumComm", "-$" + (cStats.total_commission_fee || 0).toFixed(4));
-    const cCumNet = cStats.total_pnl || 0;
+    setTxt("groupCCumProfit", "+$" + (Number(cStats.total_profit) || 0).toFixed(2));
+    setTxt("groupCCumLoss", "-$" + (Number(cStats.total_loss) || 0).toFixed(2));
+    setTxt("groupCCumComm", "-$" + (Number(cStats.total_commission_fee) || 0).toFixed(4));
+    const cCumNet = Number(cStats.total_pnl) || 0;
     const cCumNetEl = document.getElementById("groupCCumNetPnL");
     if (cCumNetEl) {
       cCumNetEl.innerText = (cCumNet >= 0 ? "+" : "") + "$" + cCumNet.toFixed(2);
       cCumNetEl.style.color = cCumNet >= 0 ? "#10b981" : "#ef4444";
     }
 
-    setTxt("groupCTodayWinsText", cStats.today_wins || 0);
-    setTxt("groupCTodayLossesText", cStats.today_losses || 0);
-    const cTPnl = cStats.today_pnl || 0;
-    const cTPct = cStats.today_pnl_pct || 0;
-    setTxt("groupCTodayPnlText", (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2));
-    setTxt("groupCTodayPctText", (cTPct >= 0 ? "+" : "") + cTPct.toFixed(2) + "%");
-    const cBadge = document.getElementById("groupCTodayPnlBadge");
-    if (cBadge) {
-      cBadge.innerText = (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2) + " (" + (cTPct >= 0 ? "+" : "") + cTPct.toFixed(1) + "%)";
-      cBadge.className = "change-badge " + (cTPnl >= 0 ? "up" : "down");
-    }
-    setTxt("groupCTodayPnlText", (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2));
-    setTxt("groupCTodayPctText", (cTPct >= 0 ? "+" : "") + cTPct.toFixed(2) + "%");
-    const cBadge = document.getElementById("groupCTodayPnlBadge");
-    if (cBadge) {
-      cBadge.innerText = (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2) + " (" + (cTPct >= 0 ? "+" : "") + cTPct.toFixed(1) + "%)";
-      cBadge.className = "change-badge " + (cTPnl >= 0 ? "up" : "down");
-    }
-
-    // VERSION 87: 2-MINUTE TIMER COUNTDOWN DISPATCH & RENDER
-    const nextSec = sRes.next_update_in_seconds !== undefined ? sRes.next_update_in_seconds : 120;
+    // 4. TIMER COUNTDOWN
+    const nextSec = sRes && sRes.next_update_in_seconds !== undefined ? sRes.next_update_in_seconds : 120;
     window.roboTradeNextSec = nextSec;
     const formatTimer = (sec) => {
       const m = Math.floor(sec / 60).toString().padStart(2, "0");
@@ -172,79 +145,72 @@ window.updateRoboTradeModule = async function () {
       return `${m}:${s}`;
     };
     const tStr = formatTimer(nextSec);
-    const gEl = document.getElementById("godSchedTimerText");
-    if (gEl) gEl.innerText = tStr;
-    const cEl = document.getElementById("groupCSchedTimerText");
-    if (cEl) cEl.innerText = tStr;
+    setTxt("godSchedTimerText", tStr);
+    setTxt("groupCSchedTimerText", tStr);
 
     if (!window.roboTradeCountdownTicker) {
       window.roboTradeCountdownTicker = setInterval(() => {
         if (window.roboTradeNextSec !== undefined && window.roboTradeNextSec > 0) {
           window.roboTradeNextSec -= 1;
           const str = formatTimer(window.roboTradeNextSec);
-          const gTimer = document.getElementById("godSchedTimerText");
-          if (gTimer) gTimer.innerText = str;
-          const cTimer = document.getElementById("groupCSchedTimerText");
-          if (cTimer) cTimer.innerText = str;
+          setTxt("godSchedTimerText", str);
+          setTxt("groupCSchedTimerText", str);
         } else if (window.roboTradeNextSec === 0) {
           window.roboTradeNextSec = 120;
-          if (document.getElementById("tab-robo-trade") && !document.getElementById("tab-robo-trade").classList.contains("hidden")) {
-            updateRoboTradeModule();
+          const roboTab = document.getElementById("tab-robo-trade");
+          if (roboTab && !roboTab.classList.contains("hidden")) {
+            window.updateRoboTradeModule();
           }
         }
       }, 1000);
     }
 
-    // Render Active Holdings with Stop Loss Price (-3.0%)
-    renderBotHoldingsTable("👑 SUPREME GOD AI BOT", holdings, "godHoldingsTableBody");
-    renderBotHoldingsTable("⚡ GROUP C OB BOT", holdings, "groupCHoldingsTableBody");
+    // 5. RENDER HOLDINGS & SCHEDULES (Isolated Error Safety)
+    try { renderBotHoldingsTable("GOD", holdings, "godHoldingsTableBody"); } catch(e) { console.error("GOD Holdings error:", e); }
+    try { renderBotHoldingsTable("GROUP C", holdings, "groupCHoldingsTableBody"); } catch(e) { console.error("Group C Holdings error:", e); }
 
-    // Render 5-Coin Schedule Plan
-    renderBotSchedulesList("👑 SUPREME GOD AI BOT", schedules, "godScheduleList");
-    renderBotSchedulesList("⚡ GROUP C OB BOT", schedules, "groupCScheduleList");
+    try { renderBotSchedulesList("GOD", schedules, "godScheduleList"); } catch(e) { console.error("GOD Schedule error:", e); }
+    try { renderBotSchedulesList("GROUP C", schedules, "groupCScheduleList"); } catch(e) { console.error("Group C Schedule error:", e); }
 
-    // VERSION 72: Render Weekly & Monthly Performance Summaries
-    renderSummaryCard(stRes.weekly_summary, "weeklySummaryContainer");
-    renderSummaryCard(stRes.monthly_summary, "monthlySummaryContainer");
-
-    // VERSION 72: Render Everyday Historical Performance Ledger (Max 7 Dates)
-    renderEverydayLedger(stRes.daily_ledger || []);
+    // 6. RENDER SUMMARY CARDS & LEDGER (Isolated Error Safety)
+    try { renderSummaryCard((stRes && stRes.weekly_summary), "weeklySummaryContainer"); } catch(e) { console.error("Weekly summary error:", e); }
+    try { renderSummaryCard((stRes && stRes.monthly_summary), "monthlySummaryContainer"); } catch(e) { console.error("Monthly summary error:", e); }
+    try { renderEverydayLedger((stRes && stRes.daily_ledger) || []); } catch(e) { console.error("Everyday ledger error:", e); }
 
   } catch (err) {
     console.error("[Robo Trade Module Update Error]", err);
   }
 };
 
-function renderBotHoldingsTable(participant, holdings, targetElId) {
+function renderBotHoldingsTable(keyword, holdings, targetElId) {
   const tbody = document.getElementById(targetElId);
   if (!tbody) return;
 
-  const botHoldings = holdings.filter(h => {
-    if (!h.participant) return false;
-    if (participant.includes("GOD") && (h.participant.includes("GOD") || h.participant.includes("God"))) return true;
-    if (participant.includes("GROUP C") && (h.participant.includes("GROUP C") || h.participant.includes("Group C") || h.participant.includes("C BOT"))) return true;
-    return h.participant === participant;
+  const kw = String(keyword).toUpperCase();
+  const botHoldings = (holdings || []).filter(h => {
+    if (!h || !h.participant) return false;
+    return String(h.participant).toUpperCase().includes(kw);
   });
+
   if (botHoldings.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center">No active open holdings currently.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center" style="padding: 0.75rem;">No active open holdings currently.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = botHoldings.map(h => {
-    const entry = h.entry_price || 0;
-    // VERSION 73: REAL-TIME TICK PRICE LOOKUP FROM WEBSOCKET BUFFER (window.allTickers)
-    const liveTicker = (window.allTickers || []).find(t => t.symbol === h.symbol);
-    const livePrice = liveTicker ? liveTicker.price : (h.live_price || entry);
+    const entry = Number(h.entry_price) || 0;
+    const amount = Number(h.amount) || 1;
+    const liveTicker = (window.allTickers || []).find(t => t && t.symbol === h.symbol);
+    const livePrice = liveTicker ? Number(liveTicker.price) || entry : (Number(h.live_price) || entry);
     const stopLossPrice = entry * 0.97; // -3% Stop Loss
     const targetPrice = entry * 1.05;  // +5% Take Profit
-    
-    // Dynamic real-time unrealized PnL ($)
-    const pnl = liveTicker ? ((livePrice - entry) * (h.amount || 1)) : (h.unrealized_pnl !== undefined ? h.unrealized_pnl : ((livePrice - entry) * (h.amount || 1)));
+
+    const pnl = liveTicker ? ((livePrice - entry) * amount) : (h.unrealized_pnl !== undefined ? Number(h.unrealized_pnl) : ((livePrice - entry) * amount));
     const pnlClass = pnl >= 0 ? "color: #10b981; font-weight: 800;" : "color: #ef4444; font-weight: 800;";
 
     return `
       <tr>
-        <td style="font-weight: 800; color: #fff;">${h.symbol}</td>
+        <td style="font-weight: 800; color: #fff;">${h.symbol || ''}</td>
         <td>$${entry.toFixed(4)}</td>
         <td style="color: #ef4444; font-weight: 800;">$${stopLossPrice.toFixed(4)}</td>
         <td style="color: #10b981; font-weight: 800;">$${targetPrice.toFixed(4)}</td>
@@ -255,29 +221,28 @@ function renderBotHoldingsTable(participant, holdings, targetElId) {
   }).join("");
 }
 
-function renderBotSchedulesList(participant, schedules, targetElId) {
+function renderBotSchedulesList(keyword, schedules, targetElId) {
   const container = document.getElementById(targetElId);
   if (!container) return;
 
-  const botScheds = schedules.filter(s => {
-    if (s.status !== 'PENDING') return false;
-    if (!s.participant) return false;
-    if (participant.includes("GOD") && (s.participant.includes("GOD") || s.participant.includes("God"))) return true;
-    if (participant.includes("GROUP C") && (s.participant.includes("GROUP C") || s.participant.includes("Group C") || s.participant.includes("C BOT"))) return true;
-    return s.participant === participant;
+  const kw = String(keyword).toUpperCase();
+  const botScheds = (schedules || []).filter(s => {
+    if (!s || s.status !== 'PENDING' || !s.participant) return false;
+    return String(s.participant).toUpperCase().includes(kw);
   });
+
   if (botScheds.length === 0) {
     container.innerHTML = `<div class="text-muted text-center" style="font-size: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">Curating 5-coin schedule entry plan...</div>`;
     return;
   }
 
   container.innerHTML = botScheds.map((s, idx) => {
-    const entryTarget = s.entry_price_target || 0;
-    const stopLossTarget = s.stop_loss_target || (entryTarget * 0.97);
-    const exitTarget = s.exit_price_target || (entryTarget * 1.05);
-    const scoreVal = s.confluence_score || 0;
+    const entryTarget = Number(s.entry_price_target) || 0;
+    const stopLossTarget = Number(s.stop_loss_target) || (entryTarget * 0.97);
+    const exitTarget = Number(s.exit_price_target) || (entryTarget * 1.05);
+    const scoreVal = Number(s.confluence_score) || 0;
     const scoreStr = scoreVal ? ` (${scoreVal.toFixed(1)} Pts)` : "";
-    const isGradeS = s.tier && s.tier.includes("GRADE S");
+    const isGradeS = s.tier && String(s.tier).toUpperCase().includes("GRADE S");
 
     const badgeHtml = isGradeS 
       ? `<span style="background: rgba(240, 185, 11, 0.25); color: #f0b90b; border: 1px solid #f0b90b; font-weight: 900; font-size: 0.63rem; padding: 0.1rem 0.4rem; border-radius: 4px;"><i class="fa-solid fa-crown"></i> GRADE S (9.5+ Pts)</span>`
@@ -287,7 +252,7 @@ function renderBotSchedulesList(participant, schedules, targetElId) {
       <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.35); border: 1px solid ${isGradeS ? 'rgba(240, 185, 11, 0.5)' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.73rem;">
         <div style="display: flex; align-items: center; gap: 0.4rem;">
           <span style="color: var(--text-muted); font-weight: 700;">Slot #${idx + 1}:</span>
-          <strong style="color: #fff;">${s.symbol}</strong>
+          <strong style="color: #fff;">${s.symbol || ''}</strong>
           ${badgeHtml}
         </div>
         <div style="font-family: var(--font-mono); font-size: 0.7rem; display: flex; align-items: center; gap: 0.4rem;">
@@ -300,55 +265,70 @@ function renderBotSchedulesList(participant, schedules, targetElId) {
   }).join("");
 }
 
-// VERSION 72: RENDER WEEKLY & MONTHLY PERFORMANCE SUMMARY CARDS
 function renderSummaryCard(summaryData, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  if (!summaryData) {
+  if (!summaryData || typeof summaryData !== "object") {
     container.innerHTML = `<div class="text-muted text-center" style="grid-column: span 2; padding: 0.75rem;">No summary data available.</div>`;
     return;
   }
 
-  const god = summaryData["👑 SUPREME GOD AI BOT"] || { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
-  const groupC = summaryData["⚡ GROUP C OB BOT"] || { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
+  function findKey(data, kw) {
+    if (!data) return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
+    const uKw = String(kw).toUpperCase();
+    for (let k in data) {
+      if (k.toUpperCase().includes(uKw)) return data[k] || {};
+    }
+    return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
+  }
+
+  const god = findKey(summaryData, "GOD");
+  const groupC = findKey(summaryData, "GROUP C");
 
   const buildBotCardHtml = (title, icon, color, data) => {
-    const netClass = data.net_pnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
-    const badgeClass = data.net_pnl >= 0 ? "up" : "down";
+    const wins = Number(data.wins) || 0;
+    const losses = Number(data.losses) || 0;
+    const totalProfit = Number(data.total_profit) || 0;
+    const totalLoss = Number(data.total_loss) || 0;
+    const netPnl = Number(data.net_pnl) || 0;
+    const profitPct = Number(data.profit_pct) || 0;
+
+    const netClass = netPnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
+    const badgeClass = netPnl >= 0 ? "up" : "down";
 
     return `
       <div style="background: rgba(0,0,0,0.35); border-radius: 10px; border: 1px solid ${color}40; padding: 0.85rem; box-sizing: border-box; min-width: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.4rem;">
           <span style="font-weight: 800; color: ${color}; font-size: 0.82rem;"><i class="${icon}"></i> ${title}</span>
           <span class="change-badge ${badgeClass}" style="font-size: 0.75rem; font-weight: 800;">
-            ${data.net_pnl >= 0 ? '+' : ''}$${data.net_pnl.toFixed(2)} (${data.profit_pct >= 0 ? '+' : ''}${data.profit_pct.toFixed(2)}%)
+            ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%)
           </span>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; text-align: center; font-size: 0.72rem; margin-bottom: 0.5rem;">
           <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.35rem;">
             <div style="color: var(--text-muted); font-size: 0.65rem;">Wins</div>
-            <strong style="color: #10b981; font-size: 0.95rem;">${data.wins}</strong>
+            <strong style="color: #10b981; font-size: 0.95rem;">${wins}</strong>
           </div>
           <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.35rem;">
             <div style="color: var(--text-muted); font-size: 0.65rem;">Losses</div>
-            <strong style="color: #ef4444; font-size: 0.95rem;">${data.losses}</strong>
+            <strong style="color: #ef4444; font-size: 0.95rem;">${losses}</strong>
           </div>
           <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.35rem;">
             <div style="color: var(--text-muted); font-size: 0.65rem;">Total Profit ($)</div>
-            <strong style="color: #10b981; font-size: 0.85rem;">+$${data.total_profit.toFixed(2)}</strong>
+            <strong style="color: #10b981; font-size: 0.85rem;">+$${totalProfit.toFixed(2)}</strong>
           </div>
           <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.35rem;">
             <div style="color: var(--text-muted); font-size: 0.65rem;">Total Loss ($)</div>
-            <strong style="color: #ef4444; font-size: 0.85rem;">-$${data.total_loss.toFixed(2)}</strong>
+            <strong style="color: #ef4444; font-size: 0.85rem;">-$${totalLoss.toFixed(2)}</strong>
           </div>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.72rem;">
           <span style="color: var(--text-muted); font-weight: 700;">Net Return PnL (%):</span>
           <strong style="${netClass} font-family: var(--font-mono); font-size: 0.85rem;">
-            ${data.net_pnl >= 0 ? '+' : ''}$${data.net_pnl.toFixed(2)} (${data.profit_pct >= 0 ? '+' : ''}${data.profit_pct.toFixed(2)}%)
+            ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%)
           </strong>
         </div>
       </div>
@@ -360,31 +340,36 @@ function renderSummaryCard(summaryData, containerId) {
     ${buildBotCardHtml("⚡ GROUP C OB BOT", "fa-solid fa-bolt", "#00f0ff", groupC)}
   `;
 }
-// VERSION 72: RENDER EVERYDAY HISTORICAL PERFORMANCE SUMMARY LEDGER (MAX 7 DATES)
+
 function renderEverydayLedger(dailyLedger) {
   const container = document.getElementById("everydayLedgerContainer");
   if (!container) return;
 
-  if (!dailyLedger || dailyLedger.length === 0) {
+  if (!dailyLedger || !Array.isArray(dailyLedger) || dailyLedger.length === 0) {
     container.innerHTML = `<div class="text-muted text-center" style="padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">No closed exit transactions logged in history yet.</div>`;
     return;
   }
 
-  // Capped at max 7 dates
   const max7Ledger = dailyLedger.slice(0, 7);
 
   container.innerHTML = max7Ledger.map(item => {
+    if (!item) return "";
     const god = item.god_ai || { wins: 0, losses: 0, pnl: 0, pnl_pct: 0, symbols: [] };
     const groupC = item.group_c || { wins: 0, losses: 0, pnl: 0, pnl_pct: 0, symbols: [] };
 
-    const godClass = god.pnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
-    const groupCClass = groupC.pnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
+    const godPnl = Number(god.pnl) || 0;
+    const godPct = Number(god.pnl_pct) || 0;
+    const groupCPnl = Number(groupC.pnl) || 0;
+    const groupCPct = Number(groupC.pnl_pct) || 0;
+
+    const godClass = godPnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
+    const groupCClass = groupCPnl >= 0 ? "color: #10b981;" : "color: #ef4444;";
 
     return `
       <div style="background: rgba(0,0,0,0.35); border-radius: 12px; border: 1px solid rgba(168, 85, 247, 0.3); padding: 0.9rem; width: 100%; box-sizing: border-box;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem; margin-bottom: 0.75rem;">
           <div style="font-weight: 900; color: #a855f7; font-size: 0.9rem;">
-            <i class="fa-solid fa-calendar-day"></i> SUMMARY LEDGER DATE: <strong style="color: #fff; font-family: var(--font-mono); font-size: 0.95rem;">${item.date}</strong>
+            <i class="fa-solid fa-calendar-day"></i> SUMMARY LEDGER DATE: <strong style="color: #fff; font-family: var(--font-mono); font-size: 0.95rem;">${item.date || ''}</strong>
           </div>
           <div style="font-size: 0.73rem; color: var(--text-muted);">
             Closed Exit Positions Audit
@@ -396,26 +381,26 @@ function renderEverydayLedger(dailyLedger) {
           <div style="background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(240, 185, 11, 0.3); padding: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
               <span style="font-weight: 800; color: #f0b90b; font-size: 0.82rem;"><i class="fa-solid fa-crown"></i> 👑 SUPREME GOD AI BOT</span>
-              <span class="change-badge ${god.pnl >= 0 ? 'up' : 'down'}" style="font-size: 0.75rem; font-weight: 800;">
-                ${god.pnl >= 0 ? '+' : ''}$${god.pnl.toFixed(2)} (${god.pnl_pct >= 0 ? '+' : ''}${god.pnl_pct.toFixed(1)}%)
+              <span class="change-badge ${godPnl >= 0 ? 'up' : 'down'}" style="font-size: 0.75rem; font-weight: 800;">
+                ${godPnl >= 0 ? '+' : ''}$${godPnl.toFixed(2)} (${godPct >= 0 ? '+' : ''}${godPct.toFixed(1)}%)
               </span>
             </div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; text-align: center; font-size: 0.73rem; margin-bottom: 0.4rem;">
               <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Wins</div>
-                <strong style="color: #10b981; font-size: 0.95rem;">${god.wins}</strong>
+                <strong style="color: #10b981; font-size: 0.95rem;">${god.wins || 0}</strong>
               </div>
               <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Loss</div>
-                <strong style="color: #ef4444; font-size: 0.95rem;">${god.losses}</strong>
+                <strong style="color: #ef4444; font-size: 0.95rem;">${god.losses || 0}</strong>
               </div>
               <div style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">PnL ($)</div>
-                <strong style="${godClass} font-size: 0.9rem;">${god.pnl >= 0 ? '+' : ''}$${god.pnl.toFixed(2)}</strong>
+                <strong style="${godClass} font-size: 0.9rem;">${godPnl >= 0 ? '+' : ''}$${godPnl.toFixed(2)}</strong>
               </div>
               <div style="background: rgba(240, 185, 11, 0.1); border: 1px solid rgba(240, 185, 11, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Return</div>
-                <strong style="color: #f0b90b; font-size: 0.9rem;">${god.pnl_pct >= 0 ? '+' : ''}${god.pnl_pct.toFixed(2)}%</strong>
+                <strong style="color: #f0b90b; font-size: 0.9rem;">${godPct >= 0 ? '+' : ''}${godPct.toFixed(2)}%</strong>
               </div>
             </div>
             ${god.symbols && god.symbols.length > 0 ? `
@@ -429,26 +414,26 @@ function renderEverydayLedger(dailyLedger) {
           <div style="background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(0, 240, 255, 0.3); padding: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
               <span style="font-weight: 800; color: #00f0ff; font-size: 0.82rem;"><i class="fa-solid fa-bolt"></i> ⚡ GROUP C OB BOT</span>
-              <span class="change-badge ${groupC.pnl >= 0 ? 'up' : 'down'}" style="font-size: 0.75rem; font-weight: 800;">
-                ${groupC.pnl >= 0 ? '+' : ''}$${groupC.pnl.toFixed(2)} (${groupC.pnl_pct >= 0 ? '+' : ''}${groupC.pnl_pct.toFixed(1)}%)
+              <span class="change-badge ${groupCPnl >= 0 ? 'up' : 'down'}" style="font-size: 0.75rem; font-weight: 800;">
+                ${groupCPnl >= 0 ? '+' : ''}$${groupCPnl.toFixed(2)} (${groupCPct >= 0 ? '+' : ''}${groupCPct.toFixed(1)}%)
               </span>
             </div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; text-align: center; font-size: 0.73rem; margin-bottom: 0.4rem;">
               <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Wins</div>
-                <strong style="color: #10b981; font-size: 0.95rem;">${groupC.wins}</strong>
+                <strong style="color: #10b981; font-size: 0.95rem;">${groupC.wins || 0}</strong>
               </div>
               <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Loss</div>
-                <strong style="color: #ef4444; font-size: 0.95rem;">${groupC.losses}</strong>
+                <strong style="color: #ef4444; font-size: 0.95rem;">${groupC.losses || 0}</strong>
               </div>
               <div style="background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">PnL ($)</div>
-                <strong style="${groupCClass} font-size: 0.9rem;">${groupC.pnl >= 0 ? '+' : ''}$${groupC.pnl.toFixed(2)}</strong>
+                <strong style="${groupCClass} font-size: 0.9rem;">${groupCPnl >= 0 ? '+' : ''}$${groupCPnl.toFixed(2)}</strong>
               </div>
               <div style="background: rgba(240, 185, 11, 0.1); border: 1px solid rgba(240, 185, 11, 0.3); border-radius: 6px; padding: 0.3rem;">
                 <div style="color: var(--text-muted); font-size: 0.65rem;">Return</div>
-                <strong style="color: #f0b90b; font-size: 0.9rem;">${groupC.pnl_pct >= 0 ? '+' : ''}${groupC.pnl_pct.toFixed(2)}%</strong>
+                <strong style="color: #f0b90b; font-size: 0.9rem;">${groupCPct >= 0 ? '+' : ''}${groupCPct.toFixed(2)}%</strong>
               </div>
             </div>
             ${groupC.symbols && groupC.symbols.length > 0 ? `
@@ -461,4 +446,9 @@ function renderEverydayLedger(dailyLedger) {
       </div>
     `;
   }).join("");
+}
+
+// Auto-trigger immediately on load
+if (typeof window.updateRoboTradeModule === "function") {
+  window.updateRoboTradeModule();
 }

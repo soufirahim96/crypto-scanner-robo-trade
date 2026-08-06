@@ -668,11 +668,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderScannerTable();
     fetchStats();
 
-    // VERSION 73: REAL-TIME SYNC TO ROBO TRADE MODULE ON LIVE TICKS
-    if (typeof window.updateRoboTradeModule === 'function') {
-      window.updateRoboTradeModule();
-    }
-
     // VERSION 30: REAL-TIME TICK PRICE SYNC FOR ACTIVE GRAPH VIEW (MAINTAINED BY GROUP A & B AI AGENTS)
     if (selectedSymbol && allTickers.length > 0) {
       const activeData = allTickers.find(t => t.symbol === selectedSymbol);
@@ -2207,7 +2202,12 @@ document.addEventListener("DOMContentLoaded", () => {
     scannerSearch.addEventListener("input", renderScannerTable);
   }
 
+  let lastFetchStatsTime = 0;
   async function fetchStats() {
+    const now = Date.now();
+    if (now - lastFetchStatsTime < 3000) return;
+    lastFetchStatsTime = now;
+
     try {
       const res = await fetch("/api/scanner/stats");
       const data = await res.json();
