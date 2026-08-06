@@ -23,6 +23,15 @@ def get_myt_timestamp_str() -> str:
     """Returns current timestamp string in MYT ('YYYY-MM-DD HH:MM:SS')."""
     return get_myt_now().strftime("%Y-%m-%d %H:%M:%S")
 
+def normalize_participant_name(p: str) -> str:
+    """Normalizes participant strings to clean standard names regardless of DB unicode encoding."""
+    p_str = str(p or "")
+    if "GOD" in p_str or "God" in p_str:
+        return "👑 SUPREME GOD AI BOT"
+    if "GROUP C" in p_str or "Group C" in p_str or "C BOT" in p_str:
+        return "⚡ GROUP C OB BOT"
+    return p_str
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PERSISTENT DATABASE PATH — Survives Railway Redeploys
 # ─────────────────────────────────────────────────────────────────────────────
@@ -786,7 +795,10 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM active_holdings WHERE status = 'OPEN' ORDER BY created_at DESC")
-            return [dict(r) for r in cursor.fetchall()]
+            rows = [dict(r) for r in cursor.fetchall()]
+            for r in rows:
+                r["participant"] = normalize_participant_name(r.get("participant"))
+            return rows
 
     def remove_active_holding(self, h_id: str) -> bool:
         with sqlite3.connect(DB_FILE) as conn:
@@ -858,7 +870,10 @@ class DatabaseManager:
                 cursor.execute("SELECT * FROM robo_schedules WHERE participant LIKE ? ORDER BY schedule_index ASC", (pattern,))
             else:
                 cursor.execute("SELECT * FROM robo_schedules ORDER BY participant, schedule_index ASC")
-            return [dict(r) for r in cursor.fetchall()]
+            rows = [dict(r) for r in cursor.fetchall()]
+            for r in rows:
+                r["participant"] = normalize_participant_name(r.get("participant"))
+            return rows
 
     def mark_robo_schedule_executed(self, s_id: str):
         with sqlite3.connect(DB_FILE) as conn:
