@@ -33,15 +33,26 @@ async function fetchPerformanceTradeReview() {
       if (totalTradesEl) totalTradesEl.textContent = m.total_executed_trades || 0;
       if (winRateEl) winRateEl.textContent = `${m.overall_win_rate_pct}%`;
       const cSum = data.commission_summary || {};
-      const cTodayEl = document.getElementById("perfCommToday");
-      const cWkEl = document.getElementById("perfCommWeekly");
-      const cMoEl = document.getElementById("perfCommMonthly");
-      const cLifeEl = document.getElementById("perfCommLifetime");
+      const godC = cSum.god_ai || {};
+      const groupcC = cSum.group_c || {};
+      const totC = cSum.total || {};
 
-      if (cTodayEl) cTodayEl.textContent = `$${(cSum.today || 0).toFixed(4)}`;
-      if (cWkEl) cWkEl.textContent = `$${(cSum.weekly || 0).toFixed(4)}`;
-      if (cMoEl) cMoEl.textContent = `$${(cSum.monthly || 0).toFixed(4)}`;
-      if (cLifeEl) cLifeEl.textContent = `$${(cSum.lifetime || 0).toFixed(4)}`;
+      function setVal(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      }
+
+      setVal("perfGodCommToday", `$${(godC.today || 0).toFixed(4)}`);
+      setVal("perfGodCommWeekly", `$${(godC.weekly || 0).toFixed(4)}`);
+      setVal("perfGodCommMonthly", `$${(godC.monthly || 0).toFixed(4)}`);
+      setVal("perfGodCommLifetime", `$${(godC.lifetime || 0).toFixed(4)}`);
+
+      setVal("perfGroupCCommToday", `$${(groupcC.today || 0).toFixed(4)}`);
+      setVal("perfGroupCCommWeekly", `$${(groupcC.weekly || 0).toFixed(4)}`);
+      setVal("perfGroupCCommMonthly", `$${(groupcC.monthly || 0).toFixed(4)}`);
+      setVal("perfGroupCCommLifetime", `$${(groupcC.lifetime || 0).toFixed(4)}`);
+
+      setVal("perfCommTotalGlobal", `$${(totC.lifetime || 0).toFixed(4)}`);
 
       // 1. OPEN HOLDINGS DIAGNOSTICS TABLE (NO WORDING BANNER - GRANULAR CELL UPDATES)
       if (diagnosticsBody) {

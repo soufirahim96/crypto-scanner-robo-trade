@@ -1,11 +1,27 @@
 import sqlite3
 import json
 import time
+import datetime
 import requests
 import os
 import threading
 from typing import List, Dict, Any, Optional
 from backend.auth import generate_32_hash_id, hash_password
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MALAYSIA TIME (MYT / UTC+8) CENTRAL HELPER FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+def get_myt_now() -> datetime.datetime:
+    """Returns current datetime in Malaysia Time (MYT / UTC+8)."""
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+
+def get_myt_date_str() -> str:
+    """Returns current date string in MYT ('YYYY-MM-DD')."""
+    return get_myt_now().strftime("%Y-%m-%d")
+
+def get_myt_timestamp_str() -> str:
+    """Returns current timestamp string in MYT ('YYYY-MM-DD HH:MM:SS')."""
+    return get_myt_now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PERSISTENT DATABASE PATH — Survives Railway Redeploys
@@ -574,16 +590,18 @@ class DatabaseManager:
             conn.commit()
 
     def add_transaction_history(self, participant: str, action: str, symbol: str, price: float, capital: float, pnl: float = 0.0, commission_fee: float = 0.0, status: str = "COMPLETED") -> Dict[str, Any]:
-        """VERSION 77: Insert paper trading transaction record into persistent DB with 0.20% Commission Fee deduction"""
+        """VERSION 77: Insert paper trading transaction record into persistent DB with 0.20% Commission Fee deduction and MYT Timestamp"""
         if commission_fee <= 0.0 and capital > 0.0:
             commission_fee = round(capital * 0.002, 4)
         tx_id = generate_32_hash_id()
+        myt_ts = get_myt_timestamp_str()
+        myt_time_only = get_myt_now().strftime("%H:%M:%S")
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO transaction_history (id, participant, action, symbol, price, capital, pnl, commission_fee, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (tx_id, participant, action, symbol, price, capital, pnl, commission_fee, status))
+                INSERT INTO transaction_history (id, participant, action, symbol, price, capital, pnl, commission_fee, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (tx_id, participant, action, symbol, price, capital, pnl, commission_fee, status, myt_ts))
             conn.commit()
         return {
             "id": tx_id,
@@ -595,7 +613,8 @@ class DatabaseManager:
             "pnl": pnl,
             "commission_fee": commission_fee,
             "status": status,
-            "timestamp": time.strftime("%H:%M:%S")
+            "timestamp": myt_time_only,
+            "created_at": myt_ts
         }
 
     def get_all_transaction_history(self) -> List[Dict[str, Any]]:
@@ -724,6 +743,7 @@ class DatabaseManager:
     # VERSION 44: ACTIVE HOLDINGS METHODS
     def add_active_holding(self, participant: str, symbol: str, entry_price: float, amount: float) -> Dict[str, Any]:
         h_id = generate_32_hash_id()
+        myt_ts = get_myt_timestamp_str()
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
             # Ensure highest_price column exists
@@ -732,11 +752,11 @@ class DatabaseManager:
             except Exception:
                 pass
             cursor.execute("""
-                INSERT INTO active_holdings (id, participant, symbol, entry_price, amount, highest_price)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (h_id, participant, symbol, entry_price, amount, entry_price))
+                INSERT INTO active_holdings (id, participant, symbol, entry_price, amount, highest_price, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (h_id, participant, symbol, entry_price, amount, entry_price, myt_ts))
             conn.commit()
-        return {"id": h_id, "participant": participant, "symbol": symbol, "entry_price": entry_price, "amount": amount, "highest_price": entry_price}
+        return {"id": h_id, "participant": participant, "symbol": symbol, "entry_price": entry_price, "amount": amount, "highest_price": entry_price, "created_at": myt_ts}
 
     def update_holding_highest_price(self, h_id: str, highest_price: float) -> bool:
         """VERSION 82: Update peak price recorded for active holding to enforce peak-trailing stop exits"""

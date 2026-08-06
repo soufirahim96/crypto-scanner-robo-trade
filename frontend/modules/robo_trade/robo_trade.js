@@ -41,14 +41,22 @@ window.initRoboTradeModule = function () {
           </span>
         </div>
 
-        <!-- GOD AI LIFETIME STATS HEADER -->
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.85rem; text-align: center; font-size: 0.72rem;">
-          <div><div style="color: var(--text-muted);">Total Wins</div><strong id="godTotalWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
-          <div><div style="color: var(--text-muted);">Total Loss</div><strong id="godTotalLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
-          <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="godTotalProfit" style="color: #10b981;">+$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="godTotalLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Net PnL</div><strong id="godTotalPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Comm. Fee</div><strong id="godTotalComm" style="color: #a855f7;">-$0.0000</strong></div>
+        <!-- GOD AI DAILY STATS HEADER (Resets Daily @ 12:00 AM MYT) -->
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.35rem; text-align: center; font-size: 0.72rem;">
+          <div><div style="color: var(--text-muted);">Today Wins</div><strong id="godTodayWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
+          <div><div style="color: var(--text-muted);">Today Loss</div><strong id="godTodayLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
+          <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="godTodayProfit" style="color: #10b981;">+$0.00</strong></div>
+          <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="godTodayLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
+          <div><div style="color: var(--text-muted);">Comm. Fee</div><strong id="godTodayComm" style="color: #a855f7;">-$0.0000</strong></div>
+          <div><div style="color: var(--text-muted);">Net PnL</div><strong id="godTodayPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
+        </div>
+        <!-- GOD AI CUMULATIVE LIFETIME SUMMARY BAR -->
+        <div style="display: flex; justify-content: space-around; align-items: center; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(240, 185, 11, 0.25); border-radius: 6px; padding: 0.35rem 0.6rem; margin-bottom: 0.85rem; font-size: 0.72rem; font-family: var(--font-mono);">
+          <span style="color: #f0b90b; font-weight: 800;"><i class="fa-solid fa-trophy"></i> Cumulative:</span>
+          <span>Profit: <strong id="godCumProfit" style="color: #10b981;">+$0.00</strong></span>
+          <span>Loss: <strong id="godCumLoss" style="color: #ef4444;">-$0.00</strong></span>
+          <span>Comm. Fee: <strong id="godCumComm" style="color: #a855f7;">-$0.0000</strong></span>
+          <span>Net PnL: <strong id="godCumNetPnL" style="color: #00f0ff; font-weight: 800;">+$0.00</strong></span>
         </div>
 
         <!-- VERSION 71: SIDE-BY-SIDE GRID (ACTIVE HOLDINGS + 5-COIN SCHEDULE PLAN) -->
@@ -107,14 +115,22 @@ window.initRoboTradeModule = function () {
           </span>
         </div>
 
-        <!-- GROUP C LIFETIME STATS HEADER -->
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.85rem; text-align: center; font-size: 0.72rem;">
-          <div><div style="color: var(--text-muted);">Total Wins</div><strong id="groupCTotalWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
-          <div><div style="color: var(--text-muted);">Total Loss</div><strong id="groupCTotalLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
-          <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="groupCTotalProfit" style="color: #10b981;">+$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="groupCTotalLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Net PnL</div><strong id="groupCTotalPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
-          <div><div style="color: var(--text-muted);">Comm. Fee</div><strong id="groupCTotalComm" style="color: #a855f7;">-$0.0000</strong></div>
+        <!-- GROUP C DAILY STATS HEADER (Resets Daily @ 12:00 AM MYT) -->
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; background: rgba(0,0,0,0.4); border-radius: 8px; padding: 0.55rem; margin-bottom: 0.35rem; text-align: center; font-size: 0.72rem;">
+          <div><div style="color: var(--text-muted);">Today Wins</div><strong id="groupCTodayWins" style="color: #10b981; font-size: 0.95rem;">0</strong></div>
+          <div><div style="color: var(--text-muted);">Today Loss</div><strong id="groupCTodayLosses" style="color: #ef4444; font-size: 0.95rem;">0</strong></div>
+          <div><div style="color: var(--text-muted);">Profit ($)</div><strong id="groupCTodayProfit" style="color: #10b981;">+$0.00</strong></div>
+          <div><div style="color: var(--text-muted);">Loss ($)</div><strong id="groupCTodayLossIncurred" style="color: #ef4444;">-$0.00</strong></div>
+          <div><div style="color: var(--text-muted);">Comm. Fee</div><strong id="groupCTodayComm" style="color: #a855f7;">-$0.0000</strong></div>
+          <div><div style="color: var(--text-muted);">Net PnL</div><strong id="groupCTodayPnL" style="color: #00f0ff; font-weight: 900;">+$0.00</strong></div>
+        </div>
+        <!-- GROUP C CUMULATIVE LIFETIME SUMMARY BAR -->
+        <div style="display: flex; justify-content: space-around; align-items: center; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 0.35rem 0.6rem; margin-bottom: 0.85rem; font-size: 0.72rem; font-family: var(--font-mono);">
+          <span style="color: #00f0ff; font-weight: 800;"><i class="fa-solid fa-trophy"></i> Cumulative:</span>
+          <span>Profit: <strong id="groupCCumProfit" style="color: #10b981;">+$0.00</strong></span>
+          <span>Loss: <strong id="groupCCumLoss" style="color: #ef4444;">-$0.00</strong></span>
+          <span>Comm. Fee: <strong id="groupCCumComm" style="color: #a855f7;">-$0.0000</strong></span>
+          <span>Net PnL: <strong id="groupCCumNetPnL" style="color: #00f0ff; font-weight: 800;">+$0.00</strong></span>
         </div>
 
         <!-- VERSION 71: SIDE-BY-SIDE GRID (ACTIVE HOLDINGS + 5-COIN SCHEDULE PLAN) -->
@@ -234,45 +250,56 @@ window.updateRoboTradeModule = async function () {
     const todayEl = document.getElementById("roboTodayDateText");
     if (todayEl) todayEl.innerText = todayDate;
 
-    // Render Cumulative Commission Fees (Header & Per-Bot Cards)
+    // Render Cumulative Commission Fees (Global)
     const commSummary = stRes.commission_summary || {};
-    setTxt("commTodayText", "$" + (commSummary.today || 0).toFixed(4));
-    setTxt("commWkText", "$" + (commSummary.weekly || 0).toFixed(4));
-    setTxt("commMoText", "$" + (commSummary.monthly || 0).toFixed(4));
-    setTxt("commTotalText", "$" + (commSummary.lifetime || 0).toFixed(4));
-
-    // Render Lifetime Stats Header & Today Ledger for God AI
-    let godStats = statsData["👑 SUPREME GOD AI BOT"] || {};
-    if (!godStats.total_wins && !godStats.total_profit) {
-      for (let k in statsData) {
-        if (k.includes("GOD") || k.includes("God")) { godStats = statsData[k]; break; }
-      }
-    }
+    const totComm = commSummary.total || {};
+    setTxt("commTodayText", "$" + (totComm.today || 0).toFixed(4));
+    setTxt("commWkText", "$" + (totComm.weekly || 0).toFixed(4));
+    setTxt("commMoText", "$" + (totComm.monthly || 0).toFixed(4));
+    setTxt("commTotalText", "$" + (totComm.lifetime || 0).toFixed(4));
 
     function setTxt(id, val) {
       const el = document.getElementById(id);
       if (el) el.innerText = String(val);
     }
 
-    const gProf = (godStats.total_profit || 0).toFixed(2);
-    const gLoss = (godStats.total_loss || 0).toFixed(2);
+    // ─────────────────────────────────────────────────────────────
+    // 1. SUPREME GOD AI BOT STATS
+    // ─────────────────────────────────────────────────────────────
+    let godStats = statsData["👑 SUPREME GOD AI BOT"] || {};
+    if (!godStats.today_wins && !godStats.total_wins && !godStats.total_profit) {
+      for (let k in statsData) {
+        if (k.includes("GOD") || k.includes("God")) { godStats = statsData[k]; break; }
+      }
+    }
 
-    setTxt("godTotalWins", godStats.total_wins || 0);
-    setTxt("godTotalLosses", godStats.total_losses || 0);
-    setTxt("godTotalProfit", "+" + "$" + gProf);
-    setTxt("godTotalLossIncurred", "-" + "$" + gLoss);
-    setTxt("godTotalComm", "-$" + (godStats.total_commission_fee || 0).toFixed(4));
+    // Today Stats (Resets 12:00 AM MYT - Requirement 2 & 3)
+    setTxt("godTodayWins", godStats.today_wins || 0);
+    setTxt("godTodayLosses", godStats.today_losses || 0);
+    setTxt("godTodayProfit", "+$" + (godStats.today_profit || 0).toFixed(2));
+    setTxt("godTodayLossIncurred", "-$" + (godStats.today_loss || 0).toFixed(2));
+    setTxt("godTodayComm", "-$" + (godStats.today_commission_fee || 0).toFixed(4));
     
-    const godNet = godStats.total_pnl || 0;
-    const godNetEl = document.getElementById("godTotalPnL");
-    if (godNetEl) {
-      godNetEl.innerText = (godNet >= 0 ? "+" : "") + "$" + godNet.toFixed(2);
-      godNetEl.style.color = godNet >= 0 ? "#10b981" : "#ef4444";
+    const godTodayNet = godStats.today_pnl || 0;
+    const godTodayNetEl = document.getElementById("godTodayPnL");
+    if (godTodayNetEl) {
+      godTodayNetEl.innerText = (godTodayNet >= 0 ? "+" : "") + "$" + godTodayNet.toFixed(2);
+      godTodayNetEl.style.color = godTodayNet >= 0 ? "#10b981" : "#ef4444";
+    }
+
+    // Cumulative Lifetime Stats (Requirement 5)
+    setTxt("godCumProfit", "+$" + (godStats.total_profit || 0).toFixed(2));
+    setTxt("godCumLoss", "-$" + (godStats.total_loss || 0).toFixed(2));
+    setTxt("godCumComm", "-$" + (godStats.total_commission_fee || 0).toFixed(4));
+    const godCumNet = godStats.total_pnl || 0;
+    const godCumNetEl = document.getElementById("godCumNetPnL");
+    if (godCumNetEl) {
+      godCumNetEl.innerText = (godCumNet >= 0 ? "+" : "") + "$" + godCumNet.toFixed(2);
+      godCumNetEl.style.color = godCumNet >= 0 ? "#10b981" : "#ef4444";
     }
 
     setTxt("godTodayWinsText", godStats.today_wins || 0);
     setTxt("godTodayLossesText", godStats.today_losses || 0);
-    
     const godTPnl = godStats.today_pnl || 0;
     const godTPct = godStats.today_pnl_pct || 0;
     setTxt("godTodayPnlText", (godTPnl >= 0 ? "+" : "") + "$" + godTPnl.toFixed(2));
@@ -283,35 +310,52 @@ window.updateRoboTradeModule = async function () {
       godBadge.className = "change-badge " + (godTPnl >= 0 ? "up" : "down");
     }
 
-    // Render Lifetime Stats Header & Today Ledger for Group C
+    // ─────────────────────────────────────────────────────────────
+    // 2. GROUP C OB BOT STATS
+    // ─────────────────────────────────────────────────────────────
     let cStats = statsData["⚡ GROUP C OB BOT"] || {};
-    if (!cStats.total_wins && !cStats.total_profit) {
+    if (!cStats.today_wins && !cStats.total_wins && !cStats.total_profit) {
       for (let k in statsData) {
         if (k.includes("GROUP C") || k.includes("Group C") || k.includes("C BOT")) { cStats = statsData[k]; break; }
       }
     }
 
-    const cProf = (cStats.total_profit || 0).toFixed(2);
-    const cLoss = (cStats.total_loss || 0).toFixed(2);
-
-    setTxt("groupCTotalWins", cStats.total_wins || 0);
-    setTxt("groupCTotalLosses", cStats.total_losses || 0);
-    setTxt("groupCTotalProfit", "+" + "$" + cProf);
-    setTxt("groupCTotalLossIncurred", "-" + "$" + cLoss);
-    setTxt("groupCTotalComm", "-$" + (cStats.total_commission_fee || 0).toFixed(4));
+    // Today Stats (Resets 12:00 AM MYT - Requirement 2 & 3)
+    setTxt("groupCTodayWins", cStats.today_wins || 0);
+    setTxt("groupCTodayLosses", cStats.today_losses || 0);
+    setTxt("groupCTodayProfit", "+$" + (cStats.today_profit || 0).toFixed(2));
+    setTxt("groupCTodayLossIncurred", "-$" + (cStats.today_loss || 0).toFixed(2));
+    setTxt("groupCTodayComm", "-$" + (cStats.today_commission_fee || 0).toFixed(4));
     
-    const cNet = cStats.total_pnl || 0;
-    const cNetEl = document.getElementById("groupCTotalPnL");
-    if (cNetEl) {
-      cNetEl.innerText = (cNet >= 0 ? "+" : "") + "$" + cNet.toFixed(2);
-      cNetEl.style.color = cNet >= 0 ? "#10b981" : "#ef4444";
+    const cTodayNet = cStats.today_pnl || 0;
+    const cTodayNetEl = document.getElementById("groupCTodayPnL");
+    if (cTodayNetEl) {
+      cTodayNetEl.innerText = (cTodayNet >= 0 ? "+" : "") + "$" + cTodayNet.toFixed(2);
+      cTodayNetEl.style.color = cTodayNet >= 0 ? "#10b981" : "#ef4444";
+    }
+
+    // Cumulative Lifetime Stats (Requirement 5)
+    setTxt("groupCCumProfit", "+$" + (cStats.total_profit || 0).toFixed(2));
+    setTxt("groupCCumLoss", "-$" + (cStats.total_loss || 0).toFixed(2));
+    setTxt("groupCCumComm", "-$" + (cStats.total_commission_fee || 0).toFixed(4));
+    const cCumNet = cStats.total_pnl || 0;
+    const cCumNetEl = document.getElementById("groupCCumNetPnL");
+    if (cCumNetEl) {
+      cCumNetEl.innerText = (cCumNet >= 0 ? "+" : "") + "$" + cCumNet.toFixed(2);
+      cCumNetEl.style.color = cCumNet >= 0 ? "#10b981" : "#ef4444";
     }
 
     setTxt("groupCTodayWinsText", cStats.today_wins || 0);
     setTxt("groupCTodayLossesText", cStats.today_losses || 0);
-    
     const cTPnl = cStats.today_pnl || 0;
     const cTPct = cStats.today_pnl_pct || 0;
+    setTxt("groupCTodayPnlText", (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2));
+    setTxt("groupCTodayPctText", (cTPct >= 0 ? "+" : "") + cTPct.toFixed(2) + "%");
+    const cBadge = document.getElementById("groupCTodayPnlBadge");
+    if (cBadge) {
+      cBadge.innerText = (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2) + " (" + (cTPct >= 0 ? "+" : "") + cTPct.toFixed(1) + "%)";
+      cBadge.className = "change-badge " + (cTPnl >= 0 ? "up" : "down");
+    }
     setTxt("groupCTodayPnlText", (cTPnl >= 0 ? "+" : "") + "$" + cTPnl.toFixed(2));
     setTxt("groupCTodayPctText", (cTPct >= 0 ? "+" : "") + cTPct.toFixed(2) + "%");
     const cBadge = document.getElementById("groupCTodayPnlBadge");

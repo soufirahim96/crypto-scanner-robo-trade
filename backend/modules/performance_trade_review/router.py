@@ -167,29 +167,51 @@ def get_performance_review_data_v59():
             "status": "SAFELY CLOSED"
         })
 
-    # Commission Fee Summary Audit
-    import datetime
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
-    today_dt = datetime.date.today()
+    # Commission Fee Summary Audit (MYT Malaysia Time)
+    from backend.db import get_myt_now
+    myt_now = get_myt_now()
+    today_dt = myt_now.date()
+    today_str = today_dt.strftime("%Y-%m-%d")
     seven_days_ago_str = (today_dt - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     thirty_days_ago_str = (today_dt - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
 
-    comm_today = 0.0
-    comm_weekly = 0.0
-    comm_monthly = 0.0
-    comm_lifetime = 0.0
+    comm_summary = {
+        "god_ai": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0},
+        "group_c": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0},
+        "total": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0}
+    }
 
     for t in closed_trades:
         exit_date_val = t.get("exit_date") or t.get("closed_at") or t.get("exit_time") or t.get("created_at", "")
         dt = str(exit_date_val)[:10]
         fee = float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002))
-        comm_lifetime += fee
+        
+        p_name = str(t.get("participant", ""))
+        group_key = "god_ai" if "GOD" in p_name else ("group_c" if "GROUP C" in p_name or "C BOT" in p_name else None)
+
+        # Global Total
+        comm_summary["total"]["lifetime"] += fee
         if dt == today_str:
-            comm_today += fee
+            comm_summary["total"]["today"] += fee
         if dt >= seven_days_ago_str:
-            comm_weekly += fee
+            comm_summary["total"]["weekly"] += fee
         if dt >= thirty_days_ago_str:
-            comm_monthly += fee
+            comm_summary["total"]["monthly"] += fee
+
+        # Per Group
+        if group_key:
+            comm_summary[group_key]["lifetime"] += fee
+            if dt == today_str:
+                comm_summary[group_key]["today"] += fee
+            if dt >= seven_days_ago_str:
+                comm_summary[group_key]["weekly"] += fee
+            if dt >= thirty_days_ago_str:
+                comm_summary[group_key]["monthly"] += fee
+
+    # Round all values
+    for gk in comm_summary:
+        for period_key in comm_summary[gk]:
+            comm_summary[gk][period_key] = round(comm_summary[gk][period_key], 4)
 
     return {
         "status": "success",
@@ -209,12 +231,7 @@ def get_performance_review_data_v59():
                 "realized_pnl": round(gc_realized, 2)
             }
         },
-        "commission_summary": {
-            "today": round(comm_today, 4),
-            "weekly": round(comm_weekly, 4),
-            "monthly": round(comm_monthly, 4),
-            "lifetime": round(comm_lifetime, 4)
-        },
+        "commission_summary": comm_summary,
         "open_holdings_diagnostics": diagnostics,
         "consolidated_ledger": consolidated_ledger
     }

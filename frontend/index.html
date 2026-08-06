@@ -1518,35 +1518,74 @@
           <!-- BOTTOM SECTION: STANDARDIZED PERFORMANCE SUMMARY LEDGERS & AUDITS -->
           <div style="display: flex; flex-direction: column; gap: 1.25rem;">
             
-            <!-- 0. CUMULATIVE COMMISSION FEE AUDIT PANEL -->
-            <div class="glass-panel" style="border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(88, 28, 135, 0.2));">
+            <!-- 0. CUMULATIVE COMMISSION FEE AUDIT PANEL (PER GROUP BREAKDOWN) -->
+            <div class="glass-panel" style="border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 1.1rem; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(88, 28, 135, 0.2)); margin-bottom: 1.25rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(168, 85, 247, 0.2); padding-bottom: 0.5rem; margin-bottom: 0.85rem;">
                 <div>
                   <h4 style="font-weight: 800; color: #a855f7; margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
                     <i class="fa-solid fa-coins"></i> Cumulative Commission Fee Audit (0.20% Per Closed Trade)
                   </h4>
-                  <span style="font-size: 0.75rem; color: var(--text-muted);">Real-time tracking of cumulative commission fees deducted across daily, weekly, monthly, and lifetime trades.</span>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Real-time tracking of cumulative commission fees deducted across daily, weekly, monthly, and lifetime trades separated by bot group.</span>
                 </div>
-                <div class="badge-mini" style="background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 800;">
-                  <i class="fa-solid fa-receipt"></i> 0.2% Trade Fee
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge-mini" style="background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 800;">
+                    <i class="fa-solid fa-receipt"></i> 0.2% Trade Fee
+                  </span>
+                  <span class="badge-mini" style="background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); font-weight: 800;">
+                    Global Total: <strong id="perfCommTotalGlobal" style="color: #fff;">$0.0000</strong>
+                  </span>
                 </div>
               </div>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; text-align: center;">
-                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Today's Fee</div>
-                  <strong id="perfCommToday" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem;">
+                <!-- GOD AI BOT COMMISSION CARD -->
+                <div style="background: rgba(0,0,0,0.35); border-radius: 10px; padding: 0.85rem; border: 1px solid rgba(240, 185, 11, 0.3);">
+                  <div style="font-weight: 800; color: #f0b90b; font-size: 0.85rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-crown"></i> 👑 SUPREME GOD AI BOT — Commission Audit
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center;">
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Today's Fee</div>
+                      <strong id="perfGodCommToday" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Weekly (7D)</div>
+                      <strong id="perfGodCommWeekly" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Monthly (30D)</div>
+                      <strong id="perfGodCommMonthly" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem; border: 1px solid rgba(240, 185, 11, 0.3);">
+                      <div style="font-size: 0.68rem; color: #f0b90b;">Lifetime Fee</div>
+                      <strong id="perfGodCommLifetime" style="font-size: 0.92rem; color: #f0b90b; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                  </div>
                 </div>
-                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Weekly Fee (7D)</div>
-                  <strong id="perfCommWeekly" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
-                </div>
-                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;">Monthly Fee (30D)</div>
-                  <strong id="perfCommMonthly" style="font-size: 1.15rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
-                </div>
-                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(168, 85, 247, 0.3);">
-                  <div style="font-size: 0.75rem; color: #a855f7; margin-bottom: 0.2rem;">Total Lifetime Fee</div>
-                  <strong id="perfCommLifetime" style="font-size: 1.15rem; color: #a855f7; font-family: var(--font-mono);">$0.0000</strong>
+
+                <!-- GROUP C OB BOT COMMISSION CARD -->
+                <div style="background: rgba(0,0,0,0.35); border-radius: 10px; padding: 0.85rem; border: 1px solid rgba(0, 240, 255, 0.3);">
+                  <div style="font-weight: 800; color: #00f0ff; font-size: 0.85rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-bolt"></i> ⚡ GROUP C OB BOT — Commission Audit
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center;">
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Today's Fee</div>
+                      <strong id="perfGroupCCommToday" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Weekly (7D)</div>
+                      <strong id="perfGroupCCommWeekly" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem;">
+                      <div style="font-size: 0.68rem; color: var(--text-muted);">Monthly (30D)</div>
+                      <strong id="perfGroupCCommMonthly" style="font-size: 0.92rem; color: #fff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.4rem; border: 1px solid rgba(0, 240, 255, 0.3);">
+                      <div style="font-size: 0.68rem; color: #00f0ff;">Lifetime Fee</div>
+                      <strong id="perfGroupCCommLifetime" style="font-size: 0.92rem; color: #00f0ff; font-family: var(--font-mono);">$0.0000</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

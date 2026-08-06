@@ -1052,40 +1052,50 @@ def get_backtest_eligible_coins():
 @app.get("/api/robo/trade_stats")
 def get_robo_trade_stats():
     """
-    VERSION 77: Computes Lifetime Stats & Everyday Summary Ledger (Grouped by Date) with 0.20% Commission Fee Tracking
-    Only caters for transactions that have already closed exit price.
+    VERSION 98: Computes Lifetime & Everyday Summary Ledger (Grouped by Date) in Malaysia Time (MYT / UTC+8)
+    Net PnL explicitly deducts the 0.20% Commission Fee.
+    Per-group commission fee breakdown provided for Supreme God AI Bot & Group C OB Bot.
     """
+    from backend.db import get_myt_now, get_myt_date_str
     all_txs = db_manager.get_all_transaction_history()
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
-    today_dt = datetime.date.today()
+    
+    myt_now = get_myt_now()
+    today_dt = myt_now.date()
+    today_str = today_dt.strftime("%Y-%m-%d")
     seven_days_ago_str = (today_dt - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     thirty_days_ago_str = (today_dt - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     stats = {}
     
-    total_comm_today = 0.0
-    total_comm_weekly = 0.0
-    total_comm_monthly = 0.0
-    total_comm_lifetime = 0.0
+    # Structure per-group commission fee tracking
+    comm_summary = {
+        "god_ai": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0},
+        "group_c": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0},
+        "total": {"today": 0.0, "weekly": 0.0, "monthly": 0.0, "lifetime": 0.0}
+    }
 
     for p in participants:
         p_txs = [t for t in all_txs if t.get("participant") == p]
         
-        # Lifetime Stats
-        wins = [t for t in p_txs if t.get("pnl", 0) > 0]
-        losses = [t for t in p_txs if t.get("pnl", 0) <= 0]
-        total_profit = sum(t.get("pnl", 0) for t in wins)
-        total_loss = sum(abs(t.get("pnl", 0)) for t in losses)
-        total_pnl = total_profit - total_loss
-        total_comm = sum(t.get("commission_fee", 0.0) or (t.get("capital", 0.0) * 0.002) for t in p_txs)
+        # Cumulative / Lifetime Stats
+        wins = [t for t in p_txs if float(t.get("pnl", 0) or 0) > 0]
+        losses = [t for t in p_txs if float(t.get("pnl", 0) or 0) <= 0]
+        total_profit = sum(float(t.get("pnl", 0) or 0) for t in wins)
+        total_loss = sum(abs(float(t.get("pnl", 0) or 0)) for t in losses)
+        total_comm = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in p_txs)
+        # Requirement 3 & 5: Net PnL = Profit - Loss - Commission Fee
+        total_pnl = total_profit - total_loss - total_comm
         
-        # Today Stats
+        # Today Stats (Requirement 2: Resets daily at 12:00 AM MYT)
         today_txs = [t for t in p_txs if str(t.get("created_at", "")).startswith(today_str)]
-        today_wins = len([t for t in today_txs if t.get("pnl", 0) > 0])
-        today_losses = len([t for t in today_txs if t.get("pnl", 0) <= 0])
-        today_pnl = sum(t.get("pnl", 0) for t in today_txs)
-        today_comm = sum(t.get("commission_fee", 0.0) or (t.get("capital", 0.0) * 0.002) for t in today_txs)
+        today_wins_tx = [t for t in today_txs if float(t.get("pnl", 0) or 0) > 0]
+        today_losses_tx = [t for t in today_txs if float(t.get("pnl", 0) or 0) <= 0]
+        today_profit = sum(float(t.get("pnl", 0) or 0) for t in today_wins_tx)
+        today_loss = sum(abs(float(t.get("pnl", 0) or 0)) for t in today_losses_tx)
+        today_comm = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in today_txs)
+        # Requirement 3: Today Net PnL = Today Profit - Today Loss - Today Comm. Fee
+        today_pnl = today_profit - today_loss - today_comm
         today_pnl_pct = (today_pnl / 100.0) * 100.0 if today_pnl != 0 else 0.0
         
         stats[p] = {
@@ -1095,14 +1105,16 @@ def get_robo_trade_stats():
             "total_loss": round(total_loss, 2),
             "total_pnl": round(total_pnl, 2),
             "total_commission_fee": round(total_comm, 4),
-            "today_wins": today_wins,
-            "today_losses": today_losses,
+            "today_wins": len(today_wins_tx),
+            "today_losses": len(today_losses_tx),
+            "today_profit": round(today_profit, 2),
+            "today_loss": round(today_loss, 2),
             "today_pnl": round(today_pnl, 2),
             "today_pnl_pct": round(today_pnl_pct, 2),
             "today_commission_fee": round(today_comm, 4)
         }
 
-    # Global Commission Fee Summary Across All Closed Transactions
+    # Requirement 4: Per-Group & Global Commission Fee Summary Across All Closed Transactions
     for t in all_txs:
         action = str(t.get("action", "")).upper()
         status = str(t.get("status", "")).upper()
@@ -1111,23 +1123,42 @@ def get_robo_trade_stats():
             dt = str(exit_date_val)[:10]
             fee = float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002))
             
-            total_comm_lifetime += fee
+            p_name = str(t.get("participant", ""))
+            group_key = "god_ai" if "GOD" in p_name else ("group_c" if "GROUP C" in p_name or "C BOT" in p_name else None)
+
+            # Global Total
+            comm_summary["total"]["lifetime"] += fee
             if dt == today_str:
-                total_comm_today += fee
+                comm_summary["total"]["today"] += fee
             if dt >= seven_days_ago_str:
-                total_comm_weekly += fee
+                comm_summary["total"]["weekly"] += fee
             if dt >= thirty_days_ago_str:
-                total_comm_monthly += fee
+                comm_summary["total"]["monthly"] += fee
+
+            # Per Group
+            if group_key:
+                comm_summary[group_key]["lifetime"] += fee
+                if dt == today_str:
+                    comm_summary[group_key]["today"] += fee
+                if dt >= seven_days_ago_str:
+                    comm_summary[group_key]["weekly"] += fee
+                if dt >= thirty_days_ago_str:
+                    comm_summary[group_key]["monthly"] += fee
+
+    # Round all values in comm_summary
+    for gk in comm_summary:
+        for period_key in comm_summary[gk]:
+            comm_summary[gk][period_key] = round(comm_summary[gk][period_key], 4)
 
     # VERSION 72: HISTORICAL EVERYDAY SUMMARY LEDGER GROUPED STRICTLY BY EXIT DATE
     ledger_map = {}
     weekly_data = {
-        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0},
-        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0}
+        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0, "comm": 0.0},
+        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0, "comm": 0.0}
     }
     monthly_data = {
-        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0},
-        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0}
+        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0, "comm": 0.0},
+        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "profit": 0.0, "loss": 0.0, "comm": 0.0}
     }
 
     for t in all_txs:
@@ -1148,23 +1179,31 @@ def get_robo_trade_stats():
 
             if bot_key:
                 pnl_val = float(t.get("pnl", 0.0) or 0.0)
+                fee_val = float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002))
 
                 if dt not in ledger_map:
                     ledger_map[dt] = {
-                        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "pnl": 0.0, "symbols": []},
-                        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "pnl": 0.0, "symbols": []}
+                        "👑 SUPREME GOD AI BOT": {"wins": 0, "losses": 0, "pnl": 0.0, "profit": 0.0, "loss": 0.0, "comm": 0.0, "symbols": []},
+                        "⚡ GROUP C OB BOT": {"wins": 0, "losses": 0, "pnl": 0.0, "profit": 0.0, "loss": 0.0, "comm": 0.0, "symbols": []}
                     }
 
                 if pnl_val > 0:
                     ledger_map[dt][bot_key]["wins"] += 1
+                    ledger_map[dt][bot_key]["profit"] += pnl_val
                 else:
                     ledger_map[dt][bot_key]["losses"] += 1
-                ledger_map[dt][bot_key]["pnl"] += pnl_val
+                    ledger_map[dt][bot_key]["loss"] += abs(pnl_val)
+
+                ledger_map[dt][bot_key]["comm"] += fee_val
+                # Net PnL = Profit - Loss - Fee
+                ledger_map[dt][bot_key]["pnl"] = ledger_map[dt][bot_key]["profit"] - ledger_map[dt][bot_key]["loss"] - ledger_map[dt][bot_key]["comm"]
+                
                 sym = t.get("symbol")
                 if sym and sym not in ledger_map[dt][bot_key]["symbols"]:
                     ledger_map[dt][bot_key]["symbols"].append(sym)
 
                 if dt >= seven_days_ago_str:
+                    weekly_data[bot_key]["comm"] += fee_val
                     if pnl_val > 0:
                         weekly_data[bot_key]["wins"] += 1
                         weekly_data[bot_key]["profit"] += pnl_val
@@ -1173,6 +1212,7 @@ def get_robo_trade_stats():
                         weekly_data[bot_key]["loss"] += abs(pnl_val)
 
                 if dt >= thirty_days_ago_str:
+                    monthly_data[bot_key]["comm"] += fee_val
                     if pnl_val > 0:
                         monthly_data[bot_key]["wins"] += 1
                         monthly_data[bot_key]["profit"] += pnl_val
@@ -1192,6 +1232,9 @@ def get_robo_trade_stats():
             "god_ai": {
                 "wins": ledger_map[dt]["👑 SUPREME GOD AI BOT"]["wins"],
                 "losses": ledger_map[dt]["👑 SUPREME GOD AI BOT"]["losses"],
+                "profit": round(ledger_map[dt]["👑 SUPREME GOD AI BOT"]["profit"], 2),
+                "loss": round(ledger_map[dt]["👑 SUPREME GOD AI BOT"]["loss"], 2),
+                "comm_fee": round(ledger_map[dt]["👑 SUPREME GOD AI BOT"]["comm"], 4),
                 "pnl": god_pnl,
                 "pnl_pct": god_pct,
                 "symbols": ledger_map[dt]["👑 SUPREME GOD AI BOT"]["symbols"]
@@ -1199,6 +1242,9 @@ def get_robo_trade_stats():
             "group_c": {
                 "wins": ledger_map[dt]["⚡ GROUP C OB BOT"]["wins"],
                 "losses": ledger_map[dt]["⚡ GROUP C OB BOT"]["losses"],
+                "profit": round(ledger_map[dt]["⚡ GROUP C OB BOT"]["profit"], 2),
+                "loss": round(ledger_map[dt]["⚡ GROUP C OB BOT"]["loss"], 2),
+                "comm_fee": round(ledger_map[dt]["⚡ GROUP C OB BOT"]["comm"], 4),
                 "pnl": c_pnl,
                 "pnl_pct": c_pct,
                 "symbols": ledger_map[dt]["⚡ GROUP C OB BOT"]["symbols"]
@@ -1208,13 +1254,14 @@ def get_robo_trade_stats():
     def format_summary_dict(data_dict):
         res = {}
         for k, v in data_dict.items():
-            net = round(v["profit"] - v["loss"], 2)
+            net = round(v["profit"] - v["loss"] - v.get("comm", 0.0), 2)
             pct = round((net / 100.0) * 100.0, 2) if net != 0 else 0.0
             res[k] = {
                 "wins": v["wins"],
                 "losses": v["losses"],
                 "total_profit": round(v["profit"], 2),
                 "total_loss": round(v["loss"], 2),
+                "total_commission_fee": round(v.get("comm", 0.0), 4),
                 "net_pnl": net,
                 "profit_pct": pct
             }
@@ -1230,12 +1277,7 @@ def get_robo_trade_stats():
         "daily_ledger": daily_ledger[:7],
         "weekly_summary": weekly_summary,
         "monthly_summary": monthly_summary,
-        "commission_summary": {
-            "today": round(total_comm_today, 4),
-            "weekly": round(total_comm_weekly, 4),
-            "monthly": round(total_comm_monthly, 4),
-            "lifetime": round(total_comm_lifetime, 4)
-        }
+        "commission_summary": comm_summary
     }
 
 
