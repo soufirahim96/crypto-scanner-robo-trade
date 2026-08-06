@@ -275,12 +275,12 @@ function renderSummaryCard(summaryData, containerId) {
   }
 
   function findKey(data, kw) {
-    if (!data) return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
+    if (!data) return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, total_commission_fee: 0, net_pnl: 0, profit_pct: 0 };
     const uKw = String(kw).toUpperCase();
     for (let k in data) {
       if (k.toUpperCase().includes(uKw)) return data[k] || {};
     }
-    return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, net_pnl: 0, profit_pct: 0 };
+    return { wins: 0, losses: 0, total_profit: 0, total_loss: 0, total_commission_fee: 0, net_pnl: 0, profit_pct: 0 };
   }
 
   const god = findKey(summaryData, "GOD");
@@ -291,6 +291,7 @@ function renderSummaryCard(summaryData, containerId) {
     const losses = Number(data.losses) || 0;
     const totalProfit = Number(data.total_profit) || 0;
     const totalLoss = Number(data.total_loss) || 0;
+    const commFee = Number(data.total_commission_fee) || Number(data.comm_fee) || 0;
     const netPnl = Number(data.net_pnl) || 0;
     const profitPct = Number(data.profit_pct) || 0;
 
@@ -308,12 +309,12 @@ function renderSummaryCard(summaryData, containerId) {
         
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; text-align: center; font-size: 0.72rem; margin-bottom: 0.5rem;">
           <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.35rem;">
-            <div style="color: var(--text-muted); font-size: 0.65rem;">Wins</div>
-            <strong style="color: #10b981; font-size: 0.95rem;">${wins}</strong>
+            <div style="color: var(--text-muted); font-size: 0.65rem;">Wins / Loss</div>
+            <strong style="color: #fff; font-size: 0.85rem;"><span style="color: #10b981;">${wins}W</span> / <span style="color: #ef4444;">${losses}L</span></strong>
           </div>
-          <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.35rem;">
-            <div style="color: var(--text-muted); font-size: 0.65rem;">Losses</div>
-            <strong style="color: #ef4444; font-size: 0.95rem;">${losses}</strong>
+          <div style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 6px; padding: 0.35rem;">
+            <div style="color: var(--text-muted); font-size: 0.65rem;">Comm. Fee ($)</div>
+            <strong style="color: #a855f7; font-size: 0.85rem;">-$${commFee.toFixed(4)}</strong>
           </div>
           <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.35rem;">
             <div style="color: var(--text-muted); font-size: 0.65rem;">Total Profit ($)</div>
