@@ -1525,17 +1525,8 @@ def run_robo_trade_loop():
     except Exception as ex_fresh:
         print(f"[V99.0 FRESH START ERROR] {ex_fresh}")
 
-    # VERSION 62: AUTOMATED BACKTEST RESET & RERUN WITH START/END PRICES
-    try:
-        print("[Group E Sentinel - VERSION 62] Wiping legacy backtest data for fresh deduplicated 10-year generation...")
-        db_manager.clear_past_patterns()
-        all_coins_db = db_manager.get_all_coins()
-        eligible_symbols = [c["symbol"].upper() for c in all_coins_db if c.get("coin_type", "").lower() not in ["currency", "meme"]]
-        for sym in eligible_symbols[:6]:
-            run_sequential_backtest(RunBacktestRequest(coin_id=sym, start_year=2016, end_year=2026))
-        print(f"[Group E Sentinel - VERSION 62] Successfully generated fresh deduplicated 10-Year backtest records with Start/End prices for {len(eligible_symbols[:6])} coins!")
-    except Exception as ex_bt:
-        print(f"[Group E Backtest Rerun Error] {ex_bt}")
+    # VERSION 62: Background Backtest Rerun is handled by Group E background task
+    print("[V99.1] Robo Trade Loop initialized. Entering real-time market analysis...")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1934,17 +1925,17 @@ def run_robo_trade_loop():
                         peak_pnl_pct = ((highest_p - entry) / entry) * 100.0 if entry > 0 else 0.0
                         curr_pnl_pct = ((curr_price - entry) / entry) * 100.0 if entry > 0 else 0.0
 
-                        # Calculate holding duration in seconds
+                        # Calculate holding duration in seconds (MYT timezone aligned)
                         created_at_val = holding.get("created_at")
                         holding_sec = 0
                         if created_at_val:
                             try:
                                 if isinstance(created_at_val, (int, float)):
-                                    holding_sec = time.time() - created_at_val
+                                    holding_sec = max(0, time.time() - created_at_val)
                                 else:
                                     c_str = str(created_at_val).split(".")[0]
                                     c_dt = datetime.datetime.strptime(c_str, "%Y-%m-%d %H:%M:%S")
-                                    holding_sec = (datetime.datetime.utcnow() - c_dt).total_seconds()
+                                    holding_sec = max(0, (get_myt_now() - c_dt).total_seconds())
                             except Exception:
                                 holding_sec = 0
 

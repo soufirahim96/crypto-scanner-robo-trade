@@ -226,10 +226,21 @@ class DatabaseManager:
                     symbol TEXT NOT NULL,
                     entry_price_target REAL NOT NULL,
                     exit_price_target REAL NOT NULL,
+                    confluence_score REAL DEFAULT 0.0,
+                    tier TEXT DEFAULT '',
                     status TEXT DEFAULT 'PENDING',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            try:
+                cursor.execute("ALTER TABLE robo_schedules ADD COLUMN confluence_score REAL DEFAULT 0.0")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE robo_schedules ADD COLUMN tier TEXT DEFAULT ''")
+            except Exception:
+                pass
 
             try:
                 cursor.execute("ALTER TABLE crypto_ticks ADD COLUMN coin_id TEXT")
@@ -821,18 +832,21 @@ class DatabaseManager:
             conn.commit()
             return True
 
-    # VERSION 44: ROBO SCHEDULES METHODS
+    # VERSION 44: ROBO TRADE SCHEDULES METHODS
     def set_robo_schedules(self, participant: str, schedules: List[Dict[str, Any]]):
         """Clears previous schedules and inserts exactly current pending ones for a participant"""
         with sqlite3.connect(DB_FILE, timeout=10.0) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM robo_schedules WHERE participant = ?", (participant,))
+            pattern = "%GOD%" if "GOD" in participant else "%GROUP C%"
+            cursor.execute("DELETE FROM robo_schedules WHERE participant LIKE ?", (pattern,))
             for idx, s in enumerate(schedules):
                 s_id = generate_32_hash_id()
+                score_val = float(s.get("confluence_score", 0.0) or 0.0)
+                tier_val = str(s.get("tier", "") or "")
                 cursor.execute("""
-                    INSERT INTO robo_schedules (id, participant, schedule_index, symbol, entry_price_target, exit_price_target)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (s_id, participant, idx + 1, s["symbol"], s["entry_price_target"], s["exit_price_target"]))
+                    INSERT INTO robo_schedules (id, participant, schedule_index, symbol, entry_price_target, exit_price_target, confluence_score, tier)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (s_id, participant, idx + 1, s["symbol"], s["entry_price_target"], s["exit_price_target"], score_val, tier_val))
             conn.commit()
 
     def get_robo_schedules(self, participant: str = None) -> List[Dict[str, Any]]:
@@ -840,7 +854,8 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             if participant:
-                cursor.execute("SELECT * FROM robo_schedules WHERE participant = ? ORDER BY schedule_index ASC", (participant,))
+                pattern = "%GOD%" if "GOD" in participant else "%GROUP C%"
+                cursor.execute("SELECT * FROM robo_schedules WHERE participant LIKE ? ORDER BY schedule_index ASC", (pattern,))
             else:
                 cursor.execute("SELECT * FROM robo_schedules ORDER BY participant, schedule_index ASC")
             return [dict(r) for r in cursor.fetchall()]
