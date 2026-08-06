@@ -1,7 +1,8 @@
 # VERSION 59: REBUILT FROM SCRATCH - GROUP D & SUPREME GOD AI PERFORMANCE TRADE REVIEW & CONSOLIDATED LEDGER
 import time
+import datetime
 from fastapi import APIRouter
-from backend.db import db_manager
+from backend.db import db_manager, get_myt_now
 from backend.scanner import scanner_engine
 
 router = APIRouter(prefix="/api/ai", tags=["Performance Trade Review Scratch Engine"])
