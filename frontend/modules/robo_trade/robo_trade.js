@@ -1,9 +1,8 @@
-// VERSION 64: DEDICATED ROBO TRADE MODULE (STOP LOSS, LIFETIME STATS & DAILY SUMMARY LEDGER)
 window.initRoboTradeModule = function () {
   const container = document.getElementById("roboTradeModuleContainer");
   if (!container) return;
 
-  if (container.children.length === 0) {
+  if (!container.querySelector("#roboTodayDateText")) {
     container.innerHTML = `
     <!-- HEADER BRANDING & SUMMARY -->
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(240, 185, 11, 0.3); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
