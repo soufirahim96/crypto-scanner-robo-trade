@@ -1698,8 +1698,12 @@ def run_robo_trade_loop():
                                 # Allow through to full scoring; if score >= 8.5 below, clear and re-enter
                                 reg["status"] = "CLEARED"
 
-                            elif reg_status == "CLEARED":
-                                pass  # Allow through to scoring — state cleared
+                            elif reg_status in ("CLEARED", "CLEARED_REENTRY_PRIORITY"):
+                                # STAGE 10 RULE 4: SAME-CANDLE RE-ENTRY COOLDOWN
+                                # Require 1-candle green confirmation (price > open_price * 1.001) before re-entering!
+                                # Prevents "one tick bounce" fakeouts that clear the registry too quickly.
+                                if price <= open_price * 1.001:
+                                    continue  # Waiting for full green candle confirmation — block
 
                         # STAGE 4 PART 1: BEARISH CHOCH PROTECTION
                         sell_vol_ratio = 1.0
@@ -1711,14 +1715,18 @@ def run_robo_trade_loop():
                         has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
                         has_volume_veto = (sell_vol_ratio > 2.0)
 
+                        # ─── V99.0 STAGE 10 RULE 3: VOLUME DIVERGENCE TRAP ───
+                        # If a coin's price pumped (chg > 0.5%), but its volume is weak/decreasing or sell volume is high,
+                        # block entry (Hard Veto). Classic smart money exit trap!
+                        has_volume_divergence = (chg > 0.5) and (sell_vol_ratio > 1.8 or vol < 5000000)
+
                         # ─── V99.0 FAKEOUT TRAP FILTER ───
-                        # Block coins with massive upper wicks (price pumped sharply but closed much lower).
-                        # Massive wick = (High - Close) / (High - Low) > 0.60 → 60%+ of the range is wick = fake pump.
                         candle_range = high - low
                         upper_wick_ratio = ((high - price) / candle_range) if candle_range > 0 else 0.0
                         has_fakeout_wick = (upper_wick_ratio > 0.60) and (chg > 0.5)  # Pump + heavy rejection wick
-                        if has_fakeout_wick:
-                            has_bearish_choch = True  # Treat as Hard Veto — fakeout trap detected
+
+                        if has_fakeout_wick or has_volume_divergence:
+                            has_bearish_choch = True  # Hard Veto — fakeout or volume divergence trap detected
 
                         # STAGE 8 LOOP 1: BTC 180-SECOND FREEZE ENGINE
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
@@ -1973,46 +1981,67 @@ def run_robo_trade_loop():
                             exit_tag = "PULLBACK_WATCH"
                             exit_reason = f"⚠️ V99.0 Early Warning Exit: Price dropped {curr_pnl_pct:.2f}% within first {holding_sec/60.0:.1f} min (< 15 min). Pullback Trap Detected! [Tag: PULLBACK_WATCH]"
 
+                        # STAGE 7: 45-MIN STATIC COIN EXIT (Recycle capital if price remains mostly static after 45m)
+                        elif holding_sec >= 2700 and abs(curr_pnl_pct) < 0.3 and h_net >= 0:
+                            should_exit = True
+                            exit_tag = "CLEARED_REENTRY_PRIORITY"
+                            exit_reason = f"⏱️ Stage 7 45-Min Static Coin Exit (Holding: {holding_sec/60.0:.1f}m, PnL static at {curr_pnl_pct:+.2f}%) — Recycling slot for higher volatility coin."
+
                         # STAGE 10: GOLDEN OPPORTUNITY EXIT (Every 12 Hours: 12AM-2AM & 12PM-2PM MYT)
                         elif is_golden_opportunity_window and h_net >= min_required_net:
                             should_exit = True
+                            exit_tag = "CLEARED_REENTRY_PRIORITY"
                             session_str = "12AM-2AM" if 0 <= myt_hour < 2 else "12PM-2PM"
                             exit_reason = f"🌟 V99.0 Golden Opportunity Exit [{session_str} MYT] (Net PnL: +${h_net:.4f} >= +${min_required_net:.4f} [0.30% Threshold])"
 
                         # GOD OF TRADE 45-MIN VELOCITY EXIT & CAPITAL RECYCLER
                         elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_required_net:
                             should_exit = True
+                            exit_tag = "CLEARED_REENTRY_PRIORITY"
                             exit_reason = f"👑 God of Trade 45-Min Velocity Exit (Holding: {holding_sec/60.0:.1f}m, Net PnL: +${h_net:.4f} >= +${min_required_net:.4f})"
 
-                        # ─── V99.0 STAGE 9: TIERED PROFIT-TAKING STOP LOSS (3 Levels) ───
-                        # Tier 3 — Peak >= +4.0%: Trail SL at Peak - 1.5% (locks >= +3.5%)
+                        # ─── V99.0 STAGE 9: PROFIT TAKING STAGES (5 Tiers) ───
+                        # Tier 1 — Peak >= +4.0%: Lock Stop Loss at +3.5%
                         elif peak_pnl_pct >= 4.0:
-                            trailing_sl_price = max(entry * 1.035, highest_p * 0.985)
-                            if curr_price <= trailing_sl_price:
+                            tier1_sl_price = max(entry * 1.035, highest_p * 0.985)
+                            if curr_price <= tier1_sl_price:
                                 should_exit = True
-                                exit_reason = f"🔒 Stage 9 Tier-3 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked >= +3.5%, Exit: ${curr_price:.5f})"
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
+                                exit_reason = f"🔒 Stage 9 Tier-1 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked SL at +3.5%, Exit: ${curr_price:.5f})"
                             elif curr_price >= entry * 1.05:
                                 should_exit = True
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
                                 exit_reason = "✅ Standard Take Profit (+5.0% Target Reached)"
 
-                        # Tier 2 — Peak >= +3.0%: Trail SL at Peak - 1.5% (locks >= +2.5%)
+                        # Tier 2 — Peak >= +3.0%: Lock Stop Loss at +2.5%
                         elif peak_pnl_pct >= 3.0:
                             tier2_sl_price = max(entry * 1.025, highest_p * 0.985)
                             if curr_price <= tier2_sl_price:
                                 should_exit = True
-                                exit_reason = f"🔒 Stage 9 Tier-2 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked >= +2.5%, Exit: ${curr_price:.5f})"
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
+                                exit_reason = f"🔒 Stage 9 Tier-2 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked SL at +2.5%, Exit: ${curr_price:.5f})"
 
-                        # Tier 1 — Peak >= +2.0%: Move SL to Breakeven + 0.40% (covers fee + profit)
+                        # Tier 3 — Peak >= +2.0%: Lock Stop Loss at +1.5%
                         elif peak_pnl_pct >= 2.0:
-                            breakeven_sl_price = entry * 1.004
-                            if curr_price <= breakeven_sl_price:
+                            tier3_sl_price = max(entry * 1.015, highest_p * 0.985)
+                            if curr_price <= tier3_sl_price:
                                 should_exit = True
-                                exit_reason = f"🛡️ Stage 9 Tier-1 Breakeven Shield (Peak: +{peak_pnl_pct:.2f}%, Protected at Entry +0.40%)"
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
+                                exit_reason = f"🔒 Stage 9 Tier-3 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked SL at +1.5%, Exit: ${curr_price:.5f})"
+
+                        # Tier 4 — Peak >= +1.5%: Lock Stop Loss at +1.0%
+                        elif peak_pnl_pct >= 1.5:
+                            tier4_sl_price = max(entry * 1.010, highest_p * 0.985)
+                            if curr_price <= tier4_sl_price:
+                                should_exit = True
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
+                                exit_reason = f"🔒 Stage 9 Tier-4 Trailing SL Triggered (Peak: +{peak_pnl_pct:.2f}%, Locked SL at +1.0%, Exit: ${curr_price:.5f})"
 
                         else:
                             # Standard Exit Rules: Take Profit (+5%) or Standard Stop Loss (-3%)
                             if curr_price >= entry * 1.05:
                                 should_exit = True
+                                exit_tag = "CLEARED_REENTRY_PRIORITY"
                                 exit_reason = "✅ Standard Take Profit (+5.0% Target Reached)"
                             elif curr_price <= entry * 0.97:
                                 should_exit = True
@@ -2036,8 +2065,7 @@ def run_robo_trade_loop():
                             db_manager.remove_active_holding(holding['id'])
                             print(f"[V99.0 EXIT] {participant} sold {sym} at {curr_price}. {exit_reason}. Gross: ${trade_pnl:.2f}, Fee: -${comm_fee:.2f}, Net: ${net_pnl:.2f}")
 
-                            # ─── V99.0 STAGE 7: WRITE COIN EXIT REGISTRY (Pullback / Bearish Tag) ───
-                            # Record exit info so the entry scanner can block re-entry during pullback/bearish
+                            # ─── V99.0 STAGE 7: WRITE COIN EXIT REGISTRY (Pullback / Bearish / Priority Tag) ───
                             if exit_tag in ("PULLBACK_WATCH", "BEARISH"):
                                 coin_exit_registry[sym] = {
                                     "sold_at_price": curr_price,
@@ -2047,8 +2075,16 @@ def run_robo_trade_loop():
                                     "bearish_retry_until": now_ts + 180 if exit_tag == "BEARISH" else 0.0
                                 }
                                 print(f"[V99.0 EXIT REGISTRY] {sym} tagged as [{exit_tag}]. Re-entry blocked for {'3 min minimum' if exit_tag == 'PULLBACK_WATCH' else '3-min retry loops'}. Price at exit: ${curr_price:.5f}")
+                            elif exit_tag == "CLEARED_REENTRY_PRIORITY":
+                                coin_exit_registry[sym] = {
+                                    "sold_at_price": curr_price,
+                                    "sold_at_time": now_ts,
+                                    "exit_chg": h_chg,
+                                    "status": "CLEARED_REENTRY_PRIORITY",
+                                    "bearish_retry_until": 0.0
+                                }
+                                print(f"[V99.0 EXIT REGISTRY] {sym} tagged as [CLEARED_REENTRY_PRIORITY]. Profitable exit — coin prioritized for re-entry if score > 8.5!")
                             elif sym in coin_exit_registry:
-                                # Coin exited cleanly (profit/golden opp) — clear any previous pullback tag
                                 del coin_exit_registry[sym]
 
         except Exception as e:
