@@ -1781,17 +1781,25 @@ def run_robo_trade_loop():
                     # STRICT HIGHEST SCORE SORTING: Prioritize coins with highest confluence scores (e.g., 9.5+, 9.0+, 8.7+ first)
                     scored_coins.sort(key=lambda x: x[0], reverse=True)
 
-                    for score_val, c in scored_coins[:5]:
+                    scheduled_symbols = set()
+                    for score_val, c in scored_coins:
+                        sym = c.get("symbol", "")
+                        if not sym or sym in held_symbols or sym in scheduled_symbols:
+                            continue
+
+                        # If other bot holds it and non-overlapping options exist, skip to prefer distinct coins
+                        if sym in other_symbols:
+                            has_non_shared = any(
+                                sc[1]["symbol"] not in other_symbols
+                                and sc[1]["symbol"] not in scheduled_symbols
+                                and sc[1]["symbol"] not in held_symbols
+                                for sc in scored_coins
+                            )
+                            if has_non_shared:
+                                continue
+
                         price = c.get("price", 100)
                         if price <= 0: continue
-                        sym = c["symbol"]
-
-                        if sym in other_symbols:
-                            other_scored = [x for x in scored_coins[:5] if x[1]["symbol"] not in other_symbols]
-                            if other_scored:
-                                score_val, c = other_scored[0]
-                                sym = c["symbol"]
-                                price = c.get("price", 100)
 
                         if "GOD" in participant:
                             entry = price * (1.0 - random.uniform(0.0005, 0.0025))
@@ -1809,6 +1817,10 @@ def run_robo_trade_loop():
                             "confluence_score":   score_val,
                             "tier":               tier_str
                         })
+                        scheduled_symbols.add(sym)
+
+                        if len(new_sched) >= 5:
+                            break
 
                     if new_sched:
                         db_manager.set_robo_schedules(participant, new_sched)
