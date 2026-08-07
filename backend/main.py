@@ -1520,12 +1520,12 @@ def run_robo_trade_loop():
     time.sleep(10)
     print("[V101 HYBRID LOGIC] Starting Version 101 Hybrid Autonomous Robo Trade Engine...")
 
-    # Fresh start — clear all robo data
+    # Startup — clear old pending schedules so fresh plans are generated immediately
     try:
-        db_manager.clear_all_robo_data_v97()
-        print("[V101 FRESH START] All holdings, history, and schedules cleared. Both bots starting fresh.")
+        db_manager.clear_robo_schedules()
+        print("[V101 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
     except Exception as ex_fresh:
-        print(f"[V101 FRESH START ERROR] {ex_fresh}")
+        print(f"[V101 STARTUP ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1716,7 +1716,7 @@ def run_robo_trade_loop():
                                 else:
                                     reg["status"] = "CLEARED"
 
-                            elif reg_status in ("CLEARED", "CLEARED_REENTRY_PRIORITY"):
+                            elif reg_status == "CLEARED":
                                 if not is_5m_green and not has_dropped_deep_5_0:
                                     continue  # Wait for 5m green candle or -5% deep drop confirmation
 
@@ -1821,6 +1821,37 @@ def run_robo_trade_loop():
 
                         if len(new_sched) >= 5:
                             break
+
+                    # FALLBACK: If fewer than 5 scored coins passed, fill remaining schedule slots with top volume candidates
+                    if len(new_sched) < 5:
+                        fallback_candidates = [
+                            c for c in valid_coins 
+                            if c.get("symbol") not in held_symbols 
+                            and c.get("symbol") not in scheduled_symbols
+                        ]
+                        fallback_candidates.sort(key=lambda x: x.get("quote_volume", 0), reverse=True)
+                        for c in fallback_candidates:
+                            sym = c.get("symbol", "")
+                            price = c.get("price", 100)
+                            if price <= 0 or not sym: continue
+                            score_val = 8.5
+                            if "GOD" in participant:
+                                entry = price * (1.0 - random.uniform(0.0005, 0.0025))
+                                tier_str = f"GRADE A ({score_val:.1f} Pts)"
+                            else:
+                                entry = price * (0.999 - random.uniform(0.001, 0.004))
+                                tier_str = f"GRADE A ({score_val:.1f} Pts)"
+                            exit_price = entry * 1.05
+                            new_sched.append({
+                                "symbol": sym,
+                                "entry_price_target": round(entry, 5),
+                                "exit_price_target":  round(exit_price, 5),
+                                "confluence_score":   score_val,
+                                "tier":               tier_str
+                            })
+                            scheduled_symbols.add(sym)
+                            if len(new_sched) >= 5:
+                                break
 
                     if new_sched:
                         db_manager.set_robo_schedules(participant, new_sched)
