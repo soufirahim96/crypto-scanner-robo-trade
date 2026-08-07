@@ -1529,8 +1529,8 @@ def run_robo_trade_loop():
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
-    last_db_prune_time = 0
-    last_daily_backtest_time = 0
+    last_db_prune_time = time.time()
+    last_daily_backtest_time = time.time()
 
     # Circuit Breaker & Recovery State
     circuit_break_until    = {p: 0.0 for p in participants}
@@ -1903,7 +1903,7 @@ def run_robo_trade_loop():
                         if sched['status'] != 'PENDING': continue
                         sym   = sched['symbol']
                         t_now = scanner_engine.active_tickers.get(sym)
-                        if t_now and t_now.get("is_live", False):
+                        if t_now and t_now.get("price", 0) > 0:
                             curr_price = t_now.get("price", 0)
                             entry      = sched['entry_price_target']
                             if curr_price > 0 and curr_price <= entry:
