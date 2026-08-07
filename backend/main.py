@@ -1491,7 +1491,7 @@ def run_automated_group_e_backtest_task():
 
 def run_robo_trade_loop():
     """
-    VERSION 103 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V103)
+    VERSION 104 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V104)
     Combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
     with V100's loss control risk armor (circuit breakers, trailing locks, early warning exits, regime protections).
 
@@ -1518,14 +1518,14 @@ def run_robo_trade_loop():
         pass
 
     time.sleep(10)
-    print("[V103 HYBRID LOGIC] Starting Version 103 Hybrid Autonomous Robo Trade Engine...")
+    print("[V104 HYBRID LOGIC] Starting Version 104 Hybrid Autonomous Robo Trade Engine...")
 
     # Startup — clear old pending schedules so fresh plans are generated immediately
     try:
         db_manager.clear_robo_schedules()
-        print("[V103 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
+        print("[V104 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
     except Exception as ex_fresh:
-        print(f"[V103 STARTUP ERROR] {ex_fresh}")
+        print(f"[V104 STARTUP ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1650,7 +1650,7 @@ def run_robo_trade_loop():
                 pending            = [s for s in schedules if s['status'] == 'PENDING']
                 needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 120) or (len(pending) < 5)
 
-                # V103 HIGH-FREQUENCY ENTRY SCANNING ENGINE
+                # V104 HIGH-FREQUENCY ENTRY SCANNING ENGINE
                 if needs_reanalysis and not is_circuit_broken:
                     new_sched = []
                     held_symbols = set(h['symbol'] for h in p_holdings)
@@ -1710,7 +1710,7 @@ def run_robo_trade_loop():
                                     continue  # Initial 3-minute hard block active
                                 elif has_dropped_deep_5_0 or is_5m_green:
                                     reg["status"] = "CLEARED"  # Condition met! Unblocked for re-entry analysis
-                                    print(f"[V103 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '5M Green candle confirmed (>+0.1%)'}")
+                                    print(f"[V104 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '5M Green candle confirmed (>+0.1%)'}")
                                 elif price < reg["sold_at_price"] * 0.998:
                                     continue  # Not recovered and hasn't met clearance conditions
                                 else:
@@ -1748,7 +1748,7 @@ def run_robo_trade_loop():
                         if has_hard_veto:
                             continue
 
-                        # V103 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
+                        # V104 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
                         sweep_pts   = 2.5 if chg > 1.2 else 2.2
                         cvd_pts     = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
@@ -1801,14 +1801,14 @@ def run_robo_trade_loop():
                         price = c.get("price", 100)
                         if price <= 0: continue
 
-                        # STAGE 10 RULE #6: ADAPTIVE ENTRY PRICE GUIDANCE
+                        # STAGE 10 RULE #6: ADAPTIVE ENTRY PRICE GUIDANCE (V104: 0.9915 & 0.9975)
                         if score_val >= 9.0:
                             entry = price * 0.9975  # Score >= 9.0 -> 0.25% micro discount offset
                         else:
-                            entry = price * 0.987   # Score 8.5 to 8.9 -> 1.30% discount cushion offset
+                            entry = price * 0.9915  # Score 8.5 to 8.9 -> 0.85% discount cushion offset
 
                         if "GOD" in participant:
-                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V103 HYBRID" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V104 HYBRID" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
 
@@ -1839,7 +1839,7 @@ def run_robo_trade_loop():
                             price = c.get("price", 100)
                             if price <= 0 or not sym: continue
                             score_val = 8.5
-                            entry = price * 0.987 # Score 8.5 -> 1.30% discount cushion offset
+                            entry = price * 0.9915 # Score 8.5 -> 0.85% discount cushion offset
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
                             exit_price = entry * 1.05
                             new_sched.append({
@@ -1857,7 +1857,7 @@ def run_robo_trade_loop():
                         db_manager.set_robo_schedules(participant, new_sched)
                         last_analysis_time[participant]        = now_ts
                         last_analysis_time_global[participant] = now_ts
-                        print(f"[V103 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
+                        print(f"[V104 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
 
                 pending = db_manager.get_robo_schedules(participant)
 
@@ -1893,7 +1893,7 @@ def run_robo_trade_loop():
                                         entry_price=worst_h['entry_price'], exit_price=worst_px,
                                         amount=worst_h['amount'], pnl=w_net
                                     )
-                                    print(f"[V103 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
+                                    print(f"[V104 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
 
@@ -1921,7 +1921,7 @@ def run_robo_trade_loop():
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                 open_count += num_lots
-                                print(f"[V103 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ({num_lots}-Lot ${capital:.2f} Spot)")
+                                print(f"[V104 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ({num_lots}-Lot ${capital:.2f} Spot)")
                                 if open_count >= 5:
                                     break
 
@@ -1954,7 +1954,7 @@ def run_robo_trade_loop():
                             open_count += (2 if re_cap == 40.0 else 1)
                             smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
                             if re_count + 1 >= 3: to_remove_reentry.append(re_sym)
-                            print(f"[V103 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
+                            print(f"[V104 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
                             continue
 
                     b1 = re_price >= re_exit_px * 0.995
