@@ -1828,16 +1828,18 @@ def run_robo_trade_loop():
                             continue
 
                         # STAGE 5: FVG Threshold per regime
+                        candle_range_pct = (high - low) / price * 100 if price > 0 else 0
                         fvg_valid = False
                         if market_regime == "BULLISH":
-                            # Threshold_FVG_Bull = Max(0.35%, 1.5 * ATR)
-                            fvg_valid = in_fvg_retest and (chg > 0.35 or (high - low) / price * 100 > 0.35)
+                            # FVG valid = good candle range OR full retest (not requiring retest)
+                            # Full 1.5pts only on retest; 0.8pts for valid candle range
+                            fvg_valid = in_fvg_retest or (chg > 0.35 or candle_range_pct > 0.35)
                         elif market_regime == "BEARISH":
                             # Threshold_FVG_Bear = Max(0.60%, 2.2 * ATR)
-                            fvg_valid = (chg < -0.60) or ((high - low) / price * 100 > 0.60)
+                            fvg_valid = (chg < -0.60) or (candle_range_pct > 0.60)
                         else:  # SIDEWAYS
                             # Threshold_FVG_Side = Max(0.20%, 1.0 * ATR)
-                            fvg_valid = (abs(chg) > 0.20 or (high - low) / price * 100 > 0.20)
+                            fvg_valid = (abs(chg) > 0.20 or candle_range_pct > 0.20)
 
                         # STAGE 5: BOS Strength Score
                         bos_score = 0
@@ -1916,8 +1918,9 @@ def run_robo_trade_loop():
                         if market_regime == "BEARISH" and chg < -0.5:
                             total_score += 0.5  # Bonus for confirmed bearish alignment
 
-                        # Recovery phase: raise minimum to 9.0
-                        min_score = 9.0 if is_recovery_phase else 8.5
+                        # Recovery phase: raise minimum to 8.5 (was 9.0)
+                        # V100 has 7 pre-filter stages before scoring — threshold lowered from 8.5->8.0
+                        min_score = 8.5 if is_recovery_phase else 8.0
 
                         # ── STAGE 12: 5-LOOP COUNCIL CONSENSUS ───────────────
                         if total_score >= min_score:
