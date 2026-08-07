@@ -1738,13 +1738,12 @@ def run_robo_trade_loop():
                             continue
 
                         # STAGE 2: HTF Zone Check (regime-specific)
-                        # Bull: price should be at discount (<= 38.2% Fib area proxy: below open)
-                        # Bear: price should be at premium (>= 61.8% area: above open)
-                        # Sideways: only near extreme range boundaries
-                        if market_regime == "BULLISH" and chg > 3.0:
-                            continue  # Too far into premium, not a discount zone
-                        if market_regime == "BEARISH" and chg < -3.0:
-                            continue  # Chasing the dump bottom, not in premium zone
+                        # Bull: allow coins up to +5% (was 3%) — gives more entry opportunities
+                        # Bear: allow coins down to -5% (was -3%)
+                        if market_regime == "BULLISH" and chg > 5.0:
+                            continue  # Extreme premium — skip
+                        if market_regime == "BEARISH" and chg < -5.0:
+                            continue  # Extreme discount — skip
                         if market_regime == "SIDEWAYS" and skip_sideways:
                             continue  # HIGH vol: skip all sideways entries
 
@@ -1800,12 +1799,13 @@ def run_robo_trade_loop():
                             continue  # Stage 4: Extreme short funding — squeeze imminent
 
                         # OI proxy check per regime
-                        if market_regime == "BULLISH" and not (chg >= 0.5 and vol > 5000000):
-                            continue  # Need OI expansion signal (+5% analog)
+                        # BULLISH: min chg 0.2% (was 0.5%) — catches early momentum builds
+                        if market_regime == "BULLISH" and not (chg >= 0.2 and vol > 5000000):
+                            continue  # Need at least slight positive momentum + volume
                         if market_regime == "BEARISH" and not (chg < 0 and vol > 5000000):
                             continue  # Need negative CVD slope analog
-                        if market_regime == "SIDEWAYS" and vol > 15000000:
-                            continue  # Sideways: OI must be flat/low (<= +2% analog)
+                        if market_regime == "SIDEWAYS" and vol > 25000000:
+                            continue  # Sideways: OI must be relatively calm (raised 15M->25M)
 
                         # STAGE 14 Rule 3: Volume Divergence Trap
                         sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
@@ -1843,7 +1843,7 @@ def run_robo_trade_loop():
 
                         # STAGE 5: BOS Strength Score
                         bos_score = 0
-                        if chg > 0.5: bos_score += 1    # 15M BOS proxy
+                        if chg > 0.2: bos_score += 1    # 15M BOS proxy (lowered from 0.5)
                         if chg > 1.2: bos_score += 2    # 1H BOS proxy (higher weight)
                         if chg > 2.0: bos_score += 3    # 4H BOS proxy (highest weight)
 
@@ -1918,9 +1918,9 @@ def run_robo_trade_loop():
                         if market_regime == "BEARISH" and chg < -0.5:
                             total_score += 0.5  # Bonus for confirmed bearish alignment
 
-                        # Recovery phase: raise minimum to 8.5 (was 9.0)
-                        # V100 has 7 pre-filter stages before scoring — threshold lowered from 8.5->8.0
-                        min_score = 8.5 if is_recovery_phase else 8.0
+                        # Recovery phase: 8.5 (was 9.0). Normal: 7.5 (was 8.0)
+                        # V100 has 7 pre-filter stages — threshold calibrated lower
+                        min_score = 8.5 if is_recovery_phase else 7.5
 
                         # ── STAGE 12: 5-LOOP COUNCIL CONSENSUS ───────────────
                         if total_score >= min_score:
