@@ -1761,14 +1761,15 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # Threshold Adaptation:
-                        # Standard coins: 8.5 Pts (Bullish/Normal), 8.8 Pts (Bearish Regime)
-                        # Previously pulled-back coins: require 8.8 Pts + FVG Retest for extra risk control
+                        # Threshold Adaptation (User Spec: 8.5 Pts threshold for max entry access)
+                        min_score = 9.0 if is_recovery_phase else 8.5
+
+                        # Pullback / Bearish Trap Detector:
+                        # Even at 8.5 Pts, block coins that are currently in an active falling candle (chg < 0 or price <= open_price)
+                        # or showing bearish candle rejection wicks.
                         if is_previously_tagged:
-                            if not in_fvg_retest: continue  # Must show genuine FVG retest
-                            min_score = 8.8
-                        else:
-                            min_score = 8.8 if market_regime == "BEARISH" else (9.0 if is_recovery_phase else 8.5)
+                            if chg < 0 or price <= open_price * 1.0005:
+                                continue  # Active pullback in progress — block entry!
 
                         # 5-Loop Council Verification
                         if total_score >= min_score:
@@ -1780,6 +1781,7 @@ def run_robo_trade_loop():
                             if council_passes == 5:
                                 scored_coins.append((total_score, c))
 
+                    # STRICT HIGHEST SCORE SORTING: Prioritize coins with highest confluence scores (e.g., 9.5+, 9.0+, 8.7+ first)
                     scored_coins.sort(key=lambda x: x[0], reverse=True)
 
                     for score_val, c in scored_coins[:5]:
