@@ -1905,7 +1905,8 @@ def run_robo_trade_loop():
                         sweep_pts  = 2.5 if chg > 1.2 else 2.2
                         cvd_pts    = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
-                        bos_pts    = min(1.5, bos_score * 0.25)  # Max 1.5 from BOS
+                        # BOS pts: base 1.2 (like V99), bonus +0.3 if multi-TF confirms (4H BOS)
+                        bos_pts    = 1.5 if (chg > 1.8 or bos_score >= 6) else (1.35 if bos_score >= 3 else 1.2)
                         total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
 
                         if chg < 0:
