@@ -1830,33 +1830,41 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # Supreme God AI Grade S Rotation
-                if "GOD" in participant and open_count >= 5 and not is_circuit_broken:
-                    top_high = next((s for s in pending if s['status'] == 'PENDING'
-                                     and float(s.get('confluence_score', 0)) >= 9.0), None)
-                    if top_high and p_holdings:
-                        holding_pnls = []
-                        for h in p_holdings:
-                            h_sym = h['symbol']
-                            h_tick = scanner_engine.active_tickers.get(h_sym)
-                            h_px   = h_tick.get("price", h['entry_price']) if h_tick else h['entry_price']
-                            h_pnl  = ((h_px - h['entry_price']) / h['entry_price']) * 100.0 if h['entry_price'] > 0 else 0.0
-                            holding_pnls.append((h_pnl, h_px, h))
-                        holding_pnls.sort(key=lambda x: x[0])
-                        worst_pct, worst_px, worst_h = holding_pnls[0]
-                        w_cap  = worst_h['entry_price'] * worst_h['amount']
-                        w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
-                        w_fee  = round(w_cap * 0.002, 4)
-                        w_net  = round(w_pnl - w_fee, 4)
-                        db_manager.remove_active_holding(worst_h['id'])
-                        db_manager.add_transaction_history(
-                            participant=participant, symbol=worst_h['symbol'], action="SELL (ROTATION)",
-                            entry_price=worst_h['entry_price'], exit_price=worst_px,
-                            amount=worst_h['amount'], pnl=w_net
-                        )
-                        print(f"[V99 PRO ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to scale into Grade S {top_high['symbol']}")
-                        p_holdings = [h for h in p_holdings if h['id'] != worst_h['id']]
-                        open_count = len(p_holdings)
+                # Supreme God AI Grade S (>= 9.5 Pts) 2-Lot & 2-Slot Rotation
+                if "GOD" in participant and not is_circuit_broken:
+                    top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
+                                        and float(s.get('confluence_score', 0)) >= 9.5), None)
+                    if top_grade_s:
+                        s_sym = top_grade_s['symbol']
+                        is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
+                        if not is_already_held:
+                            # Need 2 free slots for 2-lot entry ($40 capital). If open_count >= 4, rotate worst 2 holdings
+                            if open_count >= 4 and p_holdings:
+                                holding_pnls = []
+                                for h in p_holdings:
+                                    h_sym = h['symbol']
+                                    h_tick = scanner_engine.active_tickers.get(h_sym)
+                                    h_px   = h_tick.get("price", h['entry_price']) if h_tick else h['entry_price']
+                                    h_pnl  = ((h_px - h['entry_price']) / h['entry_price']) * 100.0 if h['entry_price'] > 0 else 0.0
+                                    holding_pnls.append((h_pnl, h_px, h))
+                                holding_pnls.sort(key=lambda x: x[0])
+                                
+                                num_to_rotate = 2 if open_count >= 4 else (1 if open_count == 4 else 0)
+                                for r_idx in range(min(num_to_rotate, len(holding_pnls))):
+                                    worst_pct, worst_px, worst_h = holding_pnls[r_idx]
+                                    w_cap  = worst_h['entry_price'] * worst_h['amount']
+                                    w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
+                                    w_fee  = round(w_cap * 0.002, 4)
+                                    w_net  = round(w_pnl - w_fee, 4)
+                                    db_manager.remove_active_holding(worst_h['id'])
+                                    db_manager.add_transaction_history(
+                                        participant=participant, symbol=worst_h['symbol'], action="SELL (GRADE_S_ROTATION)",
+                                        entry_price=worst_h['entry_price'], exit_price=worst_px,
+                                        amount=worst_h['amount'], pnl=w_net
+                                    )
+                                    print(f"[V101 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
+                                p_holdings = db_manager.get_active_holdings(participant)
+                                open_count = len(p_holdings)
 
                 # ENTRY EXECUTION
                 if open_count < 5 and not is_circuit_broken:
@@ -1873,15 +1881,20 @@ def run_robo_trade_loop():
                                     print(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                capital = 20.0  # 100% Flat $20 Spot Allocation
+                                score_val = float(sched.get('confluence_score', 8.5) or 8.5)
+                                # Grade S (>= 9.5 Pts) 2-Lot position ($40.00) if space allows
+                                is_grade_s_trade = ("GOD" in participant) and (score_val >= 9.5)
+                                num_lots = 2 if (is_grade_s_trade and open_count <= 3) else 1
+                                capital = 20.0 * num_lots
+
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
-                                open_count += 1
-                                print(f"[V99 PRO ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ($20.00 Spot)")
+                                open_count += num_lots
+                                print(f"[V101 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ({num_lots}-Lot ${capital:.2f} Spot)")
                                 if open_count >= 5:
                                     break
 
-                # SMART RE-ENTRY CHECK (Stage 11)
+                # SMART RE-ENTRY CHECK (Stage 11 & Grade S Zero-Timer Re-Entry on -0.5% Dip)
                 to_remove_reentry = []
                 for re_sym, re_data in smart_reentry_pending.get(participant, {}).items():
                     if now_ts < re_data.get("check_at", 0): continue
@@ -1897,9 +1910,21 @@ def run_robo_trade_loop():
                     re_open    = re_t.get("open", re_price)
                     re_chg     = re_t.get("change_pct", 0)
                     re_vol     = re_t.get("quote_volume", 0)
-                    re_high    = re_t.get("high", re_price)
-                    re_low     = re_t.get("low", re_price)
                     re_count   = re_data.get("count", 0)
+                    is_gr_s_re = re_data.get("is_grade_s", False)
+
+                    # Grade S continuous zero-timer re-entry on -0.5% pullback
+                    if is_gr_s_re:
+                        b1 = re_price <= re_exit_px * 0.995 # Price dropped -0.5% from exit
+                        b2 = re_chg >= 0
+                        if b1 and b2 and open_count < 5 and not is_circuit_broken:
+                            re_cap = 40.0 if open_count <= 3 else 20.0
+                            db_manager.add_active_holding(participant, re_sym, re_price, re_cap / re_price)
+                            open_count += (2 if re_cap == 40.0 else 1)
+                            smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
+                            if re_count + 1 >= 3: to_remove_reentry.append(re_sym)
+                            print(f"[V101 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
+                            continue
 
                     b1 = re_price >= re_exit_px * 0.995
                     b2 = re_price > re_open * 1.001
@@ -1992,6 +2017,7 @@ def run_robo_trade_loop():
                     exit_reason    = ""
                     exit_tag       = "SOLD_NEUTRAL"
                     exit_is_profit = False
+                    is_gr_s_holding = h_score >= 9.5
 
                     # PRIORITY 1: BTC CRASH EMERGENCY EXIT
                     if btc_emergency_exit_active:
@@ -2005,11 +2031,11 @@ def run_robo_trade_loop():
                         exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
                         exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
 
-                    # PRIORITY 3: 20-MIN EARLY WARNING EXIT (User Spec: <= -1.5% in first 20m)
-                    elif holding_sec < 1200 and curr_pnl_pct <= -1.5:
+                    # PRIORITY 3: 10-MIN EARLY WARNING EXIT (Stage 7 Spec: <= -0.8% in first 10m)
+                    elif holding_sec < 600 and curr_pnl_pct <= -0.8:
                         should_exit = True
                         exit_tag    = "EARLY_WARNING_PULLBACK"
-                        exit_reason = f"⚠️ 20-Min Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m (<= 20m)"
+                        exit_reason = f"⚠️ 10-Min Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m (<= 10m)"
 
                     # 45-MIN STATIC COIN EXIT
                     elif holding_sec >= 2700 and abs(curr_pnl_pct) < 0.3 and h_net >= 0:
@@ -2026,14 +2052,14 @@ def run_robo_trade_loop():
                             exit_reason    = f"Golden Window Exit [{session_str}] PnL:+${h_net:.4f}"
                             exit_is_profit = True
 
-                    # GOD 45-MIN VELOCITY EXIT
-                    elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_net:
-                        should_exit    = True
-                        exit_tag       = "CLEARED_REENTRY_PRIORITY"
-                        exit_reason    = f"God 45-Min Velocity Exit (${h_net:.4f})"
-                        exit_is_profit = True
+                    # STAGE 9 RULE #1: GRADE S AUTO LOCK SL @ +10.0% (Bypasses lower stages)
+                    elif is_gr_s_holding and (peak_pnl_pct >= 10.0 or curr_pnl_pct >= 10.0):
+                        sl_p = entry * 1.100
+                        if curr_price <= sl_p or curr_pnl_pct >= 10.0:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"🏆 Grade S Auto Lock SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+10.0% SL)"
 
-                    # 8-TIER TRAILING STOP (User Spec: Peak >= +0.8% Locks SL at +0.6%)
+                    # 8-TIER TRAILING STOP STAGES
                     elif peak_pnl_pct >= 10.0:
                         sl_p = entry * 1.090
                         if curr_price <= sl_p:
@@ -2070,14 +2096,17 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Tier-7 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+1.0%)"
                     elif peak_pnl_pct >= 0.8:
-                        # BREAKEVEN LOCK (User Spec: Lock Stop Loss @ +0.6% profit)
                         sl_p = entry * 1.006
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.6% SL)"
+                    elif peak_pnl_pct >= 0.5:
+                        sl_p = entry * 1.004
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Tier-9 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.4% SL)"
                     else:
-                        # Standard Stop Loss: -2.0% in BEARISH regime, -3.0% in Normal
-                        sl_mult = 0.98 if market_regime == "BEARISH" else 0.97
+                        sl_mult = 0.982 if market_regime in ("BEARISH", "SIDEWAYS") else 0.975
                         if curr_price >= entry * 1.05:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = "Standard Take Profit (+5.0%)"
