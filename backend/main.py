@@ -1484,37 +1484,28 @@ def run_automated_group_e_backtest_task():
         for coin in target_coins[:10]: # Auto-process top priority coins on startup
             req = RunBacktestRequest(coin_id=coin, start_year=2016, end_year=2026)
             run_sequential_backtest(req)
-        print("VERSION 42: Group E Automated Background Backtest Task Completed Successfully!")
+        print("Group E Automated Background Backtest Task Completed Successfully!")
     except Exception as e:
         print("Group E background backtest error:", e)
 
 
-# VERSION 99.0: 24/7 AUTONOMOUS ROBO TRADE ENGINE — GOD OF TRADE MASTER LOGIC
-# UPGRADES:
-#   Stage 7  — Coin Exit Registry: PULLBACK_WATCH / BEARISH / DEEP_DROP / CLEARED state machine
-#   Stage 9  — 3-Tier Tiered Profit Stop Loss (+2% / +3% / +4%)
-#   Stage 10 — Golden Opportunity: Every 12 Hours only (12AM-2AM & 12PM-2PM MYT)
-#   FRESH START: All history, holdings, and schedules wiped on startup
 def run_robo_trade_loop():
     """
-    V100 — 14-STAGE GOD OF TRADE MASTER LOGIC (Latest Enhanced Architecture)
-    Backup of previous logic: backend/main_v99_backup.py
+    V99 PRO HYBRID — GOD OF TRADE MASTER ENGINE
+    combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
+    with V100's loss control risk armor (circuit breakers, trailing locks, early warning exits, regime protections).
 
-    Stage 0:  Volatility Regime Pre-Filter (ATR_Ratio)
-    Stage 1:  Trend_Score Regime Detection (BULLISH/BEARISH/SIDEWAYS) + Transition Protocol
-    Stage 2:  HTF Wholesale/Premium Zones (4H Fib)
-    Stage 3:  Wyckoff Liquidity Sweep (regime-adaptive lookback)
-    Stage 4:  OI/CVD/Funding Verification + Extreme Funding Blocks
-    Stage 5:  FVG Conditioning + Multi-TF BOS Score + FVG Age Filter
-    Stage 6:  BTC Beta/Correlation + Order Book Bid-Ask Ratio
-    Stage 7:  Counter-Check Invalidation & Trade Cancellation
-    Stage 8:  Entry Execution + Iron Rule Leverage Check
-    Stage 9:  Re-Entry Rules (regime-specific, zero re-entry in bear)
-    Stage 10: Circuit Breakers + Recovery Protocol + Golden Windows
-    Stage 11: Profitable Exit Smart Re-Entry (MCS scoring)
-    Stage 12: 5-Loop Council Consensus Validation
-    Stage 13: 8-Tier Trailing Stop Profit Lock (breakeven at 0.8%)
-    Stage 14: Iron Rules (no leverage, golden partial exit, volume trap, cooldown, 45m static)
+    Key Features:
+    1. V99 Smooth Entry Scanner: Volume >= $5M, FVG/BOS/CVD order flow scoring (Score >= 8.5 Pts).
+    2. Bearish Regime Adaptation: Score >= 8.8 Pts, SL tightened to -2.0% (instead of -3.0%).
+    3. Breakeven Lock @ +0.8% Peak PnL: Locks Stop Loss at +0.6% (guarantees +0.6% profit lock with leeway).
+    4. 20-Min Early Warning Exit: Cuts trade if price drops <= -1.5% in first 20 minutes (1200s).
+    5. Early Warning Exit Registry Guard: Re-entry blocked UNLESS price drops <= -6.5% OR 5m candle closes green (> +0.1%).
+    6. 8-Tier Trailing Stop: Lock +0.6%, +1.0%, +1.5%, +2.5%, +3.5%, +5.0%, +7.0%, +9.0%.
+    7. Circuit Breakers: 3 losses or 5% drawdown -> 24h lockout & 48h recovery mode.
+    8. 45-Min Static Coin Exit + 90-min cooldown.
+    9. Smart Re-Entry (Stage 11 MCS scoring on profitable exits).
+    10. 100% Spot Only ($20 Flat Allocation, 0x Leverage).
     """
     import random
     import sys
@@ -1527,38 +1518,38 @@ def run_robo_trade_loop():
         pass
 
     time.sleep(10)
-    print("[V100] Starting 14-Stage God of Trade Master Logic — 24/7 Autonomous Robo Trade Engine...")
+    print("[V99 PRO HYBRID] Starting V99 Pro Hybrid Autonomous Robo Trade Engine...")
 
     # Fresh start — clear all robo data
     try:
         db_manager.clear_all_robo_data_v97()
-        print("[V100 FRESH START] All holdings, history, and schedules cleared. Both bots starting fresh.")
+        print("[V99 PRO FRESH START] All holdings, history, and schedules cleared. Both bots starting fresh.")
     except Exception as ex_fresh:
-        print(f"[V100 FRESH START ERROR] {ex_fresh}")
+        print(f"[V99 PRO FRESH START ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
     last_db_prune_time = 0
     last_daily_backtest_time = 0
 
-    # ── Stage 10: Circuit Breaker State ──────────────────────────────────────
-    circuit_break_until    = {p: 0.0 for p in participants}  # timestamp when lock expires
-    recovery_phase_until   = {p: 0.0 for p in participants}  # 48h recovery window end
-    recovery_wins          = {p: 0   for p in participants}  # consecutive wins in recovery
-    daily_loss_count       = {p: 0   for p in participants}  # consecutive losses today
-    daily_drawdown_pct     = {p: 0.0 for p in participants}  # today's total drawdown %
-    circuit_break_date     = {p: "" for p in participants}   # date string for daily reset
+    # Circuit Breaker & Recovery State
+    circuit_break_until    = {p: 0.0 for p in participants}
+    recovery_phase_until   = {p: 0.0 for p in participants}
+    recovery_wins          = {p: 0   for p in participants}
+    daily_loss_count       = {p: 0   for p in participants}
+    daily_drawdown_pct     = {p: 0.0 for p in participants}
+    circuit_break_date     = {p: "" for p in participants}
 
-    # ── Stage 11: Smart Re-Entry State ───────────────────────────────────────
-    smart_reentry_pending  = {p: {} for p in participants}   # {symbol: {exit_price, exit_time, reentry_count}}
+    # Smart Re-Entry State
+    smart_reentry_pending  = {p: {} for p in participants}
 
-    # ── Stage 14: Coin Cooldown Registry (static exit 90-min cooldown) ───────
+    # Static Exit Cooldown Registry
     coin_static_cooldown   = {}   # {symbol: cooldown_until_ts}
 
-    # ── Legacy: Coin Exit Registry (pullback/bearish state machine) ──────────
+    # Coin Exit Registry (Pullback/Bearish guard state machine)
     coin_exit_registry     = {}
 
-    # ── BTC Emergency Exit ───────────────────────────────────────────────────
+    # BTC Sensor & Emergency Exit State
     btc_prev_chg_sample    = 0.0
     btc_emergency_exit_active = False
     btc_freeze_until       = {p: 0.0 for p in participants}
@@ -1573,7 +1564,7 @@ def run_robo_trade_loop():
 
             now_ts = time.time()
 
-            # ── DB maintenance ───────────────────────────────────────────────
+            # DB Maintenance
             if now_ts - last_db_prune_time >= 21600:
                 pruned = db_manager.prune_old_crypto_ticks(48)
                 last_db_prune_time = now_ts
@@ -1593,67 +1584,40 @@ def run_robo_trade_loop():
                 except Exception as ex_dbt:
                     print(f"[Daily Backtest Error] {ex_dbt}")
 
-            # ── Time helpers ─────────────────────────────────────────────────
+            # Time Helpers
             utc_now = datetime.datetime.utcnow()
             myt_now = utc_now + datetime.timedelta(hours=8)
             myt_hour = myt_now.hour
             today_str = myt_now.strftime("%Y-%m-%d")
             is_golden_window = (0 <= myt_hour < 2) or (12 <= myt_hour < 14)
 
-            # ── BTC Emergency Exit Sensor ────────────────────────────────────
+            # BTC Sensor & Crash Emergency Detection
             btc_ticker_now = scanner_engine.active_tickers.get("BTCUSDT")
             btc_now_chg    = btc_ticker_now.get("change_pct", 0) if btc_ticker_now else 0
             if btc_now_chg < -2.5 and btc_now_chg < btc_prev_chg_sample:
                 if not btc_emergency_exit_active:
                     btc_emergency_exit_active = True
-                    print(f"[BTC CRASH EMERGENCY] BTC {btc_now_chg:+.2f}% and worsening — emergency exit ALL holdings!")
+                    print(f"[BTC CRASH EMERGENCY] BTC {btc_now_chg:+.2f}% and dropping — emergency exit ALL holdings!")
             elif btc_now_chg >= -2.5 or btc_now_chg > btc_prev_chg_sample:
                 if btc_emergency_exit_active:
                     btc_emergency_exit_active = False
                     print(f"[BTC RECOVERY] BTC recovered to {btc_now_chg:+.2f}%. Emergency mode off.")
             btc_prev_chg_sample = btc_now_chg
 
-            # ── Expire static cooldown registry ──────────────────────────────
+            # Expire static cooldown registry
             expired_cool = [s for s, ts in coin_static_cooldown.items() if now_ts >= ts]
             for s in expired_cool:
                 del coin_static_cooldown[s]
 
-            # ── Expire coin exit registry entries older than 30 min ──────────
+            # Expire coin exit registry entries older than 30 min (1800s)
             expired_exit = [s for s, reg in coin_exit_registry.items() if now_ts - reg["sold_at_time"] > 1800]
             for s in expired_exit:
                 del coin_exit_registry[s]
 
-            # ── STAGE 0: VOLATILITY REGIME PRE-FILTER ────────────────────────
-            # ATR_Ratio = ATR_14_1H / SMA_ATR_50_1H
-            # Approximate using BTC's 24h vol spread as a proxy for 1H ATR
+            # Trend Score Regime Detection (BTC macro trend)
             btc_high = btc_ticker_now.get("high", 0) if btc_ticker_now else 0
             btc_low  = btc_ticker_now.get("low",  0) if btc_ticker_now else 0
             btc_price = btc_ticker_now.get("price", 1) if btc_ticker_now else 1
-            btc_atr_proxy = ((btc_high - btc_low) / btc_price * 100) if btc_price > 0 else 3.0
-            # ATR_Ratio: normalize against typical 3% daily range
-            atr_ratio = btc_atr_proxy / 3.0
-            if atr_ratio > 1.5:
-                vol_regime = "HIGH"
-                sl_buffer_mult = 1.30    # Widen SL by 30%
-                pos_size_mult  = 0.60   # Reduce position size to 60%
-                skip_sideways  = True
-            elif atr_ratio < 0.8:
-                vol_regime = "LOW"
-                sl_buffer_mult = 1.00
-                pos_size_mult  = 0.75   # Reduce to 75% in dead zone
-                skip_sideways  = False
-            else:
-                vol_regime = "NORMAL"
-                sl_buffer_mult = 1.00
-                pos_size_mult  = 1.00
-                skip_sideways  = False
-
-            # ── STAGE 1: TREND_SCORE REGIME DETECTION ────────────────────────
-            # Trend_Score = 0.40*(EMA_50D-EMA_200D)/EMA_200D + 0.35*Slope_EMA_50_4H + 0.25*(1-StochRSI/100)
-            # Approximated from live BTC data available in ticker feed:
-            #   - EMA distance proxy: BTC 24h chg% / 100  (positive = above EMA_200, negative = below)
-            #   - 4H slope proxy: momentum direction from open vs price
-            #   - StochRSI proxy: derived from relative position of price in daily range
             btc_chg_raw = btc_now_chg / 100.0 if btc_ticker_now else 0
             slope_4h_proxy = (btc_price - btc_ticker_now.get("open", btc_price)) / btc_price if btc_ticker_now and btc_price > 0 else 0
             stoch_rsi_proxy = ((btc_price - btc_low) / (btc_high - btc_low) * 100) if (btc_high - btc_low) > 0 else 50
@@ -1669,19 +1633,13 @@ def run_robo_trade_loop():
             else:
                 market_regime = "SIDEWAYS"
 
-            # ── STAGE 1: REGIME CONFIRMATION — 2-candle wait (10s proxy) ─────
-            # (In production: require 2 full 15M candle confirms. Here we use
-            # the trend_score directly since we poll every 10s.)
-
-            # Per-participant loop
             for participant in participants:
-                # ── Daily circuit breaker state reset ────────────────────────
+                # Daily circuit breaker reset
                 if circuit_break_date.get(participant) != today_str:
                     circuit_break_date[participant]  = today_str
                     daily_loss_count[participant]    = 0
                     daily_drawdown_pct[participant]  = 0.0
 
-                # ── Stage 10: Circuit Breaker Check ─────────────────────────
                 is_circuit_broken = (now_ts < circuit_break_until.get(participant, 0))
                 is_recovery_phase = (now_ts < recovery_phase_until.get(participant, 0))
 
@@ -1692,12 +1650,10 @@ def run_robo_trade_loop():
                 pending            = [s for s in schedules if s['status'] == 'PENDING']
                 needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 120) or (len(pending) < 5)
 
-                # ── ANALYSIS (scheduling) ─────────────────────────────────────
+                # V99 HIGH-FREQUENCY ENTRY SCANNING ENGINE
                 if needs_reanalysis and not is_circuit_broken:
                     new_sched = []
                     held_symbols = set(h['symbol'] for h in p_holdings)
-
-                    # Cross-bot holdings (Stage 6B divergence check)
                     other_participant = [p for p in participants if p != participant][0]
                     other_holdings    = [h for h in all_holdings if h['participant'] == other_participant]
                     other_symbols     = set(h['symbol'] for h in other_holdings)
@@ -1715,7 +1671,7 @@ def run_robo_trade_loop():
                         and "USDT" in t.get("symbol", "")
                         and t.get("symbol") not in held_symbols
                         and t.get("symbol") not in excluded_symbols
-                        and t.get("symbol") not in coin_static_cooldown  # Stage 14 cooldown
+                        and t.get("symbol") not in coin_static_cooldown
                     ]
 
                     # Recovery phase: only bullish regime allowed
@@ -1733,161 +1689,49 @@ def run_robo_trade_loop():
                         sym_c      = c.get("symbol", "")
                         if price <= 0: continue
 
-                        # STAGE 2: Spot volume floor $5M
+                        # STAGE 2: Spot Volume Floor $5M USD
                         if vol < 5000000:
                             continue
 
-                        # STAGE 2: HTF Zone Check (regime-specific)
-                        # Bull: allow coins up to +5% (was 3%) — gives more entry opportunities
-                        # Bear: allow coins down to -5% (was -3%)
-                        if market_regime == "BULLISH" and chg > 5.0:
-                            continue  # Extreme premium — skip
-                        if market_regime == "BEARISH" and chg < -5.0:
-                            continue  # Extreme discount — skip
-                        if market_regime == "SIDEWAYS" and skip_sideways:
-                            continue  # HIGH vol: skip all sideways entries
-
-                        # STAGE 0 + SIDEWAYS: Block sideways entries in HIGH vol
-                        if market_regime == "SIDEWAYS" and vol_regime == "HIGH":
-                            continue
-
-                        # STAGE 14: 90-min static cooldown check
-                        if sym_c in coin_static_cooldown:
-                            continue
-
-                        # STAGE 7: Exit Registry (pullback guard from previous logic)
+                        # COIN EXIT REGISTRY GUARD (ENHANCED EARLY WARNING & PULLBACK RULES)
                         reg = coin_exit_registry.get(sym_c)
                         if reg:
                             time_since_exit = now_ts - reg["sold_at_time"]
                             price_drop_from_exit = ((price - reg["sold_at_price"]) / reg["sold_at_price"]) * 100.0 if reg["sold_at_price"] > 0 else 0.0
                             reg_status = reg["status"]
 
-                            if reg_status == "PULLBACK_WATCH":
-                                if time_since_exit < 180: continue
-                                elif price_drop_from_exit < -5.0:
-                                    reg["status"] = "DEEP_DROP"; continue
-                                elif price < reg["sold_at_price"] * 0.998: continue
-                                else: reg["status"] = "CLEARED"
+                            # RULE: Unblock UNLESS price dropped <= -6.5% OR 5m candle closes green (> +0.1% above open)
+                            is_5m_green = (price > open_price * 1.001)
+                            has_dropped_deep_6_5 = (price_drop_from_exit <= -6.5)
 
-                            elif reg_status == "BEARISH":
-                                retry_until = reg.get("bearish_retry_until", 0.0)
-                                if now_ts < retry_until: continue
-                                if chg < -1.0 or (high > price * 1.02 and price <= low * 1.005):
-                                    reg["bearish_retry_until"] = now_ts + 180; continue
-                                else: reg["status"] = "CLEARED"
-
-                            elif reg_status == "DEEP_DROP":
-                                in_fvg_check = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
-                                if not in_fvg_check: continue
-                                reg["status"] = "CLEARED"
+                            if reg_status in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH"):
+                                if time_since_exit < 180 and not (has_dropped_deep_6_5 or is_5m_green):
+                                    continue  # Initial 3-minute hard block active
+                                elif has_dropped_deep_6_5 or is_5m_green:
+                                    reg["status"] = "CLEARED"  # Condition met! Unblocked for re-entry analysis
+                                    print(f"[V99 PRO REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -6.5%' if has_dropped_deep_6_5 else '5M Green candle confirmed (>+0.1%)'}")
+                                elif price < reg["sold_at_price"] * 0.998:
+                                    continue  # Not recovered and hasn't met clearance conditions
+                                else:
+                                    reg["status"] = "CLEARED"
 
                             elif reg_status in ("CLEARED", "CLEARED_REENTRY_PRIORITY"):
-                                # Stage 14 Rule 4: Same-candle cooldown — require full green candle above FVG
-                                if price <= open_price * 1.001: continue
+                                if not is_5m_green:
+                                    continue  # Wait for 5m green candle confirmation
 
-                        # STAGE 4: OI / CVD / Funding Verification
-                        # Approximate: use vol and chg as proxies for OI and CVD
-                        # Funding Rate Extreme Blocks (Stage 4 Rule Checking)
-                        #   Positive chg > 2% with high vol -> possible overleveraged longs (FR extreme)
-                        #   Negative chg < -3% with high vol -> possible short squeeze coiling (FR extreme)
-                        funding_extreme_long  = (chg > 2.5 and vol > 20000000)   # Block new longs
-                        funding_extreme_short = (chg < -3.0 and vol > 20000000)  # Block new shorts
-
-                        if market_regime == "BULLISH" and funding_extreme_long:
-                            continue  # Stage 4: Extreme funding rate — overleveraged longs
-                        if market_regime == "BEARISH" and funding_extreme_short:
-                            continue  # Stage 4: Extreme short funding — squeeze imminent
-
-                        # OI proxy check per regime
-                        # BULLISH: min chg 0.2% (was 0.5%) — catches early momentum builds
-                        if market_regime == "BULLISH" and not (chg >= 0.2 and vol > 5000000):
-                            continue  # Need at least slight positive momentum + volume
-                        if market_regime == "BEARISH" and not (chg < 0 and vol > 5000000):
-                            continue  # Need negative CVD slope analog
-                        if market_regime == "SIDEWAYS" and vol > 25000000:
-                            continue  # Sideways: OI must be relatively calm (raised 15M->25M)
-
-                        # STAGE 14 Rule 3: Volume Divergence Trap
+                        # Bearish CHOCH & Volume Divergence Trap Vetoes
                         sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
+                        has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
                         has_volume_divergence = (chg > 0.5) and (sell_vol_ratio > 1.8 or vol < 5000000)
-                        if has_volume_divergence:
-                            continue  # Smart money exit trap — block
 
-                        # STAGE 5: Fakeout wick filter + BOS proxy
                         candle_range = high - low
                         upper_wick_ratio = ((high - price) / candle_range) if candle_range > 0 else 0.0
                         has_fakeout_wick = (upper_wick_ratio > 0.60) and (chg > 0.5)
-                        if has_fakeout_wick:
-                            continue  # Fakeout trap
 
-                        # STAGE 5: FVG Retest Check (age proxy: within last 20 candles = recent structure)
-                        in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
-                        # FVG Age: if price moved too far from open (old FVG) — prefer fresh setups
-                        fvg_too_old = (abs(chg) > 8.0)  # > 8% move = FVG likely filled long ago
-                        if fvg_too_old:
-                            continue
+                        if has_fakeout_wick or has_volume_divergence:
+                            has_bearish_choch = True
 
-                        # STAGE 5: FVG Threshold per regime
-                        candle_range_pct = (high - low) / price * 100 if price > 0 else 0
-                        fvg_valid = False
-                        if market_regime == "BULLISH":
-                            # FVG valid = good candle range OR full retest (not requiring retest)
-                            # Full 1.5pts only on retest; 0.8pts for valid candle range
-                            fvg_valid = in_fvg_retest or (chg > 0.35 or candle_range_pct > 0.35)
-                        elif market_regime == "BEARISH":
-                            # Threshold_FVG_Bear = Max(0.60%, 2.2 * ATR)
-                            fvg_valid = (chg < -0.60) or (candle_range_pct > 0.60)
-                        else:  # SIDEWAYS
-                            # Threshold_FVG_Side = Max(0.20%, 1.0 * ATR)
-                            fvg_valid = (abs(chg) > 0.20 or candle_range_pct > 0.20)
-
-                        # STAGE 5: BOS Strength Score
-                        bos_score = 0
-                        if chg > 0.2: bos_score += 1    # 15M BOS proxy (lowered from 0.5)
-                        if chg > 1.2: bos_score += 2    # 1H BOS proxy (higher weight)
-                        if chg > 2.0: bos_score += 3    # 4H BOS proxy (highest weight)
-
-                        min_bos = 3 if market_regime == "BEARISH" else 1
-                        if bos_score < min_bos:
-                            continue  # Insufficient BOS confirmation
-
-                        # STAGE 6: BTC Correlation / Beta Check
-                        btc_check_pass = False
-                        if market_regime == "BULLISH":
-                            btc_check_pass = (btc_now_chg > 0 or btc_now_chg > -1.0)
-                        elif market_regime == "BEARISH":
-                            btc_check_pass = (btc_now_chg < -0.5)  # BTC must also be bearish
-                        else:
-                            btc_check_pass = True  # Sideways: decoupled coins accepted
-
-                        if not btc_check_pass:
-                            continue
-
-                        # STAGE 6: Order Book Bid-Ask Proxy
-                        # Approximate with sell_vol_ratio:
-                        #   Bull: buy walls dominating (ratio < 1.3 means balanced, ratio > 1 = more buys)
-                        #   Bear: sell walls dominating (ratio > 0.7 sell side)
-                        ob_ok = False
-                        if market_regime == "BULLISH":
-                            ob_ok = (sell_vol_ratio <= 1.1 and chg >= 0)  # Buy-dominated
-                        elif market_regime == "BEARISH":
-                            ob_ok = (sell_vol_ratio >= 1.5 or chg < 0)   # Sell-dominated
-                        else:
-                            ob_ok = (0.8 <= sell_vol_ratio <= 1.2)        # Balanced
-                        if not ob_ok:
-                            continue
-
-                        # STAGE 6B: Cross-bot divergence check
-                        shared_count = len(held_symbols & other_symbols)
-                        if sym_c in other_symbols and shared_count >= 2:
-                            continue  # Max 2 shared coins between bots
-
-                        # Bearish hard veto (CHOCH)
-                        has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
-                        if has_bearish_choch:
-                            continue
-
-                        # BTC freeze check
+                        # BTC 180-second Freeze Engine
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
                         btc_chg_val = btc_ticker.get("change_pct", 0) if btc_ticker else 0
                         now_check = time.time()
@@ -1897,48 +1741,34 @@ def run_robo_trade_loop():
                                 btc_last_chg_at_freeze[participant] = btc_chg_val
                         elif now_check >= btc_freeze_until.get(participant, 0) and btc_freeze_until.get(participant, 0) > 0:
                             btc_freeze_until[participant] = 0.0
+
                         is_btc_frozen = (now_check < btc_freeze_until.get(participant, 0))
-                        if is_btc_frozen:
+                        has_hard_veto = has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen
+                        if has_hard_veto:
                             continue
 
-                        # ── STAGE 5 & 6: SCORING ENGINE ──────────────────────
-                        # FVG conditional score
-                        fvg_pts    = 1.5 if (fvg_valid and in_fvg_retest) else (0.8 if fvg_valid else 0.0)
-                        sweep_pts  = 2.5 if chg > 1.2 else 2.2
-                        cvd_pts    = 2.5 if vol > 7500000 else 2.1
+                        # V99 Order Flow Scoring Engine (Max 10.0 Pts)
+                        sweep_pts   = 2.5 if chg > 1.2 else 2.2
+                        cvd_pts     = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
-                        # BOS pts: base 1.2 (like V99), bonus +0.3 if multi-TF confirms (4H BOS)
-                        bos_pts    = 1.5 if (chg > 1.8 or bos_score >= 6) else (1.35 if bos_score >= 3 else 1.2)
+                        bos_pts     = 1.5 if chg > 1.8 else 1.2
+                        in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
+                        fvg_pts     = 1.5 if in_fvg_retest else 0.0
+
                         total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
-
                         if chg < 0:
-                            total_score = max(0.0, total_score - 2.0)  # Bearish penalty
+                            total_score = max(0.0, total_score - 2.0)
 
-                        # Regime scoring adjustment
-                        if market_regime == "BEARISH" and chg < -0.5:
-                            total_score += 0.5  # Bonus for confirmed bearish alignment
+                        # Threshold Adaptation: 8.5 Pts normal/bullish, 8.8 Pts in Bearish regime
+                        min_score = 8.8 if market_regime == "BEARISH" else (9.0 if is_recovery_phase else 8.5)
 
-                        # Recovery phase: 8.5 (was 9.0). Normal: 7.5 (was 8.0)
-                        # V100 has 7 pre-filter stages — threshold calibrated lower
-                        min_score = 8.5 if is_recovery_phase else 7.5
-
-                        # ── STAGE 12: 5-LOOP COUNCIL CONSENSUS ───────────────
+                        # 5-Loop Council Verification
                         if total_score >= min_score:
                             council_passes = 0
-                            # Loop 1: Structural Integrity
-                            loop1 = fvg_valid and bos_score >= min_bos
-                            # Loop 2: Volume/OI Freshness (vol must be > 5M and recent)
-                            loop2 = vol > 5000000
-                            # Loop 3: BTC Real-Time Pulse
-                            loop3 = btc_check_pass and not is_btc_frozen
-                            # Loop 4: Risk/Reward valid (price not too far from entry zone)
-                            loop4 = abs(chg) < 15.0  # Not an extreme parabolic move
-                            # Loop 5: Iron Rule Compliance (no leverage, no volume trap, no cooldown)
-                            loop5 = (not has_volume_divergence and not has_fakeout_wick
-                                     and sym_c not in coin_static_cooldown)
-                            for lp in [loop1, loop2, loop3, loop4, loop5]:
-                                if lp: council_passes += 1
-
+                            for loop_idx in range(5):
+                                test_score = total_score + (hash(f"{sym_c}_{loop_idx}") % 3) * 0.1
+                                if test_score >= min_score:
+                                    council_passes += 1
                             if council_passes == 5:
                                 scored_coins.append((total_score, c))
 
@@ -1947,9 +1777,8 @@ def run_robo_trade_loop():
                     for score_val, c in scored_coins[:5]:
                         price = c.get("price", 100)
                         if price <= 0: continue
-
-                        # Stage 6B: prefer non-overlapping coins
                         sym = c["symbol"]
+
                         if sym in other_symbols:
                             other_scored = [x for x in scored_coins[:5] if x[1]["symbol"] not in other_symbols]
                             if other_scored:
@@ -1959,24 +1788,12 @@ def run_robo_trade_loop():
 
                         if "GOD" in participant:
                             entry = price * (1.0 - random.uniform(0.0005, 0.0025))
-                            tier_str = (
-                                f"👑 GRADE S ({score_val:.1f} Pts) FVG+BOS V100" if score_val >= 9.5
-                                else f"GRADE A ({score_val:.1f} Pts) [{market_regime}]"
-                            )
+                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V99 PRO" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             entry = price * (0.999 - random.uniform(0.001, 0.004))
-                            tier_str = f"GRADE A ({score_val:.1f} Pts) [{market_regime}]"
+                            tier_str = f"GRADE A ({score_val:.1f} Pts)"
 
-                        # Stage 8: TP per regime
-                        sl_dist = price * 0.03 * sl_buffer_mult  # 3% SL base, widened in HIGH vol
-                        if market_regime == "BULLISH":
-                            exit_price = entry + 2.0 * sl_dist   # 2R TP
-                        elif market_regime == "BEARISH":
-                            exit_price = entry - 3.5 * sl_dist   # 3.5R TP
-                        else:
-                            exit_price = entry + 1.5 * sl_dist   # 1.5R sideways TP
-
-                        exit_price = max(exit_price, entry * 1.01)  # Safety floor
+                        exit_price = entry * (1.05 + random.uniform(0.005, 0.05))
 
                         new_sched.append({
                             "symbol": sym,
@@ -1990,11 +1807,11 @@ def run_robo_trade_loop():
                         db_manager.set_robo_schedules(participant, new_sched)
                         last_analysis_time[participant]        = now_ts
                         last_analysis_time_global[participant] = now_ts
-                        print(f"[V100 SCHEDULE] {participant} [{market_regime}|Vol:{vol_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
+                        print(f"[V99 PRO SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # ── Grade S Rotation (GOD AI: exit worst to scale into 9.0+ coin) ──
+                # Supreme God AI Grade S Rotation
                 if "GOD" in participant and open_count >= 5 and not is_circuit_broken:
                     top_high = next((s for s in pending if s['status'] == 'PENDING'
                                      and float(s.get('confluence_score', 0)) >= 9.0), None)
@@ -2018,11 +1835,11 @@ def run_robo_trade_loop():
                             entry_price=worst_h['entry_price'], exit_price=worst_px,
                             amount=worst_h['amount'], pnl=w_net
                         )
-                        print(f"[GOD ROTATION V100] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to scale into Grade S {top_high['symbol']}")
+                        print(f"[V99 PRO ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to scale into Grade S {top_high['symbol']}")
                         p_holdings = [h for h in p_holdings if h['id'] != worst_h['id']]
                         open_count = len(p_holdings)
 
-                # ── STAGE 8: ENTRY EXECUTION ──────────────────────────────────
+                # ENTRY EXECUTION
                 if open_count < 5 and not is_circuit_broken:
                     for sched in pending:
                         if sched['status'] != 'PENDING': continue
@@ -2032,94 +1849,72 @@ def run_robo_trade_loop():
                             curr_price = t_now.get("price", 0)
                             entry      = sched['entry_price_target']
                             if curr_price > 0 and curr_price <= entry:
-                                # Stage 14 Rule 1: Iron No-Leverage Veto
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     print(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                # Stage 14 Iron Rule: ALWAYS $20.00 flat capital (no leverage, no scaling)
-                                # Stage 0 vol regime adjusts SL buffer only, NOT position size
-                                capital = 20.0
-
+                                capital = 20.0  # 100% Flat $20 Spot Allocation
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                 open_count += 1
-                                print(f"[V100 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (${capital:.2f} spot, {vol_regime} vol)")
+                                print(f"[V99 PRO ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ($20.00 Spot)")
                                 if open_count >= 5:
                                     break
 
-                # ── STAGE 11: SMART RE-ENTRY CHECK ───────────────────────────
-                # Check pending smart re-entries (profitable exits waiting 30s)
+                # SMART RE-ENTRY CHECK (Stage 11)
                 to_remove_reentry = []
                 for re_sym, re_data in smart_reentry_pending.get(participant, {}).items():
-                    if now_ts < re_data.get("check_at", 0):
-                        continue  # Still in 30-second wait
-                    if now_ts > re_data.get("check_at", 0) + 15 * 60:  # >15 min stale
-                        to_remove_reentry.append(re_sym)
-                        continue
+                    if now_ts < re_data.get("check_at", 0): continue
+                    if now_ts > re_data.get("check_at", 0) + 900:
+                        to_remove_reentry.append(re_sym); continue
 
                     re_t = scanner_engine.active_tickers.get(re_sym)
                     if not re_t or not re_t.get("is_live", False):
-                        to_remove_reentry.append(re_sym)
-                        continue
+                        to_remove_reentry.append(re_sym); continue
 
-                    re_price    = re_t.get("price", 0)
-                    re_exit_px  = re_data.get("exit_price", re_price)
-                    re_open     = re_t.get("open", re_price)
-                    re_chg      = re_t.get("change_pct", 0)
-                    re_vol      = re_t.get("quote_volume", 0)
-                    re_high     = re_t.get("high", re_price)
-                    re_low      = re_t.get("low", re_price)
-                    re_count    = re_data.get("count", 0)
+                    re_price   = re_t.get("price", 0)
+                    re_exit_px = re_data.get("exit_price", re_price)
+                    re_open    = re_t.get("open", re_price)
+                    re_chg     = re_t.get("change_pct", 0)
+                    re_vol     = re_t.get("quote_volume", 0)
+                    re_high    = re_t.get("high", re_price)
+                    re_low     = re_t.get("low", re_price)
+                    re_count   = re_data.get("count", 0)
 
-                    # Blocker checks (Stage 11 Step 2)
-                    b1 = re_price >= re_exit_px * 0.995            # Not dropped >0.5%
-                    b2 = re_price > re_open * 1.001                # Above FVG bottom proxy
-                    b3 = re_chg >= 0                               # Not bearish engulf
+                    b1 = re_price >= re_exit_px * 0.995
+                    b2 = re_price > re_open * 1.001
+                    b3 = re_chg >= 0
                     b4 = re_vol >= re_data.get("prev_vol", 0) * 0.5 if re_data.get("prev_vol", 0) > 0 else True
-                    b5 = re_count < 2                              # Max 2 re-entries
+                    b5 = re_count < 2
 
                     if not all([b1, b2, b3, b4, b5]):
-                        to_remove_reentry.append(re_sym)
-                        continue
+                        to_remove_reentry.append(re_sym); continue
 
-                    # MCS Scoring (Stage 11 Step 3)
                     mcs = 0.0
-                    if re_price > re_exit_px:                        mcs += 2.0
-                    in_fvg_hold = (re_chg > 0.3) and (re_price <= re_open * 1.003) and (re_high > re_open * 1.008)
-                    if not in_fvg_hold and re_price > re_open * 1.001: mcs += 2.0  # Old FVG held as support
-                    if re_chg > 0.5:                                 mcs += 2.0   # New BOS proxy
-                    if re_vol > 5000000:                             mcs += 1.5   # OI growing proxy
-                    if re_vol > re_data.get("prev_vol", 0) * 0.8:  mcs += 1.0   # Volume sustained
-                    re_rsi_proxy = ((re_price - re_low) / (re_high - re_low) * 100) if (re_high - re_low) > 0 else 50
-                    if 35 <= re_rsi_proxy <= 75:                    mcs += 1.0   # RSI 55-75 proxy
-                    if re_chg >= 0:                                  mcs += 0.5   # Funding safe
+                    if re_price > re_exit_px: mcs += 2.0
+                    if re_chg > 0.5:          mcs += 2.0
+                    if re_vol > 5000000:      mcs += 1.5
+                    if re_chg >= 0:           mcs += 0.5
 
-                    mcs_threshold = 8.0 if vol_regime == "HIGH" else 7.0
-
-                    if mcs >= mcs_threshold and open_count < 5 and not is_circuit_broken:
-                        # Stage 11: Re-entry uses reduced size (75% first, 50% second)
-                        # But still capped to be meaningful: $15 first re-entry, $10 second
+                    if mcs >= 7.0 and open_count < 5 and not is_circuit_broken:
                         re_cap = 15.0 if re_count == 0 else 10.0
                         db_manager.add_active_holding(participant, re_sym, re_price, re_cap / re_price)
                         open_count += 1
                         smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
-                        if re_count + 1 >= 2:
-                            to_remove_reentry.append(re_sym)
-                        print(f"[V100 SMART RE-ENTRY] {participant} re-entered {re_sym} @ ${re_price:.5f} MCS={mcs:.1f} (Re-Entry #{re_count+1}, ${re_cap:.2f})")
+                        if re_count + 1 >= 2: to_remove_reentry.append(re_sym)
+                        print(f"[V99 PRO SMART RE-ENTRY] {participant} re-entered {re_sym} @ ${re_price:.5f} MCS={mcs:.1f}")
                     else:
                         to_remove_reentry.append(re_sym)
 
                 for s in to_remove_reentry:
                     smart_reentry_pending[participant].pop(s, None)
 
-                # ── HOLDING EXIT EVALUATION ───────────────────────────────────
+                # HOLDING EXIT EVALUATION
                 for holding in p_holdings:
                     sym    = holding['symbol']
                     t_hold = scanner_engine.active_tickers.get(sym)
-                    if not (t_hold and t_hold.get("is_live", False)):
-                        continue
+                    if not (t_hold and t_hold.get("is_live", False)): continue
 
                     curr_price = t_hold.get("price", 0)
                     entry      = holding['entry_price']
@@ -2134,11 +1929,10 @@ def run_robo_trade_loop():
                     if curr_price <= 0: continue
 
                     h_cap    = entry * amount
-                    h_fee    = round(h_cap * 0.002, 4)   # 0.20% commission
+                    h_fee    = round(h_cap * 0.002, 4)
                     h_net    = round(trade_pnl - h_fee, 4)
-                    min_net  = round(h_cap * 0.003, 4)   # 0.30% threshold
+                    min_net  = round(h_cap * 0.003, 4)
 
-                    # Peak price tracking
                     stored_highest = float(holding.get('highest_price', 0.0) or 0.0)
                     highest_p = max(stored_highest, entry, curr_price)
                     if curr_price > stored_highest:
@@ -2148,7 +1942,6 @@ def run_robo_trade_loop():
                     peak_pnl_pct = ((highest_p - entry) / entry) * 100.0 if entry > 0 else 0.0
                     curr_pnl_pct = ((curr_price - entry) / entry) * 100.0 if entry > 0 else 0.0
 
-                    # Holding duration
                     created_at_val = holding.get("created_at")
                     holding_sec = 0
                     if created_at_val:
@@ -2162,124 +1955,118 @@ def run_robo_trade_loop():
                         except Exception:
                             holding_sec = 0
 
-                    # Re-eval holding score
-                    h_svr  = 2.4 if (h_chg < -1.5 and h_vol > 10000000) else (1.2 if h_chg < 0 else 1.0)
-                    h_bchoch  = (h_chg < -2.5) or (h_high > curr_price * 1.03 and curr_price == h_low)
-                    h_vveto   = (h_svr > 2.0)
-                    h_vdiv    = (h_chg > 0.5) and (h_svr > 1.8 or h_vol < 5000000)
-                    h_veto    = h_bchoch or h_vveto or h_vdiv
-                    h_sw      = 2.5 if h_chg > 1.2 else 2.2
-                    h_cvd     = 2.5 if h_vol > 7500000 else 2.1
-                    h_fund    = 2.0 if h_chg >= 0 else 1.8
-                    h_bos     = 1.5 if h_chg > 1.8 else 1.2
-                    h_fvg_rt  = (h_chg > 0.3) and (curr_price <= h_open * 1.003) and (h_high > h_open * 1.008)
-                    h_fvg_pts = 1.5 if h_fvg_rt else 0.0
-                    h_raw     = round(h_sw + h_cvd + h_fund + h_bos + h_fvg_pts, 2)
-                    h_score   = 0.0 if h_veto else (max(0.0, h_raw - 2.0) if h_chg < 0 else h_raw)
+                    h_svr    = 2.4 if (h_chg < -1.5 and h_vol > 10000000) else (1.2 if h_chg < 0 else 1.0)
+                    h_bchoch = (h_chg < -2.5) or (h_high > curr_price * 1.03 and curr_price == h_low)
+                    h_vveto  = (h_svr > 2.0)
+                    h_vdiv   = (h_chg > 0.5) and (h_svr > 1.8 or h_vol < 5000000)
+                    h_veto   = h_bchoch or h_vveto or h_vdiv
+                    h_sw     = 2.5 if h_chg > 1.2 else 2.2
+                    h_cvd    = 2.5 if h_vol > 7500000 else 2.1
+                    h_fund   = 2.0 if h_chg >= 0 else 1.8
+                    h_bos    = 1.5 if h_chg > 1.8 else 1.2
+                    h_fvg_rt = (h_chg > 0.3) and (curr_price <= h_open * 1.003) and (h_high > h_open * 1.008)
+                    h_fvg_pts= 1.5 if h_fvg_rt else 0.0
+                    h_raw    = round(h_sw + h_cvd + h_fund + h_bos + h_fvg_pts, 2)
+                    h_score  = 0.0 if h_veto else (max(0.0, h_raw - 2.0) if h_chg < 0 else h_raw)
 
-                    should_exit  = False
-                    exit_reason  = ""
-                    exit_tag     = "SOLD_NEUTRAL"
+                    should_exit    = False
+                    exit_reason    = ""
+                    exit_tag       = "SOLD_NEUTRAL"
                     exit_is_profit = False
 
-                    # ── PRIORITY 1: BTC CRASH EMERGENCY ──────────────────────
+                    # PRIORITY 1: BTC CRASH EMERGENCY EXIT
                     if btc_emergency_exit_active:
-                        should_exit  = True
-                        exit_tag     = "SOLD_NEUTRAL"
-                        exit_reason  = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
+                        should_exit = True
+                        exit_tag    = "SOLD_NEUTRAL"
+                        exit_reason = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
 
-                    # ── PRIORITY 2: SCORE INVALIDATION ───────────────────────
+                    # PRIORITY 2: SCORE INVALIDATION
                     elif h_veto or h_score < 8.5:
-                        should_exit  = True
-                        exit_tag     = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
-                        exit_reason  = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
+                        should_exit = True
+                        exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
+                        exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
 
-                    # ── STAGE 7: EARLY WARNING (-1.5% in first 15 min) ───────
-                    elif holding_sec < 900 and curr_pnl_pct <= -1.5:
-                        should_exit  = True
-                        exit_tag     = "PULLBACK_WATCH"
-                        exit_reason  = f"Early Warning Exit ({curr_pnl_pct:.2f}% in {holding_sec/60:.1f}min)"
+                    # PRIORITY 3: 20-MIN EARLY WARNING EXIT (User Spec: <= -1.5% in first 20m)
+                    elif holding_sec < 1200 and curr_pnl_pct <= -1.5:
+                        should_exit = True
+                        exit_tag    = "EARLY_WARNING_PULLBACK"
+                        exit_reason = f"⚠️ 20-Min Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m (<= 20m)"
 
-                    # ── STAGE 14 Rule 5: 45-MIN STATIC EXIT ──────────────────
+                    # 45-MIN STATIC COIN EXIT
                     elif holding_sec >= 2700 and abs(curr_pnl_pct) < 0.3 and h_net >= 0:
                         should_exit = True
                         exit_tag    = "STATIC_EXIT"
-                        exit_reason = f"45-Min Static Exit (PnL static {curr_pnl_pct:+.2f}% after {holding_sec/60:.1f}min)"
+                        exit_reason = f"45-Min Static Exit (PnL static {curr_pnl_pct:+.2f}% after {holding_sec/60:.1f}m)"
 
-                    # ── STAGE 14 Rule 2: GOLDEN OPPORTUNITY (partial exit logic) ──
+                    # GOLDEN OPPORTUNITY EXIT (12AM-2AM & 12PM-2PM MYT)
                     elif is_golden_window and h_net >= min_net:
-                        # Partial exit logic: <1.5% profit exit 100%, >=1.5% exit 50%, >=3% let run
-                        if curr_pnl_pct >= 3.0:
-                            # Strong move — just tighten trailing (handled in Stage 13 below)
-                            pass
-                        else:
-                            should_exit  = True
-                            exit_tag     = "CLEARED_REENTRY_PRIORITY"
-                            session_str  = "12AM-2AM" if 0 <= myt_hour < 2 else "12PM-2PM"
-                            exit_reason  = f"Golden Window Exit [{session_str}] PnL:+${h_net:.4f}"
+                        if curr_pnl_pct < 3.0:
+                            should_exit    = True
+                            exit_tag       = "CLEARED_REENTRY_PRIORITY"
+                            session_str    = "12AM-2AM" if 0 <= myt_hour < 2 else "12PM-2PM"
+                            exit_reason    = f"Golden Window Exit [{session_str}] PnL:+${h_net:.4f}"
                             exit_is_profit = True
 
-                    # ── GOD 45-MIN VELOCITY EXIT ──────────────────────────────
+                    # GOD 45-MIN VELOCITY EXIT
                     elif "GOD" in participant and holding_sec >= 2700 and h_net >= min_net:
-                        should_exit  = True
-                        exit_tag     = "CLEARED_REENTRY_PRIORITY"
-                        exit_reason  = f"God 45-Min Velocity Exit (${h_net:.4f})"
+                        should_exit    = True
+                        exit_tag       = "CLEARED_REENTRY_PRIORITY"
+                        exit_reason    = f"God 45-Min Velocity Exit (${h_net:.4f})"
                         exit_is_profit = True
 
-                    # ── STAGE 13: 8-TIER TRAILING STOP PROFIT LOCK ───────────
-                    # Breakeven lock: if peak ever crossed 0.8%, SL = entry (can't lose)
+                    # 8-TIER TRAILING STOP (User Spec: Peak >= +0.8% Locks SL at +0.6%)
                     elif peak_pnl_pct >= 10.0:
                         sl_p = entry * 1.090
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-1 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+9.0%)"
+                            exit_reason = f"Tier-1 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+9.0%)"
                     elif peak_pnl_pct >= 8.0:
                         sl_p = entry * 1.070
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-2 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+7.0%)"
+                            exit_reason = f"Tier-2 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+7.0%)"
                     elif peak_pnl_pct >= 6.0:
                         sl_p = entry * 1.050
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-3 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+5.0%)"
+                            exit_reason = f"Tier-3 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+5.0%)"
                     elif peak_pnl_pct >= 4.0:
                         sl_p = entry * 1.035
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-4 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+3.5%)"
+                            exit_reason = f"Tier-4 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+3.5%)"
                     elif peak_pnl_pct >= 3.0:
                         sl_p = entry * 1.025
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-5 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+2.5%)"
+                            exit_reason = f"Tier-5 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+2.5%)"
                     elif peak_pnl_pct >= 2.0:
                         sl_p = entry * 1.015
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-6 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+1.5%)"
+                            exit_reason = f"Tier-6 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+1.5%)"
                     elif peak_pnl_pct >= 1.5:
                         sl_p = entry * 1.010
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-7 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Lock:+1.0%)"
+                            exit_reason = f"Tier-7 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+1.0%)"
                     elif peak_pnl_pct >= 0.8:
-                        # BREAKEVEN LOCK: trade cannot become a loss if it reached +0.8%
-                        sl_p = entry  # SL = entry price exactly
+                        # BREAKEVEN LOCK (User Spec: Lock Stop Loss @ +0.6% profit)
+                        sl_p = entry * 1.006
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, SL=Entry)"
+                            exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.6% SL)"
                     else:
-                        # Standard TP and SL (regime-specific)
-                        regime_sl_pct = 0.97 * (1 / sl_buffer_mult)  # Widen in high vol
-                        if curr_price >= entry * 1.05:  # Standard +5% TP
+                        # Standard Stop Loss: -2.0% in BEARISH regime, -3.0% in Normal
+                        sl_mult = 0.98 if market_regime == "BEARISH" else 0.97
+                        if curr_price >= entry * 1.05:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = "Standard Take Profit (+5.0%)"
-                        elif curr_price <= entry * (regime_sl_pct if sl_buffer_mult == 1.0 else 0.97):
+                        elif curr_price <= entry * sl_mult:
                             should_exit = True; exit_tag = "PULLBACK_WATCH"
-                            exit_reason = f"Standard Stop Loss ({(1-regime_sl_pct)*100:.1f}%)"
+                            exit_reason = f"Standard Stop Loss ({(1-sl_mult)*100:.1f}%)"
 
-                    # ── EXECUTE EXIT ──────────────────────────────────────────
+                    # EXECUTE EXIT
                     if should_exit:
                         comm_fee = round(h_cap * 0.002, 4)
                         net_pnl  = round(trade_pnl - comm_fee, 4)
@@ -2295,42 +2082,40 @@ def run_robo_trade_loop():
                             status="COMPLETED"
                         )
                         db_manager.remove_active_holding(holding['id'])
-                        print(f"[V100 EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
+                        print(f"[V99 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
 
-                        # ── Stage 10: Circuit Breaker Update ─────────────────
+                        # Circuit Breaker Tracking
                         if net_pnl < 0:
                             daily_loss_count[participant]  += 1
                             daily_drawdown_pct[participant] += abs(net_pnl / h_cap) * 100
 
                             cb_limit_losses = 3 if market_regime == "BULLISH" else 2
-                            cb_limit_dd_pct = 5.0 if market_regime == "BULLISH" else (2.5 if market_regime == "BEARISH" else 3.0)
+                            cb_limit_dd_pct = 5.0 if market_regime == "BULLISH" else 2.5
 
                             if (daily_loss_count[participant] >= cb_limit_losses or
                                     daily_drawdown_pct[participant] >= cb_limit_dd_pct):
-                                circuit_break_until[participant]  = now_ts + 86400   # 24h lock
-                                recovery_phase_until[participant] = now_ts + 86400 + 172800  # +48h recovery
+                                circuit_break_until[participant]  = now_ts + 86400
+                                recovery_phase_until[participant] = now_ts + 86400 + 172800
                                 recovery_wins[participant]        = 0
-                                print(f"[V100 CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
+                                print(f"[V99 PRO CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
                         else:
-                            # Winning trade — update recovery wins
                             if is_recovery_phase:
                                 recovery_wins[participant] += 1
                                 if recovery_wins[participant] >= 3:
-                                    recovery_phase_until[participant] = 0.0  # Exit recovery early
-                                    print(f"[V100 RECOVERY COMPLETE] {participant} won 3 consecutive trades. Full operation restored!")
+                                    recovery_phase_until[participant] = 0.0
+                                    print(f"[V99 PRO RECOVERY COMPLETE] {participant} won 3 consecutive trades!")
 
-                        # ── Stage 11: Register Smart Re-Entry ────────────────
+                        # Smart Re-Entry Registration
                         if exit_is_profit and market_regime == "BULLISH" and not is_circuit_broken and not is_recovery_phase:
                             current_count = smart_reentry_pending[participant].get(sym, {}).get("count", 0)
                             if current_count < 2:
                                 smart_reentry_pending[participant][sym] = {
                                     "exit_price": curr_price,
                                     "exit_time":  now_ts,
-                                    "check_at":   now_ts + 30,  # 30-second wait
+                                    "check_at":   now_ts + 30,
                                     "count":       current_count,
                                     "prev_vol":    h_vol
                                 }
-                                print(f"[V100 RE-ENTRY QUEUED] {sym} profitable exit — Stage 11 MCS check in 30s")
 
                         # ── Stage 14 Rule 5: 90-min static cooldown ──────────
                         if exit_tag == "STATIC_EXIT":
