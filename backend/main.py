@@ -1695,29 +1695,31 @@ def run_robo_trade_loop():
 
                         # COIN EXIT REGISTRY GUARD (ENHANCED EARLY WARNING & PULLBACK RULES)
                         reg = coin_exit_registry.get(sym_c)
+                        is_previously_tagged = False
                         if reg:
                             time_since_exit = now_ts - reg["sold_at_time"]
                             price_drop_from_exit = ((price - reg["sold_at_price"]) / reg["sold_at_price"]) * 100.0 if reg["sold_at_price"] > 0 else 0.0
                             reg_status = reg["status"]
 
-                            # RULE: Unblock UNLESS price dropped <= -6.5% OR 5m candle closes green (> +0.1% above open)
+                            # USER SPEC: Detect and remove pullback/bearish tag if price goes lower than -5.0% OR 5m candle closes green (> +0.1% above open)
                             is_5m_green = (price > open_price * 1.001)
-                            has_dropped_deep_6_5 = (price_drop_from_exit <= -6.5)
+                            has_dropped_deep_5_0 = (price_drop_from_exit <= -5.0)
 
                             if reg_status in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH"):
-                                if time_since_exit < 180 and not (has_dropped_deep_6_5 or is_5m_green):
+                                is_previously_tagged = True
+                                if time_since_exit < 180 and not (has_dropped_deep_5_0 or is_5m_green):
                                     continue  # Initial 3-minute hard block active
-                                elif has_dropped_deep_6_5 or is_5m_green:
+                                elif has_dropped_deep_5_0 or is_5m_green:
                                     reg["status"] = "CLEARED"  # Condition met! Unblocked for re-entry analysis
-                                    print(f"[V99 PRO REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -6.5%' if has_dropped_deep_6_5 else '5M Green candle confirmed (>+0.1%)'}")
+                                    print(f"[V99 PRO REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '5M Green candle confirmed (>+0.1%)'}")
                                 elif price < reg["sold_at_price"] * 0.998:
                                     continue  # Not recovered and hasn't met clearance conditions
                                 else:
                                     reg["status"] = "CLEARED"
 
                             elif reg_status in ("CLEARED", "CLEARED_REENTRY_PRIORITY"):
-                                if not is_5m_green:
-                                    continue  # Wait for 5m green candle confirmation
+                                if not is_5m_green and not has_dropped_deep_5_0:
+                                    continue  # Wait for 5m green candle or -5% deep drop confirmation
 
                         # Bearish CHOCH & Volume Divergence Trap Vetoes
                         sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
@@ -1747,7 +1749,7 @@ def run_robo_trade_loop():
                         if has_hard_veto:
                             continue
 
-                        # V99 Order Flow Scoring Engine (Max 10.0 Pts)
+                        # V99 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
                         sweep_pts   = 2.5 if chg > 1.2 else 2.2
                         cvd_pts     = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
@@ -1759,8 +1761,14 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # Threshold Adaptation: 8.5 Pts normal/bullish, 8.8 Pts in Bearish regime
-                        min_score = 8.8 if market_regime == "BEARISH" else (9.0 if is_recovery_phase else 8.5)
+                        # Threshold Adaptation:
+                        # Standard coins: 8.5 Pts (Bullish/Normal), 8.8 Pts (Bearish Regime)
+                        # Previously pulled-back coins: require 8.8 Pts + FVG Retest for extra risk control
+                        if is_previously_tagged:
+                            if not in_fvg_retest: continue  # Must show genuine FVG retest
+                            min_score = 8.8
+                        else:
+                            min_score = 8.8 if market_regime == "BEARISH" else (9.0 if is_recovery_phase else 8.5)
 
                         # 5-Loop Council Verification
                         if total_score >= min_score:
