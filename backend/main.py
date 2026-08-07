@@ -2063,10 +2063,11 @@ def run_robo_trade_loop():
                         exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
 
                     # PRIORITY 3: 10-MIN EARLY WARNING EXIT (Stage 7 Spec: <= -0.8% in first 10m)
-                    elif holding_sec < 600 and curr_pnl_pct <= -0.8:
+                    # PRIORITY 3: EARLY WARNING EXIT (Stage 7 Spec: <= -0.5% in 5m for BEARISH, <= -0.8% in 10m for Normal)
+                    elif (market_regime == "BEARISH" and holding_sec < 300 and curr_pnl_pct <= -0.5) or (holding_sec < 600 and curr_pnl_pct <= -0.8):
                         should_exit = True
                         exit_tag    = "EARLY_WARNING_PULLBACK"
-                        exit_reason = f"⚠️ 10-Min Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m (<= 10m)"
+                        exit_reason = f"⚠️ Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m"
 
                     # 45-MIN STATIC COIN EXIT
                     elif holding_sec >= 2700 and abs(curr_pnl_pct) < 0.3 and h_net >= 0:
@@ -2127,20 +2128,30 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Tier-7 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+1.0%)"
                     elif peak_pnl_pct >= 0.8:
-                        sl_p = entry * 1.006
+                        sl_lock = 1.005 if market_regime == "BEARISH" else 1.006
+                        sl_p = entry * sl_lock
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.6% SL)"
+                            exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+{(sl_lock-1)*100:.1f}% SL)"
                     elif peak_pnl_pct >= 0.5:
                         sl_p = entry * 1.004
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Tier-9 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.4% SL)"
                     else:
-                        sl_mult = 0.982 if market_regime in ("BEARISH", "SIDEWAYS") else 0.975
-                        if curr_price >= entry * 1.05:
+                        if market_regime == "BEARISH":
+                            tp_target = 1.018 # +1.8% TP1 in Bearish regime
+                            sl_mult   = 0.988 # -1.2% SL in Bearish regime
+                        elif market_regime == "SIDEWAYS":
+                            tp_target = 1.025 # +2.5% TP in Sideways regime
+                            sl_mult   = 0.982 # -1.8% SL in Sideways regime
+                        else:
+                            tp_target = 1.050 # +5.0% TP in Bullish regime
+                            sl_mult   = 0.970 # -3.0% SL in Bullish regime
+
+                        if curr_price >= entry * tp_target:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = "Standard Take Profit (+5.0%)"
+                            exit_reason = f"Standard Take Profit (+{(tp_target-1)*100:.1f}%)"
                         elif curr_price <= entry * sl_mult:
                             should_exit = True; exit_tag = "PULLBACK_WATCH"
                             exit_reason = f"Standard Stop Loss ({(1-sl_mult)*100:.1f}%)"
