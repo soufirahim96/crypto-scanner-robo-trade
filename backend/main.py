@@ -1491,8 +1491,8 @@ def run_automated_group_e_backtest_task():
 
 def run_robo_trade_loop():
     """
-    V99 PRO HYBRID — GOD OF TRADE MASTER ENGINE
-    combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
+    V99 PRO HYBRID — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V99.4)
+    Combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
     with V100's loss control risk armor (circuit breakers, trailing locks, early warning exits, regime protections).
 
     Key Features:
