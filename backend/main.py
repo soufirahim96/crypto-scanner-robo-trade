@@ -2038,8 +2038,9 @@ def run_robo_trade_loop():
                                     print(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                # Apply position size multiplier (Stage 0)
-                                capital = round(20.0 * pos_size_mult, 2)
+                                # Stage 14 Iron Rule: ALWAYS $20.00 flat capital (no leverage, no scaling)
+                                # Stage 0 vol regime adjusts SL buffer only, NOT position size
+                                capital = 20.0
 
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
@@ -2098,7 +2099,9 @@ def run_robo_trade_loop():
                     mcs_threshold = 8.0 if vol_regime == "HIGH" else 7.0
 
                     if mcs >= mcs_threshold and open_count < 5 and not is_circuit_broken:
-                        re_cap    = 20.0 * pos_size_mult * (0.75 if re_count == 0 else 0.50)
+                        # Stage 11: Re-entry uses reduced size (75% first, 50% second)
+                        # But still capped to be meaningful: $15 first re-entry, $10 second
+                        re_cap = 15.0 if re_count == 0 else 10.0
                         db_manager.add_active_holding(participant, re_sym, re_price, re_cap / re_price)
                         open_count += 1
                         smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
