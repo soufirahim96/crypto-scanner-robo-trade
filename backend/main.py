@@ -1491,16 +1491,16 @@ def run_automated_group_e_backtest_task():
 
 def run_robo_trade_loop():
     """
-    V99 PRO HYBRID — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V99.4)
+    VERSION 101 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V101)
     Combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
     with V100's loss control risk armor (circuit breakers, trailing locks, early warning exits, regime protections).
 
     Key Features:
     1. V99 Smooth Entry Scanner: Volume >= $5M, FVG/BOS/CVD order flow scoring (Score >= 8.5 Pts).
-    2. Bearish Regime Adaptation: Score >= 8.8 Pts, SL tightened to -2.0% (instead of -3.0%).
+    2. Bearish Regime Adaptation: Score >= 8.5 Pts threshold, SL tightened to -2.0% (instead of -3.0%).
     3. Breakeven Lock @ +0.8% Peak PnL: Locks Stop Loss at +0.6% (guarantees +0.6% profit lock with leeway).
     4. 20-Min Early Warning Exit: Cuts trade if price drops <= -1.5% in first 20 minutes (1200s).
-    5. Early Warning Exit Registry Guard: Re-entry blocked UNLESS price drops <= -6.5% OR 5m candle closes green (> +0.1%).
+    5. Early Warning Exit Registry Guard: Re-entry blocked UNLESS price drops <= -5.0% OR 5m candle closes green (> +0.1%).
     6. 8-Tier Trailing Stop: Lock +0.6%, +1.0%, +1.5%, +2.5%, +3.5%, +5.0%, +7.0%, +9.0%.
     7. Circuit Breakers: 3 losses or 5% drawdown -> 24h lockout & 48h recovery mode.
     8. 45-Min Static Coin Exit + 90-min cooldown.
@@ -1518,14 +1518,14 @@ def run_robo_trade_loop():
         pass
 
     time.sleep(10)
-    print("[V99 PRO HYBRID] Starting V99 Pro Hybrid Autonomous Robo Trade Engine...")
+    print("[V101 HYBRID LOGIC] Starting Version 101 Hybrid Autonomous Robo Trade Engine...")
 
     # Fresh start — clear all robo data
     try:
         db_manager.clear_all_robo_data_v97()
-        print("[V99 PRO FRESH START] All holdings, history, and schedules cleared. Both bots starting fresh.")
+        print("[V101 FRESH START] All holdings, history, and schedules cleared. Both bots starting fresh.")
     except Exception as ex_fresh:
-        print(f"[V99 PRO FRESH START ERROR] {ex_fresh}")
+        print(f"[V101 FRESH START ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1650,7 +1650,7 @@ def run_robo_trade_loop():
                 pending            = [s for s in schedules if s['status'] == 'PENDING']
                 needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 120) or (len(pending) < 5)
 
-                # V99 HIGH-FREQUENCY ENTRY SCANNING ENGINE
+                # V101 HIGH-FREQUENCY ENTRY SCANNING ENGINE
                 if needs_reanalysis and not is_circuit_broken:
                     new_sched = []
                     held_symbols = set(h['symbol'] for h in p_holdings)
@@ -1701,7 +1701,6 @@ def run_robo_trade_loop():
                             price_drop_from_exit = ((price - reg["sold_at_price"]) / reg["sold_at_price"]) * 100.0 if reg["sold_at_price"] > 0 else 0.0
                             reg_status = reg["status"]
 
-                            # USER SPEC: Detect and remove pullback/bearish tag if price goes lower than -5.0% OR 5m candle closes green (> +0.1% above open)
                             is_5m_green = (price > open_price * 1.001)
                             has_dropped_deep_5_0 = (price_drop_from_exit <= -5.0)
 
@@ -1711,7 +1710,7 @@ def run_robo_trade_loop():
                                     continue  # Initial 3-minute hard block active
                                 elif has_dropped_deep_5_0 or is_5m_green:
                                     reg["status"] = "CLEARED"  # Condition met! Unblocked for re-entry analysis
-                                    print(f"[V99 PRO REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '5M Green candle confirmed (>+0.1%)'}")
+                                    print(f"[V101 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '5M Green candle confirmed (>+0.1%)'}")
                                 elif price < reg["sold_at_price"] * 0.998:
                                     continue  # Not recovered and hasn't met clearance conditions
                                 else:
@@ -1749,7 +1748,7 @@ def run_robo_trade_loop():
                         if has_hard_veto:
                             continue
 
-                        # V99 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
+                        # V101 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
                         sweep_pts   = 2.5 if chg > 1.2 else 2.2
                         cvd_pts     = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
@@ -1761,12 +1760,10 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # Threshold Adaptation (User Spec: 8.5 Pts threshold for max entry access)
+                        # Threshold Adaptation (8.5 Pts threshold for max entry access)
                         min_score = 9.0 if is_recovery_phase else 8.5
 
                         # Pullback / Bearish Trap Detector:
-                        # Even at 8.5 Pts, block coins that are currently in an active falling candle (chg < 0 or price <= open_price)
-                        # or showing bearish candle rejection wicks.
                         if is_previously_tagged:
                             if chg < 0 or price <= open_price * 1.0005:
                                 continue  # Active pullback in progress — block entry!
@@ -1798,7 +1795,7 @@ def run_robo_trade_loop():
 
                         if "GOD" in participant:
                             entry = price * (1.0 - random.uniform(0.0005, 0.0025))
-                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V99 PRO" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V101 HYBRID" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             entry = price * (0.999 - random.uniform(0.001, 0.004))
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
@@ -1817,7 +1814,7 @@ def run_robo_trade_loop():
                         db_manager.set_robo_schedules(participant, new_sched)
                         last_analysis_time[participant]        = now_ts
                         last_analysis_time_global[participant] = now_ts
-                        print(f"[V99 PRO SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
+                        print(f"[V101 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
 
                 pending = db_manager.get_robo_schedules(participant)
 
