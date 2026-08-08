@@ -1664,7 +1664,7 @@ def run_robo_trade_loop():
                     other_symbols     = set(h['symbol'] for h in other_holdings)
 
                     all_registered = db_manager.get_all_coins()
-                    stable_or_fiat = ["USDCUSDT", "FDUSDUSDT", "BUSDUSDT", "TUSDUSDT", "EURUSDT", "DAIUSDT", "AEURUSDT", "WBTCUSDT", "CRCLBUSDT", "SPCXBUSDT"]
+                    stable_or_fiat = ["USDCUSDT", "FDUSDUSDT", "BUSDUSDT", "TUSDUSDT", "EURUSDT", "DAIUSDT", "AEURUSDT", "WBTCUSDT", "CRCLBUSDT", "SPCXBUSDT", "USD1USDT"]
                     excluded_symbols = set(
                         c["symbol"] for c in all_registered
                         if str(c.get("coin_type","")).lower() in ["currency","meme","delisted","stablecoin"]
