@@ -1946,8 +1946,25 @@ def run_robo_trade_loop():
                         t_now = scanner_engine.active_tickers.get(sym)
                         if t_now and t_now.get("price", 0) > 0:
                             curr_price = t_now.get("price", 0)
-                            entry      = sched['entry_price_target']
-                            score_val  = float(sched.get('confluence_score', 8.5) or 8.5)
+                            
+                            # STAGE 10 RULE #7 DYNAMIC TARGET ADAPTATION (V122):
+                            # Dynamically update pending target to adapt to live market movements
+                            chg_val = t_now.get("change_pct", 0)
+                            is_pullback = (chg_val < 0.0) or (curr_price <= t_now.get("open", curr_price) * 0.999)
+                            is_bullish  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
+                            score_val   = float(sched.get('confluence_score', 8.5) or 8.5)
+
+                            if score_val >= 9.0:
+                                d_mult = 0.9990
+                            elif is_pullback:
+                                d_mult = 0.9915
+                            elif is_bullish:
+                                d_mult = 0.9985
+                            else:
+                                d_mult = 0.9935
+
+                            entry = round(curr_price * d_mult, 5)
+                            sched['entry_price_target'] = entry
 
                             # Stage 10 Rule #7 Limit Fill Retest Buffer:
                             # Score >= 9.0 -> fill when curr_price <= entry * 1.0035 (within 0.35% discount retest)
