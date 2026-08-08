@@ -284,10 +284,12 @@ window.updateRoboTradeModule = async function () {
     }
 
     // ── 4. Timer Countdown ──
-    const nextSec = (sRes && sRes.next_update_in_seconds !== undefined) ? sRes.next_update_in_seconds : 120;
+    const rawNextSec = (sRes && sRes.next_update_in_seconds !== undefined) ? sRes.next_update_in_seconds : 120;
+    const nextSec = rawNextSec > 0 ? rawNextSec : 120;
     window.roboTradeNextSec = nextSec;
     function fmtTimer(s) {
-      return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+      const validS = Math.max(0, s);
+      return String(Math.floor(validS / 60)).padStart(2, "0") + ":" + String(validS % 60).padStart(2, "0");
     }
     rtSetTxt("godSchedTimerText",    fmtTimer(nextSec));
     rtSetTxt("groupCSchedTimerText", fmtTimer(nextSec));
@@ -296,9 +298,11 @@ window.updateRoboTradeModule = async function () {
       window._roboCountdown = setInterval(() => {
         if (window.roboTradeNextSec > 0) {
           window.roboTradeNextSec -= 1;
-          rtSetTxt("godSchedTimerText",    fmtTimer(window.roboTradeNextSec));
-          rtSetTxt("groupCSchedTimerText", fmtTimer(window.roboTradeNextSec));
+        } else {
+          window.roboTradeNextSec = 120;
         }
+        rtSetTxt("godSchedTimerText",    fmtTimer(window.roboTradeNextSec));
+        rtSetTxt("groupCSchedTimerText", fmtTimer(window.roboTradeNextSec));
       }, 1000);
     }
 
