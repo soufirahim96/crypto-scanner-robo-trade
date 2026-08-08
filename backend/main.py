@@ -1491,7 +1491,7 @@ def run_automated_group_e_backtest_task():
 
 def run_robo_trade_loop():
     """
-    VERSION 109 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V109)
+    VERSION 110 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V110)
     Combines V99's smooth, high-frequency entry scanner ($40+/day consistency)
     with V100's loss control risk armor (circuit breakers, trailing locks, early warning exits, regime protections).
 
@@ -1518,14 +1518,14 @@ def run_robo_trade_loop():
         pass
 
     time.sleep(10)
-    print("[V109 HYBRID LOGIC] Starting Version 109 Hybrid Autonomous Robo Trade Engine...")
+    print("[V110 HYBRID LOGIC] Starting Version 110 Hybrid Autonomous Robo Trade Engine...")
 
     # Startup — clear old pending schedules so fresh plans are generated immediately
     try:
         db_manager.clear_robo_schedules()
-        print("[V109 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
+        print("[V110 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
     except Exception as ex_fresh:
-        print(f"[V109 STARTUP ERROR] {ex_fresh}")
+        print(f"[V110 STARTUP ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1651,7 +1651,7 @@ def run_robo_trade_loop():
                 pending            = [s for s in schedules if s['status'] == 'PENDING']
                 needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 120) or (len(pending) < 5)
 
-                # V109 HIGH-FREQUENCY ENTRY SCANNING ENGINE
+                # V110 HIGH-FREQUENCY ENTRY SCANNING ENGINE
                 if needs_reanalysis and not is_circuit_broken:
                     new_sched = []
                     held_symbols = set(h['symbol'] for h in p_holdings)
@@ -1694,6 +1694,18 @@ def run_robo_trade_loop():
                         if vol < 5000000:
                             continue
 
+                        # Bearish CHOCH & Volume Divergence Trap Vetoes
+                        sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
+                        has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
+                        has_volume_divergence = (chg > 0.5) and (sell_vol_ratio > 1.8 or vol < 5000000)
+
+                        candle_range = high - low
+                        upper_wick_ratio = ((high - price) / candle_range) if candle_range > 0 else 0.0
+                        has_fakeout_wick = (upper_wick_ratio > 0.60) and (chg > 0.5)
+
+                        if has_fakeout_wick or has_volume_divergence:
+                            has_bearish_choch = True
+
                         # COIN EXIT REGISTRY GUARD (ENHANCED EARLY WARNING & PULLBACK RULES)
                         reg = coin_exit_registry.get(sym_c)
                         is_previously_tagged = False
@@ -1715,25 +1727,13 @@ def run_robo_trade_loop():
                                     continue  # Unbreakable 180s hard block active — no micro tick bypass allowed!
                                 elif (has_dropped_deep_5_0 or is_15m_green) and has_volume_consistency:
                                     reg["status"] = "CLEARED"  # Full structural recovery & volume consistency confirmed!
-                                    print(f"[V109 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '15M Green + Volume Consistency confirmed'}")
+                                    print(f"[V110 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '15M Green + Volume Consistency confirmed'}")
                                 else:
                                     continue  # Still dumping, stagnant, or volume decreasing — block re-entry
 
                             elif reg_status == "CLEARED":
                                 if (not is_15m_green and not has_dropped_deep_5_0) or not has_volume_consistency:
                                     continue  # Require 15M green candle + Volume consistency confirmation
-
-                        # Bearish CHOCH & Volume Divergence Trap Vetoes
-                        sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
-                        has_bearish_choch = (chg < -2.5) or (high > price * 1.03 and price == low)
-                        has_volume_divergence = (chg > 0.5) and (sell_vol_ratio > 1.8 or vol < 5000000)
-
-                        candle_range = high - low
-                        upper_wick_ratio = ((high - price) / candle_range) if candle_range > 0 else 0.0
-                        has_fakeout_wick = (upper_wick_ratio > 0.60) and (chg > 0.5)
-
-                        if has_fakeout_wick or has_volume_divergence:
-                            has_bearish_choch = True
 
                         # BTC 180-second Freeze Engine
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
@@ -1751,7 +1751,7 @@ def run_robo_trade_loop():
                         if has_hard_veto:
                             continue
 
-                        # V109 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
+                        # V110 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
                         sweep_pts   = 2.5 if chg > 1.2 else 2.2
                         cvd_pts     = 2.5 if vol > 7500000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
@@ -1804,14 +1804,14 @@ def run_robo_trade_loop():
                         price = c.get("price", 100)
                         if price <= 0: continue
 
-                        # STAGE 10 RULE #6: ADAPTIVE ENTRY PRICE GUIDANCE (V109: 0.9935 & 0.9990)
+                        # STAGE 10 RULE #6: ADAPTIVE ENTRY PRICE GUIDANCE (V110: 0.9935 & 0.9990)
                         if score_val >= 9.0:
                             entry = price * 0.9990  # Score >= 9.0 -> 0.10% micro discount offset
                         else:
                             entry = price * 0.9935  # Score 8.5 to 8.9 -> 0.65% discount cushion offset
 
                         if "GOD" in participant:
-                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V109 HYBRID" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V110 HYBRID" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
 
@@ -1865,7 +1865,7 @@ def run_robo_trade_loop():
 
                     if new_sched:
                         db_manager.set_robo_schedules(participant, new_sched)
-                        print(f"[V109 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
+                        print(f"[V110 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed {len(new_sched)}-coin plan. Top: {new_sched[0]['confluence_score']} Pts")
 
                 pending = db_manager.get_robo_schedules(participant)
 
@@ -1901,7 +1901,7 @@ def run_robo_trade_loop():
                                         entry_price=worst_h['entry_price'], exit_price=worst_px,
                                         amount=worst_h['amount'], pnl=w_net
                                     )
-                                    print(f"[V109 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
+                                    print(f"[V110 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
 
@@ -1929,7 +1929,7 @@ def run_robo_trade_loop():
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                 open_count += num_lots
-                                print(f"[V109 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ({num_lots}-Lot ${capital:.2f} Spot)")
+                                print(f"[V110 ENTRY] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} ({num_lots}-Lot ${capital:.2f} Spot)")
                                 if open_count >= 5:
                                     break
 
@@ -1962,7 +1962,7 @@ def run_robo_trade_loop():
                             open_count += (2 if re_cap == 40.0 else 1)
                             smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
                             if re_count + 1 >= 3: to_remove_reentry.append(re_sym)
-                            print(f"[V109 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
+                            print(f"[V110 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
                             continue
 
                     b1 = re_price >= re_exit_px * 0.995
@@ -2208,7 +2208,7 @@ def run_robo_trade_loop():
                             coin_consecutive_losses[sym] = {"count": loss_cnt, "last_loss_at": now_ts}
                             if loss_cnt >= 2:
                                 coin_static_cooldown[sym] = now_ts + 1800  # 30-Minute Hard Blacklist
-                                print(f"🛑 [V109 2X LOSS BLACKLIST] {sym} suffered {loss_cnt} consecutive losses! Blacklisted from all schedules & entries for 30 minutes.")
+                                print(f"🛑 [V110 2X LOSS BLACKLIST] {sym} suffered {loss_cnt} consecutive losses! Blacklisted from all schedules & entries for 30 minutes.")
                         else:
                             # Reset consecutive loss counter on win
                             if sym in coin_consecutive_losses:
@@ -2245,7 +2245,7 @@ def run_robo_trade_loop():
                                 "exit_chg": h_chg, "status": reg_status,
                                 "bearish_retry_until": now_ts + 180
                             }
-                            print(f"📌 [V109 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (180s Hard Cooldown Active)")
+                            print(f"📌 [V110 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (180s Hard Cooldown Active)")
                         elif exit_tag in ("CLEARED_REENTRY_PRIORITY",):
                             coin_exit_registry[sym] = {
                                 "sold_at_price": curr_price, "sold_at_time": now_ts,
