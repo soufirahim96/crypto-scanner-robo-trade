@@ -1002,6 +1002,7 @@ def clear_all_active_holdings():
 
 last_analysis_time_global = {"👑 SUPREME GOD AI BOT": 0, "⚡ GROUP C OB BOT": 0}
 last_loop_error_msg = "None"
+last_debug_info = {}
 
 @app.get("/api/robo/schedules")
 def get_robo_schedules():
@@ -1019,7 +1020,8 @@ def get_robo_schedules():
         "next_update_in_seconds": next_in,
         "interval_seconds": 60,
         "last_analysis_timestamp": last_ts,
-        "last_loop_error": last_loop_error_msg
+        "last_loop_error": last_loop_error_msg,
+        "debug_info": last_debug_info
     }
 
 
@@ -1674,6 +1676,15 @@ def run_robo_trade_loop():
                     other_participant = [p for p in participants if p != participant][0]
                     other_holdings    = [h for h in all_holdings if h['participant'] == other_participant]
                     other_symbols     = set(h['symbol'] for h in other_holdings)
+
+                    global last_debug_info
+                    last_debug_info[participant] = {
+                        "loop_time": get_myt_timestamp_str(),
+                        "tickers_count": len(tickers),
+                        "is_circuit_broken": is_circuit_broken,
+                        "is_recovery_phase": is_recovery_phase,
+                        "market_regime": market_regime
+                    }
 
                     all_registered = db_manager.get_all_coins()
                     stable_or_fiat = ["USDCUSDT", "FDUSDUSDT", "BUSDUSDT", "TUSDUSDT", "EURUSDT", "DAIUSDT", "AEURUSDT", "WBTCUSDT", "CRCLBUSDT", "SPCXBUSDT", "USD1USDT"]
