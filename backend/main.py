@@ -2284,10 +2284,13 @@ def run_robo_trade_loop():
 
                             if (daily_loss_count[participant] >= cb_limit_losses or
                                     daily_drawdown_pct[participant] >= cb_limit_dd_pct):
-                                circuit_break_until[participant]  = now_ts + 86400
-                                recovery_phase_until[participant] = now_ts + 86400 + 172800
-                                recovery_wins[participant]        = 0
-                                safe_log(f"[V99 PRO CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
+                                if not is_circuit_broken:
+                                    circuit_break_until[participant]  = now_ts + 86400
+                                    recovery_phase_until[participant] = now_ts + 86400 + 172800
+                                    recovery_wins[participant]        = 0
+                                    safe_log(f"[V99 PRO CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
+                                else:
+                                    safe_log(f"[V124 EXCEPTION TRADE EXIT] {participant} exception trade completed during active lock — 24H lockout timer strictly PRESERVED at original expiration.")
 
                             # STAGE 7 SPEC: 2x Consecutive Loss 30-Minute Hard Blacklist
                             prev_loss = coin_consecutive_losses.get(sym, {"count": 0, "last_loss_at": 0.0})
