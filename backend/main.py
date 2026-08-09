@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 
-from backend.db import db_manager
+from backend.db import db_manager, get_myt_timestamp_str
 from backend.auth import verify_password
 from backend.scanner import scanner_engine
 
