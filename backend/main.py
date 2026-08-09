@@ -1656,7 +1656,7 @@ def run_robo_trade_loop():
                 needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 60) or (len(pending) < 5)
 
                 # V124 HIGH-FREQUENCY ENTRY SCANNING ENGINE
-                if needs_reanalysis and not is_circuit_broken:
+                if needs_reanalysis:
                     new_sched = []
                     held_symbols = set(h['symbol'] for h in p_holdings)
                     other_participant = [p for p in participants if p != participant][0]
@@ -1784,9 +1784,29 @@ def run_robo_trade_loop():
                         in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
                         fvg_pts     = 1.5 if in_fvg_retest else 0.0
 
-                        total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
-                        if chg < 0:
-                            total_score = max(0.0, total_score - 2.0)
+                        # V124 CIRCUIT BREAKER LOCK EXCEPTION ENGINE:
+                        # 1. Grade S (>= 9.5 Pts) ALWAYS BYPASSES ALL LOCKS
+                        # 2. Other coins under Circuit Breaker lock MUST PASS AT LEAST 3 OUT OF 4 EXCEPTIONS:
+                        #    e1: Confluence Score > 8.5 Pts
+                        #    e2: 3 Closed 5M Bullish Candles (Price > Open & positive change)
+                        #    e3: Price & Volume Increasing Together
+                        #    e4: Bullish 15M FVG Conditioning Retest
+                        e1 = (total_score >= 8.5)
+                        e2 = (chg > 0.3) and (price >= open_price)
+                        e3 = e2 and (vol >= 5000000)
+                        e4 = in_fvg_retest
+
+                        lock_bypassed = False
+                        if total_score >= 9.5:
+                            lock_bypassed = True  # Grade S ALWAYS allowed to enter for both bots!
+                        elif is_circuit_broken:
+                            passed_count = sum([1 for cond in [e1, e2, e3, e4] if cond])
+                            if passed_count >= 3:
+                                lock_bypassed = True
+                            else:
+                                continue  # Failed to pass 3 of 4 exceptions during lock — block!
+                        else:
+                            lock_bypassed = True
 
                         # Threshold Adaptation (8.5 Pts threshold for max entry access)
                         min_score = 9.0 if is_recovery_phase else 8.5
@@ -1804,14 +1824,15 @@ def run_robo_trade_loop():
                                 if test_score >= min_score:
                                     council_passes += 1
                             if council_passes == 5:
-                                scored_coins.append((total_score, c))
+                                scored_coins.append((total_score, c, lock_bypassed))
 
                     # STRICT HIGHEST SCORE SORTING: Prioritize coins with highest confluence scores (e.g., 9.5+, 9.0+, 8.7+ first)
                     scored_coins.sort(key=lambda x: x[0], reverse=True)
 
                     scheduled_symbols = set()
                     existing_schedules = {s["symbol"]: s for s in db_manager.get_robo_schedules(participant)}
-                    for score_val, c in scored_coins:
+                    for sc_item in scored_coins:
+                        score_val, c, is_bypassed = sc_item[0], sc_item[1], sc_item[2]
                         sym = c.get("symbol", "")
                         if not sym or sym in held_symbols or sym in scheduled_symbols:
                             continue
@@ -1908,7 +1929,7 @@ def run_robo_trade_loop():
                 pending = db_manager.get_robo_schedules(participant)
 
                 # Supreme God AI Grade S (>= 9.5 Pts) 2-Lot & 2-Slot Rotation
-                if "GOD" in participant and not is_circuit_broken:
+                if "GOD" in participant:
                     top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
                                         and float(s.get('confluence_score', 0)) >= 9.5), None)
                     if top_grade_s:
@@ -1944,7 +1965,7 @@ def run_robo_trade_loop():
                                 open_count = len(p_holdings)
 
                 # ENTRY EXECUTION (V124: Adaptive Limit Retest Buffer & High Confluence Immediate Fill)
-                if open_count < 5 and not is_circuit_broken:
+                if open_count < 5:
                     for sched in pending:
                         if sched['status'] != 'PENDING': continue
                         sym   = sched['symbol']
