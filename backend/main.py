@@ -991,6 +991,7 @@ def clear_all_active_holdings():
 
 
 last_analysis_time_global = {"👑 SUPREME GOD AI BOT": 0, "⚡ GROUP C OB BOT": 0}
+last_loop_error_msg = "None"
 
 @app.get("/api/robo/schedules")
 def get_robo_schedules():
@@ -1007,7 +1008,8 @@ def get_robo_schedules():
         "schedules": db_manager.get_robo_schedules(),
         "next_update_in_seconds": next_in,
         "interval_seconds": 60,
-        "last_analysis_timestamp": last_ts
+        "last_analysis_timestamp": last_ts,
+        "last_loop_error": last_loop_error_msg
     }
 
 
@@ -2323,6 +2325,8 @@ def run_robo_trade_loop():
                             del coin_exit_registry[sym]
 
         except Exception as e:
+            global last_loop_error_msg
+            last_loop_error_msg = f"{type(e).__name__}: {e}"
             print(f"[V100 Loop Error] {e}")
 
         time.sleep(10)
