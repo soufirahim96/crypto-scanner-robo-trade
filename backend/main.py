@@ -27,6 +27,16 @@ async def lifespan(app: FastAPI):
     # Shutdown scanner
     await scanner_engine.stop()
 
+
+def safe_log(msg: str):
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(str(msg).encode("ascii", "ignore").decode("ascii"))
+        except Exception:
+            pass
+
 app = FastAPI(title="Crypto Scanner & ClickHouse Time-Series API", lifespan=lifespan)
 
 # VERSION 50: REGISTER MODULAR FEATURE ROUTERS
@@ -1521,14 +1531,14 @@ def run_robo_trade_loop():
         pass
 
     time.sleep(10)
-    print("[V124 HYBRID LOGIC] Starting Version 124 Hybrid Autonomous Robo Trade Engine...")
+    safe_log("[V124 HYBRID LOGIC] Starting Version 124 Hybrid Autonomous Robo Trade Engine...")
 
     # Startup — clear old pending schedules so fresh plans are generated immediately
     try:
         db_manager.clear_robo_schedules()
-        print("[V124 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
+        safe_log("[V124 STARTUP] Robo schedules refreshed. Active holdings & history preserved.")
     except Exception as ex_fresh:
-        print(f"[V124 STARTUP ERROR] {ex_fresh}")
+        safe_log(f"[V124 STARTUP ERROR] {ex_fresh}")
 
     participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
     last_analysis_time = {p: 0 for p in participants}
@@ -1573,7 +1583,7 @@ def run_robo_trade_loop():
                 pruned = db_manager.prune_old_crypto_ticks(48)
                 last_db_prune_time = now_ts
                 if pruned > 0:
-                    print(f"[DB CLEANER] Pruned {pruned:,} tick rows older than 48h.")
+                    safe_log(f"[DB CLEANER] Pruned {pruned:,} tick rows older than 48h.")
 
             if now_ts - last_daily_backtest_time >= 86400:
                 last_daily_backtest_time = now_ts
@@ -1587,7 +1597,7 @@ def run_robo_trade_loop():
                         for sym in eligible_symbols[:10]:
                             run_sequential_backtest(RunBacktestRequest(coin_id=sym, start_year=curr_year, end_year=curr_year))
                     except Exception as ex_dbt:
-                        print(f"[Daily Backtest Error] {ex_dbt}")
+                        safe_log(f"[Daily Backtest Error] {ex_dbt}")
                 threading.Thread(target=_bg_daily_backtest, daemon=True).start()
 
             # Time Helpers
@@ -1603,11 +1613,11 @@ def run_robo_trade_loop():
             if btc_now_chg < -2.5 and btc_now_chg < btc_prev_chg_sample:
                 if not btc_emergency_exit_active:
                     btc_emergency_exit_active = True
-                    print(f"[BTC CRASH EMERGENCY] BTC {btc_now_chg:+.2f}% and dropping — emergency exit ALL holdings!")
+                    safe_log(f"[BTC CRASH EMERGENCY] BTC {btc_now_chg:+.2f}% and dropping — emergency exit ALL holdings!")
             elif btc_now_chg >= -2.5 or btc_now_chg > btc_prev_chg_sample:
                 if btc_emergency_exit_active:
                     btc_emergency_exit_active = False
-                    print(f"[BTC RECOVERY] BTC recovered to {btc_now_chg:+.2f}%. Emergency mode off.")
+                    safe_log(f"[BTC RECOVERY] BTC recovered to {btc_now_chg:+.2f}%. Emergency mode off.")
             btc_prev_chg_sample = btc_now_chg
 
             # Expire static cooldown registry
@@ -1743,7 +1753,7 @@ def run_robo_trade_loop():
                                 # STAGE 10 RULE #2: Re-analyze to see if status/regime has recovered to Bullish/Sideways
                                 if time_since_exit >= 180 and is_15m_green and has_volume_consistency and not is_bearish:
                                     reg["status"] = "CLEARED"
-                                    print(f"[V124 REGISTRY RECOVERY] {sym_c} recovered from {reg_status} -> CLEARED (15M Green + Volume Consistency confirmed)")
+                                    safe_log(f"[V124 REGISTRY RECOVERY] {sym_c} recovered from {reg_status} -> CLEARED (15M Green + Volume Consistency confirmed)")
                                 else:
                                     continue  # BEARISH / DEEP_BEARISH remains strictly blocked!
 
@@ -1754,7 +1764,7 @@ def run_robo_trade_loop():
                                     continue  # Unbreakable 180s hard block active — no micro tick bypass allowed!
                                 elif (has_dropped_deep_5_0 or is_15m_green) and has_volume_consistency:
                                     reg["status"] = "CLEARED"  # Full structural recovery & volume consistency confirmed!
-                                    print(f"[V124 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '15M Green + Volume Consistency confirmed'}")
+                                    safe_log(f"[V124 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '15M Green + Volume Consistency confirmed'}")
                                 else:
                                     continue  # Still dumping, stagnant, or volume decreasing — block re-entry
 
@@ -1887,7 +1897,7 @@ def run_robo_trade_loop():
 
                         if sym in existing_schedules:
                             old_entry = existing_schedules[sym].get("entry_price_target", entry)
-                            print(f"🔄 [V124 DYNAMIC 60S ENTRY REFRESH] {participant} retained {sym}: updated Entry Target ${old_entry:.5f} -> ${entry:.5f} (Live Price: ${price:.5f})")
+                            safe_log(f"🔄 [V124 DYNAMIC 60S ENTRY REFRESH] {participant} retained {sym}: updated Entry Target ${old_entry:.5f} -> ${entry:.5f} (Live Price: ${price:.5f})")
 
                         if len(new_sched) >= 5:
                             break
@@ -1928,7 +1938,7 @@ def run_robo_trade_loop():
 
                     if new_sched:
                         db_manager.set_robo_schedules(participant, new_sched)
-                        print(f"[V124 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed 60s plan ({len(new_sched)} coins). Top: {new_sched[0]['confluence_score']} Pts")
+                        safe_log(f"[V124 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed 60s plan ({len(new_sched)} coins). Top: {new_sched[0]['confluence_score']} Pts")
 
                 pending = db_manager.get_robo_schedules(participant)
 
@@ -1964,7 +1974,7 @@ def run_robo_trade_loop():
                                         entry_price=worst_h['entry_price'], exit_price=worst_px,
                                         amount=worst_h['amount'], pnl=w_net
                                     )
-                                    print(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
+                                    safe_log(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
 
@@ -1987,7 +1997,7 @@ def run_robo_trade_loop():
                             if curr_price > 0 and curr_price <= fill_threshold:
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
-                                    print(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
+                                    safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
                                 # Grade S (>= 9.5 Pts) 2-Lot position ($40.00) if space allows
@@ -1998,7 +2008,7 @@ def run_robo_trade_loop():
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                 open_count += num_lots
-                                print(f"[V124 ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Target: ${entry:.5f}, Score: {score_val:.1f})")
+                                safe_log(f"[V124 ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Target: ${entry:.5f}, Score: {score_val:.1f})")
                                 if open_count >= 5:
                                     break
 
@@ -2031,7 +2041,7 @@ def run_robo_trade_loop():
                             open_count += (2 if re_cap == 40.0 else 1)
                             smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
                             if re_count + 1 >= 3: to_remove_reentry.append(re_sym)
-                            print(f"[V124 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
+                            safe_log(f"[V124 GRADE S RE-ENTRY] {participant} continuous re-entry {re_sym} @ ${re_price:.5f} (-0.5% dip)")
                             continue
 
                     b1 = re_price >= re_exit_px * 0.995
@@ -2055,7 +2065,7 @@ def run_robo_trade_loop():
                         open_count += 1
                         smart_reentry_pending[participant][re_sym]["count"] = re_count + 1
                         if re_count + 1 >= 2: to_remove_reentry.append(re_sym)
-                        print(f"[V99 PRO SMART RE-ENTRY] {participant} re-entered {re_sym} @ ${re_price:.5f} MCS={mcs:.1f}")
+                        safe_log(f"[V99 PRO SMART RE-ENTRY] {participant} re-entered {re_sym} @ ${re_price:.5f} MCS={mcs:.1f}")
                     else:
                         to_remove_reentry.append(re_sym)
 
@@ -2249,7 +2259,7 @@ def run_robo_trade_loop():
                             status="COMPLETED"
                         )
                         db_manager.remove_active_holding(holding['id'])
-                        print(f"[V99 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
+                        safe_log(f"[V99 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
 
                         # Circuit Breaker Tracking
                         # Circuit Breaker & Consecutive Loss Tracking
@@ -2265,7 +2275,7 @@ def run_robo_trade_loop():
                                 circuit_break_until[participant]  = now_ts + 86400
                                 recovery_phase_until[participant] = now_ts + 86400 + 172800
                                 recovery_wins[participant]        = 0
-                                print(f"[V99 PRO CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
+                                safe_log(f"[V99 PRO CIRCUIT BREAK] {participant} [{market_regime}] LOCKED 24H! Losses:{daily_loss_count[participant]}, DD:{daily_drawdown_pct[participant]:.2f}%")
 
                             # STAGE 7 SPEC: 2x Consecutive Loss 30-Minute Hard Blacklist
                             prev_loss = coin_consecutive_losses.get(sym, {"count": 0, "last_loss_at": 0.0})
@@ -2277,7 +2287,7 @@ def run_robo_trade_loop():
                             coin_consecutive_losses[sym] = {"count": loss_cnt, "last_loss_at": now_ts}
                             if loss_cnt >= 2:
                                 coin_static_cooldown[sym] = now_ts + 1800  # 30-Minute Hard Blacklist
-                                print(f"🛑 [V124 2X LOSS BLACKLIST] {sym} suffered {loss_cnt} consecutive losses! Blacklisted from all schedules & entries for 30 minutes.")
+                                safe_log(f"🛑 [V124 2X LOSS BLACKLIST] {sym} suffered {loss_cnt} consecutive losses! Blacklisted from all schedules & entries for 30 minutes.")
                         else:
                             # Reset consecutive loss counter on win
                             if sym in coin_consecutive_losses:
@@ -2287,7 +2297,7 @@ def run_robo_trade_loop():
                                 recovery_wins[participant] += 1
                                 if recovery_wins[participant] >= 3:
                                     recovery_phase_until[participant] = 0.0
-                                    print(f"[V99 PRO RECOVERY COMPLETE] {participant} won 3 consecutive trades!")
+                                    safe_log(f"[V99 PRO RECOVERY COMPLETE] {participant} won 3 consecutive trades!")
 
                         # Smart Re-Entry Registration
                         if exit_is_profit and market_regime == "BULLISH" and not is_circuit_broken and not is_recovery_phase:
@@ -2304,7 +2314,7 @@ def run_robo_trade_loop():
                         # ── Stage 14 Rule 5: 90-min static cooldown ──────────
                         if exit_tag == "STATIC_EXIT":
                             coin_static_cooldown[sym] = now_ts + 5400  # 90 minutes
-                            print(f"[V100 STATIC COOLDOWN] {sym} on 90-min cooldown after static exit.")
+                            safe_log(f"[V100 STATIC COOLDOWN] {sym} on 90-min cooldown after static exit.")
 
                         # ── Write exit registry (ALL LOSS EXITS TAGGED) ──────
                         if net_pnl < 0 or exit_tag in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH"):
@@ -2314,7 +2324,7 @@ def run_robo_trade_loop():
                                 "exit_chg": h_chg, "status": reg_status,
                                 "bearish_retry_until": now_ts + 180
                             }
-                            print(f"📌 [V124 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (180s Hard Cooldown Active)")
+                            safe_log(f"📌 [V124 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (180s Hard Cooldown Active)")
                         elif exit_tag in ("CLEARED_REENTRY_PRIORITY",):
                             coin_exit_registry[sym] = {
                                 "sold_at_price": curr_price, "sold_at_time": now_ts,
@@ -2327,7 +2337,7 @@ def run_robo_trade_loop():
         except Exception as e:
             global last_loop_error_msg
             last_loop_error_msg = f"{type(e).__name__}: {e}"
-            print(f"[V100 Loop Error] {e}")
+            safe_log(f"[V100 Loop Error] {e}")
 
         time.sleep(10)
 
