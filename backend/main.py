@@ -1794,6 +1794,7 @@ def run_robo_trade_loop():
                         funding_pts = 2.0 if chg >= 0 else 1.8
                         bos_pts     = 1.5 if chg > 1.8 else 1.2
                         in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
+                        fvg_pts     = 1.5 if in_fvg_retest else 0.0
                         total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
