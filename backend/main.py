@@ -1812,11 +1812,12 @@ def run_robo_trade_loop():
 
                         # V124 CIRCUIT BREAKER LOCK EXCEPTION ENGINE:
                         # 1. Grade S (>= 9.5 Pts) ALWAYS BYPASSES ALL LOCKS
-                        # 2. Other coins under Circuit Breaker lock MUST PASS AT LEAST 3 OUT OF 4 EXCEPTIONS:
-                        #    e1: Confluence Score > 8.5 Pts
+                        # 2. Other coins under Circuit Breaker lock MUST PASS ALL 4 EXCEPTIONS (4 OF 4 REQUIRED):
+                        #    e1: Confluence Score >= 8.5 Pts
                         #    e2: 3 Closed 5M Bullish Candles (Price > Open & positive change)
                         #    e3: Price & Volume Increasing Together
                         #    e4: Bullish 15M FVG Conditioning Retest
+                        # 3. Coin MUST NOT be tagged in BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK
                         e1 = (total_score >= 8.5)
                         e2 = (chg > 0.3) and (price >= open_price)
                         e3 = e2 and (vol >= 5000000)
@@ -1826,11 +1827,16 @@ def run_robo_trade_loop():
                         if total_score >= 9.5:
                             lock_bypassed = True  # Grade S ALWAYS allowed to enter for both bots!
                         elif is_circuit_broken:
-                            passed_count = sum([1 for cond in [e1, e2, e3, e4] if cond])
-                            if passed_count >= 3:
+                            # STRICT VETO: Coin status/tag CANNOT be BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK
+                            if is_bearish or is_previously_tagged:
+                                continue  # Hard vetoed during lock!
+
+                            # ALL 4 EXCEPTIONS MUST BE MET (4 OF 4 REQUIRED)
+                            passed_all = (e1 and e2 and e3 and e4)
+                            if passed_all:
                                 lock_bypassed = True
                             else:
-                                continue  # Failed to pass 3 of 4 exceptions during lock — block!
+                                continue  # Failed to pass ALL 4 exceptions during lock — block!
                         else:
                             lock_bypassed = True
 
@@ -2183,77 +2189,56 @@ def run_robo_trade_loop():
                             exit_reason    = f"Golden Window Exit [{session_str}] PnL:+${h_net:.4f}"
                             exit_is_profit = True
 
-                    # STAGE 9 RULE #1: GRADE S AUTO LOCK SL @ +10.0% (Bypasses lower stages)
-                    elif is_gr_s_holding and (peak_pnl_pct >= 10.0 or curr_pnl_pct >= 10.0):
+                    # STAGED CENT STOP LOSS & PROFIT LOCK MATRIX (Stage 9 Spec)
+                    # Slot Capital = h_cap ($20.00 standard, $40.00 Grade S 2-lot)
+                    # Stage 5: Peak PnL >= $2.50 or Peak PnL >= +10.0% -> Lock $2.00 profit (+$4.00 on $40 Grade S)
+                    # Stage 4: Peak PnL >= $1.20 or Peak PnL >= +6.0%  -> Lock $1.00 profit (+$2.00 on $40 Grade S)
+                    # Stage 3: Peak PnL >= $0.80 or Peak PnL >= +4.0%  -> Lock $0.50 profit (+$1.00 on $40 Grade S)
+                    # Stage 2: Peak PnL >= $0.30 or Peak PnL >= +1.5%  -> Lock $0.07 profit (+$0.14 on $40 Grade S, covers $0.04 fee)
+                    # Stage 1 (Initial SL): Max loss -$0.18 per $20 slot (-0.90% SL)
+                    peak_pnl_dollar = (highest_price - entry) * amount
+                    curr_pnl_dollar = (curr_price - entry) * amount
+
+                    if is_gr_s_holding and (peak_pnl_pct >= 10.0 or curr_pnl_pct >= 10.0):
                         sl_p = entry * 1.100
                         if curr_price <= sl_p or curr_pnl_pct >= 10.0:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"🏆 Grade S Auto Lock SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+10.0% SL)"
-
-                    # 8-TIER TRAILING STOP STAGES (V124 FEE-SHIELDED ASYMMETRIC R:R)
-                    elif peak_pnl_pct >= 10.0:
-                        sl_p = entry * 1.090
+                    elif peak_pnl_dollar >= (2.50 * (h_cap / 20.0)) or peak_pnl_pct >= 10.0:
+                        lock_dollar = 2.00 * (h_cap / 20.0)
+                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-1 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+9.0%)"
-                    elif peak_pnl_pct >= 8.0:
-                        sl_p = entry * 1.070
+                            exit_reason = f"Stage 5 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
+                    elif peak_pnl_dollar >= (1.20 * (h_cap / 20.0)) or peak_pnl_pct >= 6.0:
+                        lock_dollar = 1.00 * (h_cap / 20.0)
+                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-2 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+7.0%)"
-                    elif peak_pnl_pct >= 6.0:
-                        sl_p = entry * 1.050
+                            exit_reason = f"Stage 4 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
+                    elif peak_pnl_dollar >= (0.80 * (h_cap / 20.0)) or peak_pnl_pct >= 4.0:
+                        lock_dollar = 0.50 * (h_cap / 20.0)
+                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-3 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+5.0%)"
-                    elif peak_pnl_pct >= 4.0:
-                        sl_p = entry * 1.035
+                            exit_reason = f"Stage 3 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
+                    elif peak_pnl_dollar >= (0.30 * (h_cap / 20.0)) or peak_pnl_pct >= 1.5:
+                        lock_dollar = 0.07 * (h_cap / 20.0)
+                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-4 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+3.5%)"
-                    elif peak_pnl_pct >= 3.0:
-                        sl_p = entry * 1.025
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-5 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+2.5%)"
-                    elif peak_pnl_pct >= 2.0:
-                        sl_p = entry * 1.015
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-6 Trail SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+1.5%)"
-                    elif peak_pnl_pct >= 1.5:
-                        sl_p = entry * 1.0035  # V124 Fee Shield Lock (+0.35%: covers $0.04 Binance spot fee + net profit)
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-7 Fee Shield Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.35% Fee Shield)"
-                    elif peak_pnl_pct >= 0.8:
-                        sl_lock = 1.005 if market_regime == "BEARISH" else 1.006
-                        sl_p = entry * sl_lock
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-8 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+{(sl_lock-1)*100:.1f}% SL)"
-                    elif peak_pnl_pct >= 0.5:
-                        sl_p = entry * 1.004
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Tier-9 Breakeven Lock (Peak:+{peak_pnl_pct:.1f}%, Locked:+0.4% SL)"
+                            exit_reason = f"Stage 2 Fee Shield Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Fee Shield)"
                     else:
-                        if market_regime == "BEARISH":
-                            tp_target = 1.018 # +1.8% TP1 in Bearish regime
-                            sl_mult   = 0.988 # -1.2% SL in Bearish regime
-                        elif market_regime == "SIDEWAYS":
-                            tp_target = 1.025 # +2.5% TP in Sideways regime
-                            sl_mult   = 0.982 # -1.8% SL in Sideways regime
-                        else:
-                            tp_target = 1.050 # +5.0% TP in Bullish regime
-                            sl_mult   = 0.970 # -3.0% SL in Bullish regime
+                        initial_sl_dollar = 0.18 * (h_cap / 20.0)
+                        initial_sl_price  = entry * (1.0 - (initial_sl_dollar / h_cap))
+                        tp_target_price   = entry * 1.050
 
-                        if curr_price >= entry * tp_target:
+                        if curr_price >= tp_target_price:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Standard Take Profit (+{(tp_target-1)*100:.1f}%)"
-                        elif curr_price <= entry * sl_mult:
+                            exit_reason = "Standard Take Profit (+5.00%)"
+                        elif curr_price <= initial_sl_price:
                             should_exit = True; exit_tag = "PULLBACK_WATCH"
-                            exit_reason = f"Standard Stop Loss ({(1-sl_mult)*100:.1f}%)"
+                            exit_reason = f"Stage 1 Cent Stop Loss (-${initial_sl_dollar:.2f} Max Loss / -0.90% SL)"
 
                     # EXECUTE EXIT
                     if should_exit:
