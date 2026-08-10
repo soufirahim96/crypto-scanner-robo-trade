@@ -1800,21 +1800,21 @@ def run_robo_trade_loop():
                             has_volume_consistency = (vol >= 5000000) and not (chg > 0.5 and sell_vol_ratio > 1.8)
 
                             if reg_status in ("BEARISH", "DEEP_BEARISH"):
-                                # STAGE 10 RULE #2: Re-analyze to see if status/regime has recovered to Bullish/Sideways
-                                if time_since_exit >= 180 and is_15m_green and has_volume_consistency and not is_bearish:
+                                # STAGE 10 RULE #2: 30-Minute (1800s) HARD COOLDOWN + Bullish Confirmation
+                                if time_since_exit >= 1800 and is_15m_green and has_volume_consistency and not is_bearish:
                                     reg["status"] = "CLEARED"
-                                    safe_log(f"[V124 REGISTRY RECOVERY] {sym_c} recovered from {reg_status} -> CLEARED (15M Green + Volume Consistency confirmed)")
+                                    safe_log(f"[V124 REGISTRY RECOVERY] {sym_c} recovered from {reg_status} -> CLEARED (30m Cooldown + 15M Green confirmed)")
                                 else:
-                                    continue  # BEARISH / DEEP_BEARISH remains strictly blocked!
+                                    continue  # BEARISH / DEEP_BEARISH remains strictly blocked for 30m!
 
                             if reg_status in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
                                 is_previously_tagged = True
-                                # STRICT RULE: First 180 seconds (3 minutes) is a HARD UNBREAKABLE COOLDOWN!
-                                if time_since_exit < 180:
-                                    continue  # Unbreakable 180s hard block active — no micro tick bypass allowed!
+                                # STRICT RULE: 30 minutes (1800s) HARD UNBREAKABLE COOLDOWN!
+                                if time_since_exit < 1800:
+                                    continue  # Unbreakable 30-minute hard block active — no early re-entry!
                                 elif (has_dropped_deep_5_0 or is_15m_green) and has_volume_consistency:
                                     reg["status"] = "CLEARED"  # Full structural recovery & volume consistency confirmed!
-                                    safe_log(f"[V124 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '15M Green + Volume Consistency confirmed'}")
+                                    safe_log(f"[V124 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '30m + 15M Green confirmed'}")
                                 else:
                                     continue  # Still dumping, stagnant, or volume decreasing — block re-entry
 
@@ -2361,9 +2361,9 @@ def run_robo_trade_loop():
                             coin_exit_registry[sym] = {
                                 "sold_at_price": curr_price, "sold_at_time": now_ts,
                                 "exit_chg": h_chg, "status": reg_status,
-                                "bearish_retry_until": now_ts + 180
+                                "bearish_retry_until": now_ts + 1800
                             }
-                            safe_log(f"📌 [V124 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (180s Hard Cooldown Active)")
+                            safe_log(f"📌 [V124 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (30-Min / 1800s Hard Cooldown Active)")
                         elif exit_tag in ("CLEARED_REENTRY_PRIORITY",):
                             coin_exit_registry[sym] = {
                                 "sold_at_price": curr_price, "sold_at_time": now_ts,
