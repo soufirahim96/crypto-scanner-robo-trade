@@ -1957,6 +1957,10 @@ def run_robo_trade_loop():
                     last_analysis_time[participant]        = now_ts
                     last_analysis_time_global[participant] = now_ts
 
+                    last_debug_info[participant]["scored_coins_count"] = len(scored_coins)
+                    last_debug_info[participant]["new_sched_count"] = len(new_sched)
+                    last_debug_info[participant]["top_scored_symbols"] = [sc[1]["symbol"] for sc in scored_coins[:5]]
+
                     if new_sched:
                         db_manager.set_robo_schedules(participant, new_sched)
                         safe_log(f"[V124 HYBRID SCHEDULE] {participant} [{market_regime}] refreshed 60s plan ({len(new_sched)} coins). Top: {new_sched[0]['confluence_score']} Pts")
