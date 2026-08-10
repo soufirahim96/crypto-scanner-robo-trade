@@ -1504,6 +1504,45 @@ def run_automated_group_e_backtest_task():
         print("Group E background backtest error:", e)
 
 
+import requests
+
+_klines_cache: Dict[str, Any] = {}
+
+def has_latest_3_closed_5m_bullish_candles(symbol: str) -> bool:
+    """
+    STRICT SECURITY EXCEPTION GUARD (Rule 2):
+    Queries real-time Binance klines to verify that the LATEST 3 CLOSED 5-minute candles
+    (excluding current unclosed active candle) are ALL BULLISH (close > open).
+    Cached for 30 seconds to optimize REST latency and prevent rate-limiting.
+    """
+    now_sec = int(time.time())
+    if symbol in _klines_cache:
+        cached_ts, cached_val = _klines_cache[symbol]
+        if now_sec - cached_ts < 30:
+            return cached_val
+
+    endpoints = [
+        f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=4",
+        f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval=5m&limit=4",
+        f"https://api1.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=4",
+    ]
+
+    for url in endpoints:
+        try:
+            r = requests.get(url, timeout=2.0)
+            if r.status_code == 200:
+                klines = r.json()
+                if isinstance(klines, list) and len(klines) >= 4:
+                    closed_3 = klines[:-1]  # Exclude current unclosed candle (limit=4 -> 3 closed candles)
+                    is_all_bullish = all(float(k[4]) > float(k[1]) for k in closed_3)
+                    _klines_cache[symbol] = (now_sec, is_all_bullish)
+                    return is_all_bullish
+        except Exception:
+            continue
+
+    # Fail-safe default if REST API fails
+    return False
+
 def run_robo_trade_loop():
     """
     VERSION 124 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V124)
@@ -1814,12 +1853,12 @@ def run_robo_trade_loop():
                         # 1. Grade S (>= 9.5 Pts) ALWAYS BYPASSES ALL LOCKS
                         # 2. Other coins under Circuit Breaker lock MUST PASS ALL 4 EXCEPTIONS (4 OF 4 REQUIRED):
                         #    e1: Confluence Score >= 8.5 Pts
-                        #    e2: 3 Closed 5M Bullish Candles (Price > Open & positive change)
+                        #    e2: LATEST 3 Closed 5M Candles are ALL Bullish (close > open on last 3 completed 5m bars)
                         #    e3: Price & Volume Increasing Together
                         #    e4: Bullish 15M FVG Conditioning Retest
                         # 3. Coin MUST NOT be tagged in BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK
                         e1 = (total_score >= 8.5)
-                        e2 = (chg > 0.3) and (price >= open_price)
+                        e2 = has_latest_3_closed_5m_bullish_candles(sym_c)
                         e3 = e2 and (vol >= 5000000)
                         e4 = in_fvg_retest
 
