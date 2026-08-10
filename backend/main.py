@@ -1837,11 +1837,6 @@ def run_robo_trade_loop():
                         # Threshold Adaptation (8.5 Pts threshold for max entry access)
                         min_score = 9.0 if is_recovery_phase else 8.5
 
-                        # Pullback / Bearish Trap Detector:
-                        if is_previously_tagged:
-                            if chg < 0 or price <= open_price * 1.0005:
-                                continue  # Active pullback in progress — block entry!
-
                         # 5-Loop Council Verification
                         if total_score >= min_score:
                             council_passes = 0
