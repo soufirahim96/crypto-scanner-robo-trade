@@ -1787,40 +1787,17 @@ def run_robo_trade_loop():
                             }
                             continue  # STAGE 10 RULE #2 HARD VETO: Coins in BEARISH or DEEP_BEARISH status/regime are STRICTLY BLOCKED!
 
-                        # COIN EXIT REGISTRY GUARD (ENHANCED EARLY WARNING & PULLBACK RULES)
+                        # UNIVERSAL BEARISH & PULLBACK TAG VETO (APPLIES UNCONDITIONALLY TO ALL COINS IN NORMAL & LOCK MODES)
+                        # Once a coin is tagged with BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK,
+                        # NO ENTRIES ARE ALLOWED in Normal Mode OR Hard Lock Mode until 30m cooldown expires & status is CLEARED!
                         reg = coin_exit_registry.get(sym_c)
-                        is_previously_tagged = False
                         if reg:
-                            time_since_exit = now_ts - reg["sold_at_time"]
-                            price_drop_from_exit = ((price - reg["sold_at_price"]) / reg["sold_at_price"]) * 100.0 if reg["sold_at_price"] > 0 else 0.0
-                            reg_status = reg["status"]
+                            reg_status = reg.get("status")
+                            time_since_exit = now_ts - reg.get("sold_at_time", 0)
 
-                            is_15m_green = (price >= open_price * 1.005) # Require full 15M green candle close (+0.5% gain)
-                            has_dropped_deep_5_0 = (price_drop_from_exit <= -5.0)
-                            has_volume_consistency = (vol >= 5000000) and not (chg > 0.5 and sell_vol_ratio > 1.8)
-
-                            if reg_status in ("BEARISH", "DEEP_BEARISH"):
-                                # STAGE 10 RULE #2: 30-Minute (1800s) HARD COOLDOWN + Bullish Confirmation
-                                if time_since_exit >= 1800 and is_15m_green and has_volume_consistency and not is_bearish:
-                                    reg["status"] = "CLEARED"
-                                    safe_log(f"[V124 REGISTRY RECOVERY] {sym_c} recovered from {reg_status} -> CLEARED (30m Cooldown + 15M Green confirmed)")
-                                else:
-                                    continue  # BEARISH / DEEP_BEARISH remains strictly blocked for 30m!
-
-                            if reg_status in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
-                                is_previously_tagged = True
-                                # STRICT RULE: 30 minutes (1800s) HARD UNBREAKABLE COOLDOWN!
-                                if time_since_exit < 1800:
-                                    continue  # Unbreakable 30-minute hard block active — no early re-entry!
-                                elif (has_dropped_deep_5_0 or is_15m_green) and has_volume_consistency:
-                                    reg["status"] = "CLEARED"  # Full structural recovery & volume consistency confirmed!
-                                    safe_log(f"[V124 REGISTRY CLEARED] {sym_c} cleared for re-entry! Reason: {'Deep drop <= -5.0%' if has_dropped_deep_5_0 else '30m + 15M Green confirmed'}")
-                                else:
-                                    continue  # Still dumping, stagnant, or volume decreasing — block re-entry
-
-                            elif reg_status == "CLEARED":
-                                if (not is_15m_green and not has_dropped_deep_5_0) or not has_volume_consistency:
-                                    continue  # Require 15M green candle + Volume consistency confirmation
+                            if reg_status in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
+                                if time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0):
+                                    continue  # UNIVERSAL HARD VETO: Bearish/Pullback tagged coin strictly blocked in ALL modes!
 
                         # BTC 180-second Freeze Engine
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
@@ -1968,6 +1945,7 @@ def run_robo_trade_loop():
                             and t.get("symbol") not in held_symbols 
                             and t.get("symbol") not in scheduled_symbols
                             and str(t.get("symbol")).upper() not in excluded_symbols
+                            and coin_exit_registry.get(t.get("symbol"), {}).get("status") not in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK")
                         ]
                         fallback_candidates.sort(key=lambda x: x.get("quote_volume", 0), reverse=True)
                         for c in fallback_candidates:
