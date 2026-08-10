@@ -2180,13 +2180,6 @@ def run_robo_trade_loop():
                         exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
                         exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
 
-                    # PRIORITY 3: 10-MIN EARLY WARNING EXIT (Stage 7 Spec: <= -0.8% in first 10m)
-                    # PRIORITY 3: EARLY WARNING EXIT (Stage 7 Spec: <= -0.5% in 5m for BEARISH, <= -0.8% in 10m for Normal)
-                    elif (market_regime == "BEARISH" and holding_sec < 300 and curr_pnl_pct <= -0.5) or (holding_sec < 600 and curr_pnl_pct <= -0.8):
-                        should_exit = True
-                        exit_tag    = "EARLY_WARNING_PULLBACK"
-                        exit_reason = f"⚠️ Early Warning Exit: Dropped {curr_pnl_pct:.2f}% in first {holding_sec/60:.1f}m"
-
                     # 25-MIN FEE-AWARE STAGNANT COIN ROTATION (Stage 7 & Pillar 3 Spec)
                     elif holding_sec >= 1500 and h_net >= min_net and not is_gr_s_holding:
                         should_exit = True
