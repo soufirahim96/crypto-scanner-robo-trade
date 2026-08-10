@@ -2286,7 +2286,25 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     else:
-                        initial_sl_dollar = 0.18 * (h_cap / 20.0)
+                        # V129 4-STAGE TIME-DECAY STOP LOSS MATRIX (SCALED PER LOT)
+                        # Stage 1 (0 to 5m): SL @ -$0.14/lot (-0.70% SL)
+                        # Stage 2 (5 to 15m): SL @ -$0.11/lot (-0.55% SL)
+                        # Stage 3 (15 to 30m): SL @ -$0.08/lot (-0.40% SL)
+                        # Stage 4 (After 30m): SL @ -$0.04/lot (-0.20% Breakeven Fee Cover)
+                        if holding_sec >= 1800:
+                            max_sl_dollar_per_lot = 0.04
+                            sl_stage_name = "Stage 4 (30m+ Stagnant Breakeven Cover)"
+                        elif holding_sec >= 900:
+                            max_sl_dollar_per_lot = 0.08
+                            sl_stage_name = "Stage 3 (15m to 30m Decay SL)"
+                        elif holding_sec >= 300:
+                            max_sl_dollar_per_lot = 0.11
+                            sl_stage_name = "Stage 2 (5m to 15m Decay SL)"
+                        else:
+                            max_sl_dollar_per_lot = 0.14
+                            sl_stage_name = "Stage 1 (0 to 5m Entry SL)"
+
+                        initial_sl_dollar = max_sl_dollar_per_lot * lot_scale
                         initial_sl_price  = entry * (1.0 - (initial_sl_dollar / h_cap))
                         tp_target_price   = entry * 1.050
 
@@ -2295,7 +2313,7 @@ def run_robo_trade_loop():
                             exit_reason = "Standard Take Profit (+5.00%)"
                         elif curr_price <= initial_sl_price:
                             should_exit = True; exit_tag = "PULLBACK_WATCH"
-                            exit_reason = f"Stage 1 Cent Stop Loss (-${initial_sl_dollar:.2f} Max Loss / -0.90% SL)"
+                            exit_reason = f"V129 {sl_stage_name} (-${initial_sl_dollar:.2f} Loss Cap)"
 
                     # EXECUTE EXIT
                     if should_exit:
