@@ -1812,23 +1812,29 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # V126 IDEA 1: Relative Volume (RVOL >= 2.0x) Institutional Volume Filter
-                        rvol_5m = float(c.get("rvol") or 0.0)
-                        if rvol_5m <= 0:
-                            rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
+                        # V128 GRADE A & S EXCEPTION RULE PRE-EVALUATION:
+                        chg_30m = float(c.get("change_pct_30m", chg) or 0)
+                        is_30m_positive_bullish_grade_a = (
+                            (total_score >= 8.5) and 
+                            (chg_30m >= 0) and 
+                            (chg >= 0) and 
+                            (rvol_5m >= 1.0) and 
+                            (not has_bearish_choch)
+                        )
+                        is_grade_a_or_s_exempt = (total_score >= 9.5) or is_30m_positive_bullish_grade_a
 
-                        if rvol_5m < 2.0 and total_score < 9.5:
+                        if rvol_5m < 2.0 and not is_grade_a_or_s_exempt:
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                last_debug_info[participant]["rejections"][sym_c] = f"RVOL {rvol_5m:.2f}x < 2.0x & Score {total_score} < 9.5"
+                                last_debug_info[participant]["rejections"][sym_c] = f"RVOL {rvol_5m:.2f}x < 2.0x & Not Exempt"
                             continue  # RVOL VETO: Block fakeout pumps with low institutional volume!
 
                         # STAGE 10 RULE #2 & STAGE 2/4: BEARISH & DEEP BEARISH HARD VETO SHIELD (V125)
                         is_deep_bearish = (chg <= -5.0) or (sell_vol_ratio >= 2.5) or (sym_c in coin_static_cooldown) or (coin_consecutive_losses.get(sym_c, {}).get("count", 0) >= 2)
                         is_bearish = is_deep_bearish or (market_regime == "BEARISH") or (chg < -2.5) or (sell_vol_ratio > 2.0) or has_bearish_choch
                         
-                        if is_bearish and total_score < 9.5:
+                        if is_bearish and not is_grade_a_or_s_exempt:
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                last_debug_info[participant]["rejections"][sym_c] = f"Bearish Shield (CHoCH:{has_bearish_choch}, Wick:{upper_wick_ratio:.2f}) & Score {total_score} < 9.5"
+                                last_debug_info[participant]["rejections"][sym_c] = f"Bearish Shield (CHoCH:{has_bearish_choch}, Wick:{upper_wick_ratio:.2f}) & Not Exempt"
                             coin_exit_registry[sym_c] = {
                                 "sold_at_price": price, "sold_at_time": now_ts,
                                 "exit_chg": chg, "status": "BEARISH" if not is_deep_bearish else "DEEP_BEARISH",
@@ -1837,16 +1843,15 @@ def run_robo_trade_loop():
                             continue  # STAGE 10 RULE #2 HARD VETO: Coins in BEARISH/DEEP_BEARISH strictly BLOCKED!
 
                         # COIN EXIT REGISTRY & PULLBACK GUARD:
-                        # Grade S (>= 9.5 Pts) is the ONLY exception allowed to enter in Normal Mode or Hard Lock Mode!
                         reg = coin_exit_registry.get(sym_c)
                         if reg:
                             reg_status = reg.get("status")
                             time_since_exit = now_ts - reg.get("sold_at_time", 0)
                             if reg_status in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
-                                if (time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0)) and total_score < 9.5:
+                                if (time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0)) and not is_grade_a_or_s_exempt:
                                     if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                        last_debug_info[participant]["rejections"][sym_c] = f"Exit Registry Lock ({reg_status}, {int(time_since_exit)}s) & Score {total_score} < 9.5"
-                                    continue  # NON-GRADE S STRICTLY BLOCKED! Only Grade S (>= 9.5 Pts) allowed!
+                                        last_debug_info[participant]["rejections"][sym_c] = f"Exit Registry Lock ({reg_status}, {int(time_since_exit)}s) & Not Exempt"
+                                    continue
 
                         # V125 IDEA 2: Dynamic BTC 15-Minute Flash-Dump Guard (<= -0.40%)
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
@@ -1863,26 +1868,14 @@ def run_robo_trade_loop():
                             btc_freeze_until[participant] = 0.0
 
                         is_btc_frozen = (now_check < btc_freeze_until.get(participant, 0))
-                        has_hard_veto = (has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen) and (total_score < 9.5)
+                        has_hard_veto = (has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen) and not is_grade_a_or_s_exempt
                         if has_hard_veto:
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                last_debug_info[participant]["rejections"][sym_c] = f"BTC Frozen ({is_btc_frozen}) or Hard Veto & Score {total_score} < 9.5"
+                                last_debug_info[participant]["rejections"][sym_c] = f"BTC Frozen ({is_btc_frozen}) or Hard Veto & Not Exempt"
                             continue
 
-                        # V128 GRADE A & S EXCEPTION RULE:
-                        # 1. Grade S (>= 9.5 Pts) ALWAYS bypasses Circuit Breaker.
-                        # 2. Grade A (>= 8.5 Pts) bypasses Circuit Breaker IF recent 30-min price movement is positive (chg >= 0) with expanding volume (rvol_5m >= 1.0) and NO bearish choch/pullback!
-                        chg_30m = float(c.get("change_pct_30m", chg) or 0)
-                        is_30m_positive_bullish_grade_a = (
-                            (total_score >= 8.5) and 
-                            (chg_30m >= 0) and 
-                            (chg >= 0) and 
-                            (rvol_5m >= 1.0) and 
-                            (not has_bearish_choch)
-                        )
-
                         lock_bypassed = False
-                        if total_score >= 9.5 or is_30m_positive_bullish_grade_a:
+                        if is_grade_a_or_s_exempt:
                             lock_bypassed = True  # Grade S OR 30M Positive Volume Expansion Grade A Bypasses Circuit Breaker!
                         elif is_circuit_broken:
                             continue  # HARD LOCK ACTIVE: Pullback/Bearish coins strictly BLOCKED!
