@@ -1919,37 +1919,6 @@ def run_robo_trade_loop():
                         if len(new_sched) >= 5:
                             break
 
-                    # FALLBACK: If fewer than 5 scored coins passed, fill remaining schedule slots with top volume candidates
-                    if len(new_sched) < 5:
-                        fallback_candidates = [
-                            t for t in tickers
-                            if "USDT" in t.get("symbol", "")
-                            and t.get("price", 0) > 0
-                            and t.get("symbol") not in held_symbols 
-                            and t.get("symbol") not in scheduled_symbols
-                            and str(t.get("symbol")).upper() not in excluded_symbols
-                            and coin_exit_registry.get(t.get("symbol"), {}).get("status") not in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK")
-                        ]
-                        fallback_candidates.sort(key=lambda x: x.get("quote_volume", 0), reverse=True)
-                        for c in fallback_candidates:
-                            sym = c.get("symbol", "")
-                            price = c.get("price", 100)
-                            if price <= 0 or not sym: continue
-                            score_val = 8.5
-                            entry = price * (0.9935 if market_regime == "BEARISH" else (0.9985 if market_regime == "BULLISH" else 0.9965))
-                            tier_str = f"GRADE A ({score_val:.1f} Pts)"
-                            exit_price = entry * 1.05
-                            new_sched.append({
-                                "symbol": sym,
-                                "entry_price_target": round(entry, 5),
-                                "exit_price_target":  round(exit_price, 5),
-                                "confluence_score":   score_val,
-                                "tier":               tier_str
-                            })
-                            scheduled_symbols.add(sym)
-                            if len(new_sched) >= 5:
-                                break
-
                     # STAGE 10 RULE #8: 1-MINUTE (60s) SCHEDULE ENTRY TIMER
                     last_analysis_time[participant]        = now_ts
                     last_analysis_time_global[participant] = now_ts
@@ -2007,10 +1976,8 @@ def run_robo_trade_loop():
                             entry      = sched['entry_price_target']
                             score_val  = float(sched.get('confluence_score', 8.5) or 8.5)
 
-                            # Stage 10 Rule #7 Limit Fill Retest Buffer:
-                            # Score >= 9.0 -> fill when curr_price <= entry * 1.0035 (within 0.35% discount retest)
-                            # Score 8.5 to 8.9 -> fill when curr_price <= entry * 1.0070 (immediate fill on discount retest)
-                            fill_threshold = entry * (1.0035 if score_val >= 9.0 else 1.0070)
+                            # V126 STRICT LIMIT FILL EXECUTION: Limit buys fill only when market price reaches target limit price (<= entry * 1.0005)
+                            fill_threshold = entry * 1.0005
                             
                             if curr_price > 0 and curr_price <= fill_threshold:
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
@@ -2161,8 +2128,8 @@ def run_robo_trade_loop():
                         exit_tag    = "SOLD_NEUTRAL"
                         exit_reason = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
 
-                    # PRIORITY 2: SCORE INVALIDATION
-                    elif h_veto or h_score < 8.5:
+                    # PRIORITY 2: SCORE INVALIDATION (V126: Buffer score invalidation to h_score < 7.5)
+                    elif h_veto or h_score < 7.5:
                         should_exit = True
                         exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
                         exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
