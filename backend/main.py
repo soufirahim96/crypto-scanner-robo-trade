@@ -1746,8 +1746,7 @@ def run_robo_trade_loop():
                         "is_circuit_broken": is_circuit_broken,
                         "is_recovery_phase": is_recovery_phase,
                         "market_regime": market_regime,
-                        "is_btc_frozen": (time.time() < btc_freeze_until.get(participant, 0)),
-                        "btc_freeze_remaining_sec": max(0, int(btc_freeze_until.get(participant, 0) - time.time()))
+                        "rejections": {}
                     }
 
                     all_registered = db_manager.get_all_coins()
@@ -1786,6 +1785,8 @@ def run_robo_trade_loop():
 
                         # STAGE 2: Spot Volume Floor $5M USD
                         if vol < 5000000:
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = f"Vol ${vol/1e6:.2f}M < $5M"
                             continue
 
                         # Bearish CHOCH & Volume Divergence Trap Vetoes
@@ -1817,6 +1818,8 @@ def run_robo_trade_loop():
                             rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
 
                         if rvol_5m < 2.0 and total_score < 9.5:
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = f"RVOL {rvol_5m:.2f}x < 2.0x & Score {total_score} < 9.5"
                             continue  # RVOL VETO: Block fakeout pumps with low institutional volume!
 
                         # STAGE 10 RULE #2 & STAGE 2/4: BEARISH & DEEP BEARISH HARD VETO SHIELD (V125)
@@ -1824,6 +1827,8 @@ def run_robo_trade_loop():
                         is_bearish = is_deep_bearish or (market_regime == "BEARISH") or (chg < -2.5) or (sell_vol_ratio > 2.0) or has_bearish_choch
                         
                         if is_bearish and total_score < 9.5:
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = f"Bearish Shield (CHoCH:{has_bearish_choch}, Wick:{upper_wick_ratio:.2f}) & Score {total_score} < 9.5"
                             coin_exit_registry[sym_c] = {
                                 "sold_at_price": price, "sold_at_time": now_ts,
                                 "exit_chg": chg, "status": "BEARISH" if not is_deep_bearish else "DEEP_BEARISH",
@@ -1839,6 +1844,8 @@ def run_robo_trade_loop():
                             time_since_exit = now_ts - reg.get("sold_at_time", 0)
                             if reg_status in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
                                 if (time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0)) and total_score < 9.5:
+                                    if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                        last_debug_info[participant]["rejections"][sym_c] = f"Exit Registry Lock ({reg_status}, {int(time_since_exit)}s) & Score {total_score} < 9.5"
                                     continue  # NON-GRADE S STRICTLY BLOCKED! Only Grade S (>= 9.5 Pts) allowed!
 
                         # V125 IDEA 2: Dynamic BTC 15-Minute Flash-Dump Guard (<= -0.40%)
@@ -1858,6 +1865,8 @@ def run_robo_trade_loop():
                         is_btc_frozen = (now_check < btc_freeze_until.get(participant, 0))
                         has_hard_veto = (has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen) and (total_score < 9.5)
                         if has_hard_veto:
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = f"BTC Frozen ({is_btc_frozen}) or Hard Veto & Score {total_score} < 9.5"
                             continue
 
                         # V128 GRADE A & S EXCEPTION RULE:
