@@ -1047,28 +1047,38 @@ def reset_robo_trade_arena():
     VERSION 129: RESET ALL ROBO TRADE DATA FOR A FRESH NEW START
     Clears active holdings, queued schedules, transaction history, circuit breaker locks, exit registry cooldowns, and analysis timers.
     """
-    db_manager.clear_active_holdings()
-    db_manager.clear_robo_schedules()
-    db_manager.clear_transaction_history()
-    
-    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses, btc_freeze_until
-    coin_exit_registry.clear()
-    coin_static_cooldown.clear()
-    coin_consecutive_losses.clear()
-    for k in list(last_analysis_time.keys()):
-        last_analysis_time[k] = 0
-        last_analysis_time_global[k] = 0
-        circuit_break_until[k] = 0.0
-        recovery_phase_until[k] = 0.0
-        recovery_wins[k] = 0
-        daily_loss_count[k] = 0
-        daily_drawdown_pct[k] = 0.0
-        btc_freeze_until[k] = 0.0
+    try:
+        db_manager.clear_active_holdings()
+        db_manager.clear_robo_schedules()
+        db_manager.clear_transaction_history()
+        
+        global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses, btc_freeze_until
+        coin_exit_registry.clear()
+        coin_static_cooldown.clear()
+        coin_consecutive_losses.clear()
+        for k in list(last_analysis_time.keys()):
+            last_analysis_time[k] = 0
+            last_analysis_time_global[k] = 0
+            circuit_break_until[k] = 0.0
+            recovery_phase_until[k] = 0.0
+            recovery_wins[k] = 0
+            daily_loss_count[k] = 0
+            daily_drawdown_pct[k] = 0.0
+            btc_freeze_until[k] = 0.0
 
-    return {
-        "status": "success",
-        "message": "Autonomous Robo Trade Arena has been reset to a fresh start."
-    }
+        return {
+            "status": "success",
+            "message": "Autonomous Robo Trade Arena has been reset to a fresh start."
+        }
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        safe_log(f"[RESET ERROR] {err_msg}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": err_msg
+        }
 
 
 class RunBacktestRequest(BaseModel):
