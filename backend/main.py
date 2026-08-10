@@ -2313,25 +2313,25 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     else:
-                        # V129 4-STAGE TIME-DECAY STOP LOSS MATRIX (SCALED PER LOT)
-                        # Stage 1 (0 to 5m): SL @ -$0.14/lot (-0.70% SL)
-                        # Stage 2 (5 to 15m): SL @ -$0.11/lot (-0.55% SL)
-                        # Stage 3 (15 to 30m): SL @ -$0.08/lot (-0.40% SL)
-                        # Stage 4 (After 30m): SL @ -$0.04/lot (-0.20% Breakeven Fee Cover)
+                        # V129 4-STAGE TIME-DECAY STOP LOSS MATRIX (NET PNL SCALED PER LOT AFTER 0.20% BINANCE SPOT FEES)
+                        # Commission Fee per $20 lot = $20 * 0.002 = $0.04
+                        comm_offset = 0.04
                         if holding_sec >= 1800:
-                            max_sl_dollar_per_lot = 0.04
+                            target_net_sl = 0.04
                             sl_stage_name = "Stage 4 (30m+ Stagnant Breakeven Cover)"
                         elif holding_sec >= 900:
-                            max_sl_dollar_per_lot = 0.08
+                            target_net_sl = 0.08
                             sl_stage_name = "Stage 3 (15m to 30m Decay SL)"
                         elif holding_sec >= 300:
-                            max_sl_dollar_per_lot = 0.11
+                            target_net_sl = 0.11
                             sl_stage_name = "Stage 2 (5m to 15m Decay SL)"
                         else:
-                            max_sl_dollar_per_lot = 0.14
+                            target_net_sl = 0.14
                             sl_stage_name = "Stage 1 (0 to 5m Entry SL)"
 
-                        initial_sl_dollar = max_sl_dollar_per_lot * lot_scale
+                        # Fee-Adjusted Gross Price Drop SL (Net PnL = Gross SL + $0.04 Fee)
+                        gross_sl_dollar_per_lot = max(0.0, target_net_sl - comm_offset)
+                        initial_sl_dollar = gross_sl_dollar_per_lot * lot_scale
                         initial_sl_price  = entry * (1.0 - (initial_sl_dollar / h_cap))
                         tp_target_price   = entry * 1.050
 
@@ -2340,7 +2340,7 @@ def run_robo_trade_loop():
                             exit_reason = "Standard Take Profit (+5.00%)"
                         elif curr_price <= initial_sl_price:
                             should_exit = True; exit_tag = "PULLBACK_WATCH"
-                            exit_reason = f"V129 {sl_stage_name} (-${initial_sl_dollar:.2f} Loss Cap)"
+                            exit_reason = f"V129 {sl_stage_name} (-${target_net_sl * lot_scale:.2f} Net Loss Cap)"
 
                     # EXECUTE EXIT
                     if should_exit:
