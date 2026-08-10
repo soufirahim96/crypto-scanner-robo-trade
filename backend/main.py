@@ -1786,10 +1786,11 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # V125 IDEA 1: Relative Volume (RVOL >= 2.0x) Institutional Filter
-                        vol_5m = c.get("quote_volume_5m", vol / 12.0)
-                        avg_vol_5m = max(1.0, vol / 12.0)
-                        rvol_5m = c.get("rvol", vol_5m / avg_vol_5m)
+                        # V126 IDEA 1: Relative Volume (RVOL >= 2.0x) Institutional Volume Filter
+                        rvol_5m = float(c.get("rvol") or 0.0)
+                        if rvol_5m <= 0:
+                            rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
+
                         if rvol_5m < 2.0 and total_score < 9.5:
                             continue  # RVOL VETO: Block fakeout pumps with low institutional volume!
 
