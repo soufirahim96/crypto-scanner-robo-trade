@@ -1000,9 +1000,25 @@ def clear_all_active_holdings():
     return {"status": "success", "message": "All active holdings cleared."}
 
 
+# ROBO TRADE STATE ENGINE GLOBALS
+participants_global    = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
+last_analysis_time     = {p: 0.0 for p in participants_global}
 last_analysis_time_global = {"👑 SUPREME GOD AI BOT": 0, "⚡ GROUP C OB BOT": 0}
-last_loop_error_msg = "None"
-last_debug_info = {}
+circuit_break_until    = {p: 0.0 for p in participants_global}
+recovery_phase_until   = {p: 0.0 for p in participants_global}
+recovery_wins          = {p: 0   for p in participants_global}
+daily_loss_count       = {p: 0   for p in participants_global}
+daily_drawdown_pct     = {p: 0.0 for p in participants_global}
+circuit_break_date     = {p: "" for p in participants_global}
+smart_reentry_pending  = {p: {} for p in participants_global}
+coin_static_cooldown   = {}   # {symbol: cooldown_until_ts}
+coin_consecutive_losses= {}   # {symbol: {"count": N, "last_loss_at": ts}}
+coin_exit_registry     = {}
+btc_freeze_until       = {p: 0.0 for p in participants_global}
+btc_last_chg_at_freeze = {p: 0.0 for p in participants_global}
+last_loop_error_msg    = "None"
+last_debug_info        = {}
+
 
 @app.get("/api/robo/schedules")
 def get_robo_schedules():
@@ -1035,17 +1051,19 @@ def reset_robo_trade_arena():
     db_manager.clear_robo_schedules()
     db_manager.clear_transaction_history()
     
-    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses
+    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses, btc_freeze_until
     coin_exit_registry.clear()
     coin_static_cooldown.clear()
     coin_consecutive_losses.clear()
     for k in list(last_analysis_time.keys()):
         last_analysis_time[k] = 0
         last_analysis_time_global[k] = 0
-        circuit_break_until[k] = 0
-        recovery_phase_until[k] = 0
+        circuit_break_until[k] = 0.0
+        recovery_phase_until[k] = 0.0
+        recovery_wins[k] = 0
         daily_loss_count[k] = 0
         daily_drawdown_pct[k] = 0.0
+        btc_freeze_until[k] = 0.0
 
     return {
         "status": "success",
@@ -1592,34 +1610,13 @@ def run_robo_trade_loop():
     except Exception as ex_fresh:
         safe_log(f"[V124 STARTUP ERROR] {ex_fresh}")
 
-    participants = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
-    last_analysis_time = {p: 0 for p in participants}
+    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, circuit_break_date, smart_reentry_pending, coin_static_cooldown, coin_consecutive_losses, coin_exit_registry, btc_freeze_until, btc_last_chg_at_freeze
+    participants = participants_global
     last_db_prune_time = time.time()
     last_daily_backtest_time = time.time()
 
-    # Circuit Breaker & Recovery State
-    circuit_break_until    = {p: 0.0 for p in participants}
-    recovery_phase_until   = {p: 0.0 for p in participants}
-    recovery_wins          = {p: 0   for p in participants}
-    daily_loss_count       = {p: 0   for p in participants}
-    daily_drawdown_pct     = {p: 0.0 for p in participants}
-    circuit_break_date     = {p: "" for p in participants}
-
-    # Smart Re-Entry State
-    smart_reentry_pending  = {p: {} for p in participants}
-
-    # Static Exit Cooldown Registry & 2x Consecutive Loss Blacklist
-    coin_static_cooldown     = {}   # {symbol: cooldown_until_ts}
-    coin_consecutive_losses  = {}   # {symbol: {"count": N, "last_loss_at": ts}}
-
-    # Coin Exit Registry (Pullback/Bearish guard state machine)
-    coin_exit_registry       = {}
-
-    # BTC Sensor & Emergency Exit State
     btc_prev_chg_sample    = 0.0
     btc_emergency_exit_active = False
-    btc_freeze_until       = {p: 0.0 for p in participants}
-    btc_last_chg_at_freeze = {p: 0.0 for p in participants}
 
     while True:
         try:
