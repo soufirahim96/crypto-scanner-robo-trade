@@ -1775,17 +1775,35 @@ def run_robo_trade_loop():
                         if has_fakeout_wick or has_volume_divergence:
                             has_bearish_choch = True
 
-                        # STAGE 10 RULE #2 & STAGE 2/4: BEARISH & DEEP BEARISH HARD VETO SHIELD (V124)
+                        # ORDER FLOW SCORING ENGINE ACROSS ALL 481+ COINS (Max 10.0 Pts)
+                        sweep_pts   = 2.5 if chg > 1.2 else 2.2
+                        cvd_pts     = 2.5 if vol > 7500000 else 2.1
+                        funding_pts = 2.0 if chg >= 0 else 1.8
+                        bos_pts     = 1.5 if chg > 1.8 else 1.2
+                        in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
+                        fvg_pts     = 1.5 if in_fvg_retest else 0.0
+                        total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
+                        if chg < 0:
+                            total_score = max(0.0, total_score - 2.0)
+
+                        # V125 IDEA 1: Relative Volume (RVOL >= 2.0x) Institutional Filter
+                        vol_5m = c.get("quote_volume_5m", vol / 12.0)
+                        avg_vol_5m = max(1.0, vol / 12.0)
+                        rvol_5m = c.get("rvol", vol_5m / avg_vol_5m)
+                        if rvol_5m < 2.0 and total_score < 9.5:
+                            continue  # RVOL VETO: Block fakeout pumps with low institutional volume!
+
+                        # STAGE 10 RULE #2 & STAGE 2/4: BEARISH & DEEP BEARISH HARD VETO SHIELD (V125)
                         is_deep_bearish = (chg <= -5.0) or (sell_vol_ratio >= 2.5) or (sym_c in coin_static_cooldown) or (coin_consecutive_losses.get(sym_c, {}).get("count", 0) >= 2)
                         is_bearish = is_deep_bearish or (market_regime == "BEARISH") or (chg < -2.5) or (sell_vol_ratio > 2.0) or has_bearish_choch
                         
-                        if is_bearish:
+                        if is_bearish and total_score < 9.5:
                             coin_exit_registry[sym_c] = {
                                 "sold_at_price": price, "sold_at_time": now_ts,
                                 "exit_chg": chg, "status": "BEARISH" if not is_deep_bearish else "DEEP_BEARISH",
                                 "bearish_retry_until": now_ts + 1800
                             }
-                            continue  # STAGE 10 RULE #2 HARD VETO: Coins in BEARISH or DEEP_BEARISH status/regime are STRICTLY BLOCKED!
+                            continue  # STAGE 10 RULE #2 HARD VETO: Coins in BEARISH/DEEP_BEARISH strictly BLOCKED!
 
                         # COIN EXIT REGISTRY & PULLBACK GUARD:
                         # Grade S (>= 9.5 Pts) is the ONLY exception allowed to enter in Normal Mode or Hard Lock Mode!
@@ -1797,13 +1815,16 @@ def run_robo_trade_loop():
                                 if (time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0)) and total_score < 9.5:
                                     continue  # NON-GRADE S STRICTLY BLOCKED! Only Grade S (>= 9.5 Pts) allowed!
 
-                        # BTC 180-second Freeze Engine
+                        # V125 IDEA 2: Dynamic BTC 15-Minute Flash-Dump Guard (<= -0.40%)
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
                         btc_chg_val = btc_ticker.get("change_pct", 0) if btc_ticker else 0
+                        btc_chg_15m = btc_ticker.get("change_pct_15m", btc_chg_val) if btc_ticker else 0
                         now_check = time.time()
-                        if btc_chg_val < -2.5:
+
+                        is_btc_flash_dumping = (btc_chg_15m <= -0.40) or (btc_chg_val < -2.5)
+                        if is_btc_flash_dumping:
                             if now_check >= btc_freeze_until.get(participant, 0):
-                                btc_freeze_until[participant] = now_check + 180
+                                btc_freeze_until[participant] = now_check + 900  # 15-minute global buying freeze
                                 btc_last_chg_at_freeze[participant] = btc_chg_val
                         elif now_check >= btc_freeze_until.get(participant, 0) and btc_freeze_until.get(participant, 0) > 0:
                             btc_freeze_until[participant] = 0.0
@@ -1813,18 +1834,7 @@ def run_robo_trade_loop():
                         if has_hard_veto:
                             continue
 
-                        # V124 Order Flow Scoring Engine Across All 481+ Coins (Max 10.0 Pts)
-                        sweep_pts   = 2.5 if chg > 1.2 else 2.2
-                        cvd_pts     = 2.5 if vol > 7500000 else 2.1
-                        funding_pts = 2.0 if chg >= 0 else 1.8
-                        bos_pts     = 1.5 if chg > 1.8 else 1.2
-                        in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
-                        fvg_pts     = 1.5 if in_fvg_retest else 0.0
-                        total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
-                        if chg < 0:
-                            total_score = max(0.0, total_score - 2.0)
-
-                        # V124 SOLE EXCEPTION RULE:
+                        # V125 SOLE EXCEPTION RULE:
                         # ONLY GRADE S (>= 9.5 Pts) IS ALLOWED TO ENTER IN NORMAL MODE OR HARD LOCK MODE!
                         lock_bypassed = False
                         if total_score >= 9.5:
@@ -2189,41 +2199,55 @@ def run_robo_trade_loop():
                     peak_pnl_dollar = (highest_p - entry) * amount
                     curr_pnl_dollar = (curr_price - entry) * amount
 
-                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (10 PnL STAGES)
+                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (12 PnL STAGES - V125)
                     # 1. PnL >= $0.10 -> Lock SL @ $0.05
                     # 2. PnL >= $0.15 -> Lock SL @ $0.10
                     # 3. PnL >= $0.20 -> Lock SL @ $0.15
                     # 4. PnL >= $0.30 -> Lock SL @ $0.20
                     # 5. PnL >= $0.40 -> Lock SL @ $0.30
                     # 6. PnL >= $0.50 -> Lock SL @ $0.40
-                    # 7. PnL >= $1.00 -> Lock SL @ $0.80
-                    # 8. PnL >= $1.50 -> Lock SL @ $1.00
-                    # 9. PnL >= $2.00 -> Lock SL @ $1.70
-                    # 10. PnL >= $3.00 -> Lock SL @ $2.70
+                    # 7. PnL >= $0.70 -> Lock SL @ $0.60
+                    # 8. PnL >= $0.90 -> Lock SL @ $0.75
+                    # 9. PnL >= $1.00 -> Lock SL @ $0.80
+                    # 10. PnL >= $1.50 -> Lock SL @ $1.00
+                    # 11. PnL >= $2.00 -> Lock SL @ $1.70
+                    # 12. PnL >= $3.00 -> Lock SL @ $2.70
                     if peak_pnl_dollar >= 3.00:
                         target_sl_dollar = 2.70
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 10 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$2.70 PnL)"
+                            exit_reason = f"Stage 12 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$2.70 PnL)"
                     elif peak_pnl_dollar >= 2.00:
                         target_sl_dollar = 1.70
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 9 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.70 PnL)"
+                            exit_reason = f"Stage 11 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.70 PnL)"
                     elif peak_pnl_dollar >= 1.50:
                         target_sl_dollar = 1.00
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 8 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.00 PnL)"
+                            exit_reason = f"Stage 10 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.00 PnL)"
                     elif peak_pnl_dollar >= 1.00:
                         target_sl_dollar = 0.80
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 7 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.80 PnL)"
+                            exit_reason = f"Stage 9 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.80 PnL)"
+                    elif peak_pnl_dollar >= 0.90:
+                        target_sl_dollar = 0.75
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 8 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.75 PnL)"
+                    elif peak_pnl_dollar >= 0.70:
+                        target_sl_dollar = 0.60
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 7 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.60 PnL)"
                     elif peak_pnl_dollar >= 0.50:
                         target_sl_dollar = 0.40
                         sl_p = entry + (target_sl_dollar / amount)
