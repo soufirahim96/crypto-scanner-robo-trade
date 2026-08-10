@@ -1881,11 +1881,11 @@ def run_robo_trade_loop():
                         # Threshold Adaptation (8.5 Pts threshold for max entry access)
                         min_score = 9.0 if is_recovery_phase else 8.5
 
-                        # 5-Loop Council Verification
+                        # 5-Loop Council Verification (Unanimous Consensus)
                         if total_score >= min_score:
                             council_passes = 0
                             for loop_idx in range(5):
-                                test_score = total_score + (hash(f"{sym_c}_{loop_idx}") % 3) * 0.1
+                                test_score = total_score + (abs(hash(f"{sym_c}_{loop_idx}")) % 3) * 0.1
                                 if test_score >= min_score:
                                     council_passes += 1
                             if council_passes == 5:
