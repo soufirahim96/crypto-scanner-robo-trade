@@ -1930,11 +1930,11 @@ def run_robo_trade_loop():
                         is_bullish_trend  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
 
                         if score_val >= 9.0:
-                            entry = price * 0.9973  # Score >= 9.0 -> 0.27% discount cushion offset (V130)
+                            entry = price * 0.9982  # Score >= 9.0 -> 0.18% discount cushion offset (V131)
                         elif is_pullback_trend:
                             entry = price * 0.9935  # Score 8.5 to 8.9 Pullback -> 0.65% discount cushion offset
                         elif is_bullish_trend:
-                            entry = price * 0.9973  # Score 8.5 to 8.9 Bullish -> 0.27% discount cushion offset (V130)
+                            entry = price * 0.9982  # Score 8.5 to 8.9 Bullish Grade A -> 0.18% discount cushion offset (V131)
                         else:
                             entry = price * 0.9965  # Score 8.5 to 8.9 Sideways -> 0.35% discount cushion offset
 
