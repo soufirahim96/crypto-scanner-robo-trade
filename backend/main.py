@@ -2189,35 +2189,77 @@ def run_robo_trade_loop():
                     peak_pnl_dollar = (highest_p - entry) * amount
                     curr_pnl_dollar = (curr_price - entry) * amount
 
-                    if is_gr_s_holding and (peak_pnl_pct >= 10.0 or curr_pnl_pct >= 10.0):
-                        sl_p = entry * 1.100
-                        if curr_price <= sl_p or curr_pnl_pct >= 10.0:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"🏆 Grade S Auto Lock SL (Peak:+{peak_pnl_pct:.1f}%, Locked:+10.0% SL)"
-                    elif peak_pnl_dollar >= (2.50 * (h_cap / 20.0)) or peak_pnl_pct >= 10.0:
-                        lock_dollar = 2.00 * (h_cap / 20.0)
-                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
+                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (10 PnL STAGES)
+                    # 1. PnL >= $0.10 -> Lock SL @ $0.05
+                    # 2. PnL >= $0.15 -> Lock SL @ $0.10
+                    # 3. PnL >= $0.20 -> Lock SL @ $0.15
+                    # 4. PnL >= $0.30 -> Lock SL @ $0.20
+                    # 5. PnL >= $0.40 -> Lock SL @ $0.30
+                    # 6. PnL >= $0.50 -> Lock SL @ $0.40
+                    # 7. PnL >= $1.00 -> Lock SL @ $0.80
+                    # 8. PnL >= $1.50 -> Lock SL @ $1.00
+                    # 9. PnL >= $2.00 -> Lock SL @ $1.70
+                    # 10. PnL >= $3.00 -> Lock SL @ $2.70
+                    if peak_pnl_dollar >= 3.00:
+                        target_sl_dollar = 2.70
+                        sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 5 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
-                    elif peak_pnl_dollar >= (1.20 * (h_cap / 20.0)) or peak_pnl_pct >= 6.0:
-                        lock_dollar = 1.00 * (h_cap / 20.0)
-                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
+                            exit_reason = f"Stage 10 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$2.70 PnL)"
+                    elif peak_pnl_dollar >= 2.00:
+                        target_sl_dollar = 1.70
+                        sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 4 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
-                    elif peak_pnl_dollar >= (0.80 * (h_cap / 20.0)) or peak_pnl_pct >= 4.0:
-                        lock_dollar = 0.50 * (h_cap / 20.0)
-                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
+                            exit_reason = f"Stage 9 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.70 PnL)"
+                    elif peak_pnl_dollar >= 1.50:
+                        target_sl_dollar = 1.00
+                        sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 3 Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Profit)"
-                    elif peak_pnl_dollar >= (0.30 * (h_cap / 20.0)) or peak_pnl_pct >= 1.5:
-                        lock_dollar = 0.07 * (h_cap / 20.0)
-                        sl_p = entry * (1.0 + (lock_dollar / h_cap))
+                            exit_reason = f"Stage 8 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$1.00 PnL)"
+                    elif peak_pnl_dollar >= 1.00:
+                        target_sl_dollar = 0.80
+                        sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 2 Fee Shield Cent Lock (Peak PnL: ${peak_pnl_dollar:.2f}, Locked +${lock_dollar:.2f} Fee Shield)"
+                            exit_reason = f"Stage 7 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.80 PnL)"
+                    elif peak_pnl_dollar >= 0.50:
+                        target_sl_dollar = 0.40
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 6 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.40 PnL)"
+                    elif peak_pnl_dollar >= 0.40:
+                        target_sl_dollar = 0.30
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 5 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.30 PnL)"
+                    elif peak_pnl_dollar >= 0.30:
+                        target_sl_dollar = 0.20
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 4 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.20 PnL)"
+                    elif peak_pnl_dollar >= 0.20:
+                        target_sl_dollar = 0.15
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 3 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.15 PnL)"
+                    elif peak_pnl_dollar >= 0.15:
+                        target_sl_dollar = 0.10
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 2 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.10 PnL)"
+                    elif peak_pnl_dollar >= 0.10:
+                        target_sl_dollar = 0.05
+                        sl_p = entry + (target_sl_dollar / amount)
+                        if curr_price <= sl_p:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +$0.05 PnL)"
                     else:
                         initial_sl_dollar = 0.18 * (h_cap / 20.0)
                         initial_sl_price  = entry * (1.0 - (initial_sl_dollar / h_cap))
