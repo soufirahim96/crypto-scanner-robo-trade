@@ -2235,7 +2235,7 @@ def run_robo_trade_loop():
                     # Stage 3: Peak PnL >= $0.80 or Peak PnL >= +4.0%  -> Lock $0.50 profit (+$1.00 on $40 Grade S)
                     # Stage 2: Peak PnL >= $0.30 or Peak PnL >= +1.5%  -> Lock $0.07 profit (+$0.14 on $40 Grade S, covers $0.04 fee)
                     # Stage 1 (Initial SL): Max loss -$0.18 per $20 slot (-0.90% SL)
-                    peak_pnl_dollar = (highest_price - entry) * amount
+                    peak_pnl_dollar = (highest_p - entry) * amount
                     curr_pnl_dollar = (curr_price - entry) * amount
 
                     if is_gr_s_holding and (peak_pnl_pct >= 10.0 or curr_pnl_pct >= 10.0):
