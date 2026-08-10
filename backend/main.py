@@ -1745,7 +1745,9 @@ def run_robo_trade_loop():
                         "tickers_count": len(tickers),
                         "is_circuit_broken": is_circuit_broken,
                         "is_recovery_phase": is_recovery_phase,
-                        "market_regime": market_regime
+                        "market_regime": market_regime,
+                        "is_btc_frozen": (time.time() < btc_freeze_until.get(participant, 0)),
+                        "btc_freeze_remaining_sec": max(0, int(btc_freeze_until.get(participant, 0) - time.time()))
                     }
 
                     all_registered = db_manager.get_all_coins()
