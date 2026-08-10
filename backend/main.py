@@ -1053,12 +1053,17 @@ def reset_robo_trade_arena():
         db_manager.clear_transaction_history()
         
         global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses, btc_freeze_until
-        coin_exit_registry.clear()
-        coin_static_cooldown.clear()
-        coin_consecutive_losses.clear()
-        for k in list(last_analysis_time.keys()):
-            last_analysis_time[k] = 0
-            last_analysis_time_global[k] = 0
+        
+        try: coin_exit_registry.clear()
+        except Exception: pass
+        try: coin_static_cooldown.clear()
+        except Exception: pass
+        try: coin_consecutive_losses.clear()
+        except Exception: pass
+        
+        for k in ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]:
+            last_analysis_time[k] = 0.0
+            last_analysis_time_global[k] = 0.0
             circuit_break_until[k] = 0.0
             recovery_phase_until[k] = 0.0
             recovery_wins[k] = 0
