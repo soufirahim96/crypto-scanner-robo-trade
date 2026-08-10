@@ -1787,17 +1787,15 @@ def run_robo_trade_loop():
                             }
                             continue  # STAGE 10 RULE #2 HARD VETO: Coins in BEARISH or DEEP_BEARISH status/regime are STRICTLY BLOCKED!
 
-                        # UNIVERSAL BEARISH & PULLBACK TAG VETO (APPLIES UNCONDITIONALLY TO ALL COINS IN NORMAL & LOCK MODES)
-                        # Once a coin is tagged with BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK,
-                        # NO ENTRIES ARE ALLOWED in Normal Mode OR Hard Lock Mode until 30m cooldown expires & status is CLEARED!
+                        # COIN EXIT REGISTRY & PULLBACK GUARD:
+                        # Grade S (>= 9.5 Pts) is the ONLY exception allowed to enter in Normal Mode or Hard Lock Mode!
                         reg = coin_exit_registry.get(sym_c)
                         if reg:
                             reg_status = reg.get("status")
                             time_since_exit = now_ts - reg.get("sold_at_time", 0)
-
                             if reg_status in ("BEARISH", "DEEP_BEARISH", "PULLBACK_WATCH", "EARLY_WARNING_PULLBACK"):
-                                if time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0):
-                                    continue  # UNIVERSAL HARD VETO: Bearish/Pullback tagged coin strictly blocked in ALL modes!
+                                if (time_since_exit < 1800 or now_ts < reg.get("bearish_retry_until", 0)) and total_score < 9.5:
+                                    continue  # NON-GRADE S STRICTLY BLOCKED! Only Grade S (>= 9.5 Pts) allowed!
 
                         # BTC 180-second Freeze Engine
                         btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
@@ -1811,7 +1809,7 @@ def run_robo_trade_loop():
                             btc_freeze_until[participant] = 0.0
 
                         is_btc_frozen = (now_check < btc_freeze_until.get(participant, 0))
-                        has_hard_veto = has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen
+                        has_hard_veto = (has_bearish_choch or (sell_vol_ratio > 2.0) or is_btc_frozen) and (total_score < 9.5)
                         if has_hard_veto:
                             continue
 
@@ -1826,33 +1824,13 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # V124 CIRCUIT BREAKER LOCK EXCEPTION ENGINE:
-                        # 1. Grade S (>= 9.5 Pts) ALWAYS BYPASSES ALL LOCKS
-                        # 2. Other coins under Circuit Breaker lock MUST PASS ALL 4 EXCEPTIONS (4 OF 4 REQUIRED):
-                        #    e1: Confluence Score >= 8.5 Pts
-                        #    e2: LATEST 3 Closed 5M Candles are ALL Bullish (close > open on last 3 completed 5m bars)
-                        #    e3: Price & Volume Increasing Together
-                        #    e4: Bullish 15M FVG Conditioning Retest
-                        # 3. Coin MUST NOT be tagged in BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK
-                        e1 = (total_score >= 8.5)
-                        e2 = has_latest_3_closed_5m_bullish_candles(sym_c)
-                        e3 = e2 and (vol >= 5000000)
-                        e4 = in_fvg_retest
-
+                        # V124 SOLE EXCEPTION RULE:
+                        # ONLY GRADE S (>= 9.5 Pts) IS ALLOWED TO ENTER IN NORMAL MODE OR HARD LOCK MODE!
                         lock_bypassed = False
                         if total_score >= 9.5:
-                            lock_bypassed = True  # Grade S ALWAYS allowed to enter for both bots!
+                            lock_bypassed = True  # Grade S (>= 9.5 Pts) is ALWAYS allowed to make an entry!
                         elif is_circuit_broken:
-                            # STRICT VETO: Coin status/tag CANNOT be BEARISH, DEEP_BEARISH, PULLBACK_WATCH, or EARLY_WARNING_PULLBACK
-                            if is_bearish or is_previously_tagged:
-                                continue  # Hard vetoed during lock!
-
-                            # ALL 4 EXCEPTIONS MUST BE MET (4 OF 4 REQUIRED)
-                            passed_all = (e1 and e2 and e3 and e4)
-                            if passed_all:
-                                lock_bypassed = True
-                            else:
-                                continue  # Failed to pass ALL 4 exceptions during lock — block!
+                            continue  # HARD LOCK ACTIVE: Non-Grade S (< 9.5 Pts) strictly BLOCKED!
                         else:
                             lock_bypassed = True
 
