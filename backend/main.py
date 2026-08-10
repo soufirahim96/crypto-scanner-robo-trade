@@ -1028,14 +1028,17 @@ def get_robo_schedules():
 @app.post("/api/robo/reset")
 def reset_robo_trade_arena():
     """
-    VERSION 128: RESET ALL ROBO TRADE DATA FOR A FRESH NEW START
-    Clears active holdings, queued schedules, transaction history, circuit breaker locks, and analysis timers.
+    VERSION 129: RESET ALL ROBO TRADE DATA FOR A FRESH NEW START
+    Clears active holdings, queued schedules, transaction history, circuit breaker locks, exit registry cooldowns, and analysis timers.
     """
     db_manager.clear_active_holdings()
     db_manager.clear_robo_schedules()
     db_manager.clear_transaction_history()
     
-    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, daily_loss_count, daily_drawdown_pct
+    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, daily_loss_count, daily_drawdown_pct, coin_exit_registry, coin_static_cooldown, coin_consecutive_losses
+    coin_exit_registry.clear()
+    coin_static_cooldown.clear()
+    coin_consecutive_losses.clear()
     for k in list(last_analysis_time.keys()):
         last_analysis_time[k] = 0
         last_analysis_time_global[k] = 0
