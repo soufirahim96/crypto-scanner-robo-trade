@@ -1783,6 +1783,10 @@ def run_robo_trade_loop():
                         sym_c      = c.get("symbol", "")
                         if price <= 0: continue
 
+                        rvol_5m = float(c.get("rvol") or 0.0)
+                        if rvol_5m <= 0:
+                            rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
+
                         # STAGE 2: Spot Volume Floor $5M USD
                         if vol < 5000000:
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
@@ -1811,11 +1815,6 @@ def run_robo_trade_loop():
                         total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
-
-                        # V126 IDEA 1: Relative Volume (RVOL >= 2.0x) Institutional Volume Filter
-                        rvol_5m = float(c.get("rvol") or 0.0)
-                        if rvol_5m <= 0:
-                            rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
 
                         # V128 GRADE A & S EXCEPTION RULE PRE-EVALUATION:
                         chg_30m = float(c.get("change_pct_30m", chg) or 0)
