@@ -2345,11 +2345,16 @@ def run_robo_trade_loop():
                             sl_stage_name = "Stage 1 (0 to 3m Entry SL -$0.06)"
                             is_profit_lock_stage = False
 
-                        tp_target_price = entry * 1.050
+                        # V134 MULTI-TIER HARD TAKE PROFIT TARGETS:
+                        # Grade S (h_score >= 9.5): +10.00% Hard TP (+ $2.00 / lot)
+                        # Grade A (h_score < 9.5): +2.50% Hard TP (+ $0.50 / lot)
+                        tp_mult = 1.100 if is_gr_s_holding else 1.0250
+                        tp_target_price = entry * tp_mult
 
                         if curr_price >= tp_target_price:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = "Standard Take Profit (+5.00%)"
+                            tp_pct_str = "+10.00%" if is_gr_s_holding else "+2.50%"
+                            exit_reason = f"Standard Take Profit ({tp_pct_str})"
                         elif curr_price <= initial_sl_price:
                             should_exit = True
                             exit_tag = "CLEARED_REENTRY_PRIORITY" if is_profit_lock_stage else "PULLBACK_WATCH"
