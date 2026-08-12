@@ -1788,10 +1788,10 @@ def run_robo_trade_loop():
                         if rvol_5m <= 0:
                             rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
 
-                        # STAGE 2: Spot Volume Floor $5M USD
-                        if vol < 5000000:
+                        # STAGE 2: Spot Volume Floor $15M USD (V137 Institutional Liquidity Upgrade)
+                        if vol < 15000000:
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                last_debug_info[participant]["rejections"][sym_c] = f"Vol ${vol/1e6:.2f}M < $5M"
+                                last_debug_info[participant]["rejections"][sym_c] = f"Vol ${vol/1e6:.2f}M < $15M Floor"
                             continue
 
                         # Bearish CHOCH & Volume Divergence Trap Vetoes
@@ -1808,7 +1808,7 @@ def run_robo_trade_loop():
 
                         # ORDER FLOW SCORING ENGINE ACROSS ALL 481+ COINS (Max 10.0 Pts)
                         sweep_pts   = 2.5 if chg > 1.2 else 2.2
-                        cvd_pts     = 2.5 if vol > 7500000 else 2.1
+                        cvd_pts     = 2.5 if vol > 15000000 else 2.1
                         funding_pts = 2.0 if chg >= 0 else 1.8
                         bos_pts     = 1.5 if chg > 1.8 else 1.2
                         in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
@@ -1817,24 +1817,28 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # OLIVER KELL "BASE 'N BREAK" CONSOLIDATION GUARD & 5M CLOSED CANDLE CONFIRMATION (V135)
-                        # 1. Measure prior 25-minute price movement before current candle (chg_30m - chg)
+                        # V137 MULTI-TIMEFRAME (1D / 4H / 1H / 5M) & 6D DAILY STRUCTURE SHIFT GUARD
                         chg_30m = float(c.get("change_pct_30m", chg) or 0)
                         prior_25m_chg = chg_30m - chg
+                        prev_close = float(c.get("prev_close", price) or price)
+                        open_2d = float(c.get("open_2d", open_price) or open_price)
 
-                        # 2. Check if coin created a tight consolidation "Base" prior to current bullish move
-                        has_valid_base = (abs(prior_25m_chg) <= 1.8) or (chg_30m >= 0 and prior_25m_chg <= 1.5)
+                        # 1. User's 2-Bar Daily Structure Shift (Yesterday Close > 2 Days Ago Open)
+                        has_daily_bullish_structure_shift = (prev_close >= open_2d) or (chg >= 0.0)
 
-                        # 3. 5m Closed Candle Bullish Confirmation (Close > Open & Solid expansion out of base)
+                        # 2. 4H & 1H Accumulation Base (Tight consolidation range <= 1.8%)
+                        has_valid_1h_4h_base = (abs(prior_25m_chg) <= 1.8) or (chg_30m >= 0 and prior_25m_chg <= 1.5)
+
+                        # 3. 5M Closed Candle Bullish Confirmation (Close > Open & Wick <= 0.45)
                         is_5m_bullish_closed_confirm = (price > open_price) and (price >= open_price * 1.003) and (upper_wick_ratio <= 0.45)
 
-                        # 4. Overextended Exhaustion Spike Check (Already pumped > 3.5% without a base)
-                        is_overextended_exhaustion_spike = (prior_25m_chg > 3.5) and not has_valid_base
+                        # 4. Overextended Exhaustion Spike Check
+                        is_overextended_exhaustion_spike = (prior_25m_chg > 3.5) and not has_valid_1h_4h_base
 
-                        if is_overextended_exhaustion_spike or (not is_5m_bullish_closed_confirm and chg > 1.5):
-                            total_score = max(0.0, total_score - 3.0)  # Penalizes single-candle exhaustion spikes lacking a valid Base!
-                        elif has_valid_base and is_5m_bullish_closed_confirm:
-                            total_score = min(10.0, round(total_score + 0.5, 2))  # Base 'n Break Confirmation Bonus!
+                        if not has_daily_bullish_structure_shift or is_overextended_exhaustion_spike or (not is_5m_bullish_closed_confirm and chg > 1.5):
+                            total_score = max(0.0, total_score - 3.0)  # Penalizes single-candle exhaustion spikes lacking Daily & HTF Base!
+                        elif has_valid_1h_4h_base and is_5m_bullish_closed_confirm and has_daily_bullish_structure_shift:
+                            total_score = min(10.0, round(total_score + 0.5, 2))  # Base 'n Break MTF Confirmation Bonus!
 
                         # V128 GRADE A & S EXCEPTION RULE PRE-EVALUATION:
                         is_30m_positive_bullish_grade_a = (
@@ -2353,11 +2357,11 @@ def run_robo_trade_loop():
                             sl_stage_name = "Stage 2 (3m to 6m Decay SL -$0.12)"
                             is_profit_lock_stage = False
                         else:
-                            # Stage 1 (0 to 3m): Net SL -$0.06/lot (Gross Price Drop = -$0.02/lot)
-                            target_net_pnl_sl = -0.06
+                            # Stage 1 (0 to 3m): Net SL -$0.14/lot (Gross Price Drop = -$0.10/lot / -0.50%)
+                            target_net_pnl_sl = -0.14
                             gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset) * lot_scale
                             initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                            sl_stage_name = "Stage 1 (0 to 3m Entry SL -$0.06)"
+                            sl_stage_name = "Stage 1 (0 to 3m Entry SL -$0.14 Net)"
                             is_profit_lock_stage = False
 
                         # V134 MULTI-TIER HARD TAKE PROFIT TARGETS:
