@@ -1602,14 +1602,42 @@ def run_robo_trade_loop():
     5. Early Warning Exit Registry Guard: Re-entry blocked UNLESS price drops <= -5.0% OR 5m candle closes green (> +0.1%).
     6. 8-Tier Trailing Stop: Lock +0.6%, +1.0%, +1.5%, +2.5%, +3.5%, +5.0%, +7.0%, +9.0%.
     7. Circuit Breakers: 3 losses or 5% drawdown -> 24h lockout & 48h recovery mode.
-    8. 45-Min Static Coin Exit + 90-min cooldown.
-    9. Smart Re-Entry (Stage 11 MCS scoring on profitable exits).
-    10. 100% Spot Only ($20 Flat Allocation, 0x Leverage).
     """
-    import random
-    import sys
-    import sqlite3
-    import datetime
+
+klines_cache = {}
+
+def fetch_symbol_klines_cached(symbol: str, interval: str, limit: int = 6):
+    now = time.time()
+    cache_key = f"{symbol}_{interval}_{limit}"
+    cached = klines_cache.get(cache_key)
+    ttl = 300 if interval in ["1d", "4h", "1h"] else 15
+    if cached and (now - cached["ts"] < ttl):
+        return cached["data"]
+
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+    try:
+        r = requests.get(url, timeout=3)
+        if r.status_code == 200:
+            raw = r.json()
+            parsed = []
+            for item in raw:
+                parsed.append({
+                    "open": float(item[1]),
+                    "high": float(item[2]),
+                    "low": float(item[3]),
+                    "close": float(item[4]),
+                    "volume": float(item[5])
+                })
+            klines_cache[cache_key] = {"ts": now, "data": parsed}
+            return parsed
+    except Exception:
+        pass
+    return []
+
+def run_robo_trade_loop():
+    """
+    VERSION 124 HYBRID LOGIC MASTER AUTONOMOUS ROBO TRADER
+    """
     try:
         if sys.stdout and hasattr(sys.stdout, "reconfigure"):
             sys.stdout.reconfigure(encoding='utf-8', errors='ignore')
@@ -1817,28 +1845,52 @@ def run_robo_trade_loop():
                         if chg < 0:
                             total_score = max(0.0, total_score - 2.0)
 
-                        # V137 MULTI-TIMEFRAME (1D / 4H / 1H / 5M) & 6D DAILY STRUCTURE SHIFT GUARD
+                        # V138 PROFESSIONAL TRADER ENGINE (POINTS 1, 2, 3 UPGRADES)
+                        # Point 1: Real Historical K-lines Fetcher (Binance REST API /api/v3/klines)
+                        k_1d = fetch_symbol_klines_cached(sym_c, "1d", limit=6)
+                        k_5m = fetch_symbol_klines_cached(sym_c, "5m", limit=6)
+                        btc_5m = fetch_symbol_klines_cached("BTCUSDT", "5m", limit=3)
+
+                        # Point 3: Strict BTC 5-Minute Real-Time Momentum Gate
+                        is_btc_5m_bullish = True
+                        if btc_5m and len(btc_5m) >= 2:
+                            is_btc_5m_bullish = (btc_5m[-1]["close"] >= btc_5m[-1]["open"])
+
+                        if not is_btc_5m_bullish and market_regime != "SUPER_BULLISH":
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = "BTC 5M Red Candle Gate (Longs Frozen)"
+                            continue  # Point 3: Freeze altcoin long entries when BTC 5m candle is RED!
+
+                        # Point 1: True 1D Daily 2-Bar Structure Shift (Yesterday Close > 2 Days Ago Open)
+                        has_daily_bullish_structure_shift = True
+                        if k_1d and len(k_1d) >= 3:
+                            yesterday_close = k_1d[-2]["close"]
+                            two_days_ago_open = k_1d[-3]["open"]
+                            has_daily_bullish_structure_shift = (yesterday_close >= two_days_ago_open)
+
+                        # 4H & 1H Accumulation Base (Tight consolidation range <= 1.8%)
                         chg_30m = float(c.get("change_pct_30m", chg) or 0)
                         prior_25m_chg = chg_30m - chg
-                        prev_close = float(c.get("prev_close", price) or price)
-                        open_2d = float(c.get("open_2d", open_price) or open_price)
-
-                        # 1. User's 2-Bar Daily Structure Shift (Yesterday Close > 2 Days Ago Open)
-                        has_daily_bullish_structure_shift = (prev_close >= open_2d) or (chg >= 0.0)
-
-                        # 2. 4H & 1H Accumulation Base (Tight consolidation range <= 1.8%)
                         has_valid_1h_4h_base = (abs(prior_25m_chg) <= 1.8) or (chg_30m >= 0 and prior_25m_chg <= 1.5)
 
-                        # 3. 5M Closed Candle Bullish Confirmation (Close > Open & Wick <= 0.45)
-                        is_5m_bullish_closed_confirm = (price > open_price) and (price >= open_price * 1.003) and (upper_wick_ratio <= 0.45)
+                        # Point 2: 3-Candle "Breakout + Retest + Rebound" Confirmation (Never Buy Candle #1 Spike!)
+                        is_3candle_retest_confirmed = False
+                        if k_5m and len(k_5m) >= 3:
+                            c1, c2, c3 = k_5m[-3], k_5m[-2], k_5m[-1]
+                            is_c1_breakout = (c1["close"] > c1["open"]) and (c1["close"] >= c1["open"] * 1.002)
+                            is_c2_retest   = (c2["low"] <= c1["close"] * 1.001) and (c2["close"] >= c1["open"] * 0.999)
+                            is_c3_rebound  = (c3["close"] > c3["open"]) and (c3["close"] >= c2["high"])
+                            is_3candle_retest_confirmed = is_c1_breakout and is_c2_retest and is_c3_rebound
+                        else:
+                            is_3candle_retest_confirmed = (price > open_price) and (upper_wick_ratio <= 0.45)
 
-                        # 4. Overextended Exhaustion Spike Check
+                        # Overextended Exhaustion Spike Check
                         is_overextended_exhaustion_spike = (prior_25m_chg > 3.5) and not has_valid_1h_4h_base
 
-                        if not has_daily_bullish_structure_shift or is_overextended_exhaustion_spike or (not is_5m_bullish_closed_confirm and chg > 1.5):
-                            total_score = max(0.0, total_score - 3.0)  # Penalizes single-candle exhaustion spikes lacking Daily & HTF Base!
-                        elif has_valid_1h_4h_base and is_5m_bullish_closed_confirm and has_daily_bullish_structure_shift:
-                            total_score = min(10.0, round(total_score + 0.5, 2))  # Base 'n Break MTF Confirmation Bonus!
+                        if not has_daily_bullish_structure_shift or is_overextended_exhaustion_spike or not is_3candle_retest_confirmed:
+                            total_score = max(0.0, total_score - 3.0)  # Penalizes single-candle exhaustion spikes lacking Daily & Retest Confirmation!
+                        elif has_valid_1h_4h_base and is_3candle_retest_confirmed and has_daily_bullish_structure_shift:
+                            total_score = min(10.0, round(total_score + 0.5, 2))  # Base 'n Break MTF Retest Confirmation Bonus!
 
                         # V128 GRADE A & S EXCEPTION RULE PRE-EVALUATION:
                         is_30m_positive_bullish_grade_a = (
