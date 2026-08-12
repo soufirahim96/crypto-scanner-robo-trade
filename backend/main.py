@@ -1634,6 +1634,51 @@ def fetch_symbol_klines_cached(symbol: str, interval: str, limit: int = 6):
         pass
     return []
 
+depth_cache = {}
+
+def fetch_order_book_depth_ratio_cached(symbol: str) -> float:
+    """
+    V139 ITEM 1: Fetches Binance REST API Order Book Depth (limit=20) and calculates Bid/Ask USD Ratio.
+    Returns Bid_Depth_USD / Ask_Depth_USD.
+    """
+    now = time.time()
+    cached = depth_cache.get(symbol)
+    if cached and (now - cached["ts"] < 10):
+        return cached["ratio"]
+
+    url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20"
+    try:
+        r = requests.get(url, timeout=2.5)
+        if r.status_code == 200:
+            data = r.json()
+            bids = data.get("bids", [])
+            asks = data.get("asks", [])
+            
+            bid_usd = sum(float(b[0]) * float(b[1]) for b in bids)
+            ask_usd = sum(float(a[0]) * float(a[1]) for a in asks)
+            
+            ratio = (bid_usd / ask_usd) if ask_usd > 0 else 1.0
+            depth_cache[symbol] = {"ts": now, "ratio": round(ratio, 2)}
+            return round(ratio, 2)
+    except Exception:
+        pass
+    return 1.5  # Neutral fallback
+
+def calculate_atr_14(klines_5m: list) -> float:
+    """
+    V139 ITEM 2: Calculates Average True Range (ATR) from 5m K-lines.
+    """
+    if len(klines_5m) < 2:
+        return 0.0
+    tr_list = []
+    for i in range(1, len(klines_5m)):
+        prev_close = klines_5m[i-1]["close"]
+        curr_high = klines_5m[i]["high"]
+        curr_low = klines_5m[i]["low"]
+        tr = max(curr_high - curr_low, abs(curr_high - prev_close), abs(curr_low - prev_close))
+        tr_list.append(tr)
+    return sum(tr_list) / len(tr_list) if tr_list else 0.0
+
 def run_robo_trade_loop():
     """
     VERSION 124 HYBRID LOGIC MASTER AUTONOMOUS ROBO TRADER
@@ -1860,6 +1905,13 @@ def run_robo_trade_loop():
                             if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
                                 last_debug_info[participant]["rejections"][sym_c] = "BTC 5M Red Candle Gate (Longs Frozen)"
                             continue  # Point 3: Freeze altcoin long entries when BTC 5m candle is RED!
+
+                        # V139 ITEM 1: LIVE ORDER BOOK IMBALANCE GATE (Bid/Ask Depth Ratio >= 1.5)
+                        ob_ratio = fetch_order_book_depth_ratio_cached(sym_c)
+                        if ob_ratio < 1.5 and market_regime != "SUPER_BULLISH":
+                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
+                                last_debug_info[participant]["rejections"][sym_c] = f"Order Book Sell Wall (Bid/Ask {ob_ratio:.2f} < 1.50)"
+                            continue  # Veto trade if sell wall outweighs buyers in top 20 order book depth!
 
                         # Point 1: True 1D Daily 2-Bar Structure Shift (Yesterday Close > 2 Days Ago Open)
                         has_daily_bullish_structure_shift = True
@@ -2416,10 +2468,18 @@ def run_robo_trade_loop():
                             sl_stage_name = "Stage 1 (0 to 3m Entry SL -$0.14 Net)"
                             is_profit_lock_stage = False
 
-                        # V134 MULTI-TIER HARD TAKE PROFIT TARGETS:
-                        # Grade S (h_score >= 9.5): +10.00% Hard TP (+ $2.00 / lot)
-                        # Grade A (h_score < 9.5): +2.50% Hard TP (+ $0.50 / lot)
-                        tp_mult = 1.100 if is_gr_s_holding else 1.0250
+                        # V139 ITEM 2: DYNAMIC ATR VOLATILITY TAKE PROFIT ENGINE
+                        # Measure 5m ATR for current symbol
+                        h_klines_5m = fetch_symbol_klines_cached(h_symbol, "5m", limit=15)
+                        h_atr_14 = calculate_atr_14(h_klines_5m)
+
+                        if is_gr_s_holding:
+                            # Grade S (+10.00% minimum or 4.5 * ATR_14 during volatility expansion)
+                            tp_mult = max(1.100, 1.0 + ((4.5 * h_atr_14) / entry)) if (entry > 0 and h_atr_14 > 0) else 1.100
+                        else:
+                            # Grade A (+2.50% minimum or 3.2 * ATR_14 during volatility expansion)
+                            tp_mult = max(1.0250, 1.0 + ((3.2 * h_atr_14) / entry)) if (entry > 0 and h_atr_14 > 0) else 1.0250
+
                         tp_target_price = entry * tp_mult
 
                         if curr_price >= tp_target_price:
