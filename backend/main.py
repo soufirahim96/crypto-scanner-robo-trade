@@ -1812,12 +1812,26 @@ def run_robo_trade_loop():
                         bos_pts     = 1.5 if chg > 1.8 else 1.2
                         in_fvg_retest = (chg > 0.3) and (price <= open_price * 1.003) and (high > open_price * 1.008)
                         fvg_pts     = 1.5 if in_fvg_retest else 0.0
-                        total_score = round(sweep_pts + cvd_pts + funding_pts + bos_pts + fvg_pts, 2)
-                        if chg < 0:
-                            total_score = max(0.0, total_score - 2.0)
+                        # OLIVER KELL "BASE 'N BREAK" CONSOLIDATION GUARD & 5M CLOSED CANDLE CONFIRMATION (V135)
+                        # 1. Measure prior 25-minute price movement before current candle (chg_30m - chg)
+                        chg_30m = float(c.get("change_pct_30m", chg) or 0)
+                        prior_25m_chg = chg_30m - chg
+
+                        # 2. Check if coin created a tight consolidation "Base" prior to current bullish move
+                        has_valid_base = (abs(prior_25m_chg) <= 1.8) or (chg_30m >= 0 and prior_25m_chg <= 1.5)
+
+                        # 3. 5m Closed Candle Bullish Confirmation (Close > Open & Solid expansion out of base)
+                        is_5m_bullish_closed_confirm = (price > open_price) and (price >= open_price * 1.003) and (upper_wick_ratio <= 0.45)
+
+                        # 4. Overextended Exhaustion Spike Check (Already pumped > 3.5% without a base)
+                        is_overextended_exhaustion_spike = (prior_25m_chg > 3.5) and not has_valid_base
+
+                        if is_overextended_exhaustion_spike or (not is_5m_bullish_closed_confirm and chg > 1.5):
+                            total_score = max(0.0, total_score - 3.0)  # Penalizes single-candle exhaustion spikes lacking a valid Base!
+                        elif has_valid_base and is_5m_bullish_closed_confirm:
+                            total_score = min(10.0, round(total_score + 0.5, 2))  # Base 'n Break Confirmation Bonus!
 
                         # V128 GRADE A & S EXCEPTION RULE PRE-EVALUATION:
-                        chg_30m = float(c.get("change_pct_30m", chg) or 0)
                         is_30m_positive_bullish_grade_a = (
                             (total_score >= 8.5) and 
                             (chg_30m >= 0) and 
