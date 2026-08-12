@@ -1948,14 +1948,10 @@ def run_robo_trade_loop():
                         is_pullback_trend = (chg_val < 0.0) or (price <= c.get("open", price) * 0.999)
                         is_bullish_trend  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
 
-                        if score_val >= 9.0:
-                            entry = price * 0.9985  # Score >= 9.0 -> 0.15% discount cushion offset (V132)
-                        elif is_pullback_trend:
-                            entry = price * 0.9935  # Score 8.5 to 8.9 Pullback -> 0.65% discount cushion offset
-                        elif is_bullish_trend:
-                            entry = price * 0.9985  # Score 8.5 to 8.9 Bullish Grade A -> 0.15% discount cushion offset (V132)
-                        else:
-                            entry = price * 0.9965  # Score 8.5 to 8.9 Sideways -> 0.35% discount cushion offset
+                        # V136 INSTANT ENTRY EXECUTION ENGINE (1.0000):
+                        # For Oliver Kell Base 'n Break confirmed breakouts, set entry price target to 1.0000 * live price
+                        # without discount offset, ensuring 100% immediate fill execution on high-conviction breakouts!
+                        entry = price * 1.0000
 
                         if "GOD" in participant:
                             tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V124 DYNAMIC" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
@@ -2041,8 +2037,8 @@ def run_robo_trade_loop():
                             entry      = sched['entry_price_target']
                             score_val  = float(sched.get('confluence_score', 8.5) or 8.5)
 
-                            # V126 STRICT LIMIT FILL EXECUTION: Limit buys fill only when market price reaches target limit price (<= entry * 1.0005)
-                            fill_threshold = entry * 1.0005
+                            # V136 INSTANT FILL EXECUTION: All confirmed Base 'n Break entries fill immediately (fill_threshold = entry * 1.0015)
+                            fill_threshold = entry * 1.0015
                             
                             if curr_price > 0 and curr_price <= fill_threshold:
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
