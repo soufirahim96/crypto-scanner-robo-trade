@@ -1636,37 +1636,43 @@ def fetch_symbol_klines_cached(symbol: str, interval: str, limit: int = 6):
 
 def detect_4h_support_base(symbol: str) -> dict:
     """
-    V140: Detect real 4H support base using actual klines.
-    Returns support_level, how many times it was tested, consolidation range %, and whether the base is solid.
+    V140.3: Detect real 4H support base using actual klines.
+    Uses zone-based support detection (bottom 25% of 48H range = support zone).
+    Counts candles whose low falls inside the support zone (not a pinpoint 0.5% band).
+    Returns support_level, zone touches, consolidation range %, and base quality.
     """
     k4h = fetch_symbol_klines_cached(symbol, "4h", limit=12)  # Last 48 hours of 4H candles
     if len(k4h) < 4:
         return {"has_base": False, "support": 0.0, "touches": 0, "range_pct": 999.0}
 
-    # Find the lowest low in the 4H lookback (support floor)
-    lows = [k["low"] for k in k4h]
+    lows  = [k["low"]  for k in k4h]
     highs = [k["high"] for k in k4h]
-    support_floor = min(lows)
+    support_floor      = min(lows)
     resistance_ceiling = max(highs)
 
-    # Count how many candles touched (or came within 0.5% of) the support floor
-    touch_threshold = support_floor * 1.005
-    support_touches = sum(1 for k in k4h if k["low"] <= touch_threshold)
+    # Calculate the 48H price range
+    price_range = resistance_ceiling - support_floor
+    if support_floor <= 0 or price_range <= 0:
+        return {"has_base": False, "support": 0.0, "touches": 0, "range_pct": 999.0}
 
-    # Calculate consolidation range as % of support floor
-    if support_floor > 0:
-        range_pct = ((resistance_ceiling - support_floor) / support_floor) * 100.0
-    else:
-        range_pct = 999.0
+    range_pct = (price_range / support_floor) * 100.0
 
-    # A "solid base" requires: support tested >= 2 times AND consolidation range <= 15%
-    # (Crypto altcoins naturally consolidate in 8-15% ranges over 48 hours, 8% was too tight)
-    has_solid_base = (support_touches >= 2) and (range_pct <= 15.0)
+    # Support ZONE = bottom 25% of the 48H range
+    # (Professional traders define support as a zone, not a pinpoint price)
+    support_zone_top = support_floor + (price_range * 0.25)
+
+    # Count candles whose LOW entered the support zone
+    support_touches = sum(1 for k in k4h if k["low"] <= support_zone_top)
+
+    # A "solid base" requires:
+    #  - >= 1 touch inside the support zone (price found buyers here)
+    #  - Consolidation range <= 20% (not in a full trending freefall)
+    has_solid_base = (support_touches >= 1) and (range_pct <= 20.0)
 
     return {
-        "has_base": has_solid_base,
-        "support": round(support_floor, 8),
-        "touches": support_touches,
+        "has_base":  has_solid_base,
+        "support":   round(support_floor, 8),
+        "touches":   support_touches,
         "range_pct": round(range_pct, 2)
     }
 
