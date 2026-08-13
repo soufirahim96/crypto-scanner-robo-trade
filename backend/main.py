@@ -2082,15 +2082,15 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # Supreme God AI Grade S (>= 9.5 Pts) 2-Lot & 2-Slot Rotation
+                # Supreme God AI Grade S (>= 8.5 Pts) 2-Lot & 2-Slot Rotation
                 if "GOD" in participant:
                     top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
-                                        and float(s.get('confluence_score', 0)) >= 9.5), None)
+                                        and float(s.get('confluence_score', 0)) >= 8.5), None)
                     if top_grade_s:
                         s_sym = top_grade_s['symbol']
                         is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
                         if not is_already_held:
-                            # Need 2 free slots for 2-lot entry ($40 capital). If open_count >= 4, rotate worst 2 holdings
+                            # Need 2 free slots for 2-lot entry ($40 capital). If open_count >= 4, rotate worst holdings to bring open_count down to 3
                             if open_count >= 4 and p_holdings:
                                 holding_pnls = []
                                 for h in p_holdings:
@@ -2101,7 +2101,7 @@ def run_robo_trade_loop():
                                     holding_pnls.append((h_pnl, h_px, h))
                                 holding_pnls.sort(key=lambda x: x[0])
                                 
-                                num_to_rotate = 2 if open_count >= 4 else (1 if open_count == 4 else 0)
+                                num_to_rotate = 2 if open_count == 5 else (1 if open_count == 4 else 0)
                                 for r_idx in range(min(num_to_rotate, len(holding_pnls))):
                                     worst_pct, worst_px, worst_h = holding_pnls[r_idx]
                                     w_cap  = worst_h['entry_price'] * worst_h['amount']
