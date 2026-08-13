@@ -2412,37 +2412,15 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     else:
-                        # V141.7 PROFESSIONAL 4-STAGE TIME-DECAY STOP LOSS MATRIX
-                        # Gives base-building coins breathing room to consolidate without early noise stops below -$0.10
+                        # V143 USER-REQUESTED FIXED -0.25 NET SL FLOOR (-1.00% PRICE BUFFER)
+                        # Position SL remains strictly fixed at -1.00% price drop (-$0.25 Net PnL per $20 lot)
+                        # without time-decay shrinking during drawdown, allowing base consolidation to reach +2.50% TP.
                         comm_offset = 0.04
-                        if holding_sec >= 2700:
-                            # Stage 4 (45m+): Breakeven +$0.02 Net Profit / Fee Cover
-                            target_net_pnl_sl = +0.02
-                            gross_target_dollar = (target_net_pnl_sl + comm_offset) * lot_scale
-                            initial_sl_price = entry + (gross_target_dollar / amount)
-                            sl_stage_name = "Stage 4 (45m+ Stagnant Profit Lock +$0.02)"
-                            is_profit_lock_stage = True
-                        elif holding_sec >= 1500:
-                            # Stage 3 (25m to 45m): Net SL -$0.12/lot (-0.40% price drop)
-                            target_net_pnl_sl = -0.12
-                            gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset) * lot_scale
-                            initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                            sl_stage_name = "Stage 3 (25m to 45m Decay SL -$0.12)"
-                            is_profit_lock_stage = False
-                        elif holding_sec >= 600:
-                            # Stage 2 (10m to 25m): Net SL -$0.18/lot (-0.70% price drop)
-                            target_net_pnl_sl = -0.18
-                            gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset) * lot_scale
-                            initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                            sl_stage_name = "Stage 2 (10m to 25m Decay SL -$0.18)"
-                            is_profit_lock_stage = False
-                        else:
-                            # Stage 1 (0 to 10m): Net SL -$0.25/lot (-1.00% price drop)
-                            target_net_pnl_sl = -0.25
-                            gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset) * lot_scale
-                            initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                            sl_stage_name = "Stage 1 (0 to 10m Base SL -$0.25 Net)"
-                            is_profit_lock_stage = False
+                        target_net_pnl_sl = -0.25
+                        gross_target_dollar = (abs(target_net_pnl_sl) - comm_offset) * lot_scale
+                        initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
+                        sl_stage_name = "V143 Fixed Base SL (-$0.25 Net / -1.00% Price Drop)"
+                        is_profit_lock_stage = False
 
                         # V139 ITEM 2: DYNAMIC ATR VOLATILITY TAKE PROFIT ENGINE
                         # Measure 5m ATR for current symbol
