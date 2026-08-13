@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 
-from backend.db import db_manager, get_myt_timestamp_str
+from backend.db import db_manager, get_myt_timestamp_str, normalize_participant_name
 from backend.auth import verify_password
 from backend.scanner import scanner_engine
 
@@ -1140,7 +1140,8 @@ def get_robo_trade_stats():
     }
 
     for p in participants:
-        p_txs = [t for t in all_txs if t.get("participant") == p]
+        norm_p = normalize_participant_name(p)
+        p_txs = [t for t in all_txs if normalize_participant_name(t.get("participant")) == norm_p]
         
         # Cumulative / Lifetime Stats
         wins = [t for t in p_txs if float(t.get("pnl", 0) or 0) > 0]
@@ -2454,7 +2455,7 @@ def run_robo_trade_loop():
 
                         # V139 ITEM 2: DYNAMIC ATR VOLATILITY TAKE PROFIT ENGINE
                         # Measure 5m ATR for current symbol
-                        h_klines_5m = fetch_symbol_klines_cached(h_symbol, "5m", limit=15)
+                        h_klines_5m = fetch_symbol_klines_cached(sym, "5m", limit=15)
                         h_atr_14 = calculate_atr_14(h_klines_5m)
 
                         if is_gr_s_holding:
