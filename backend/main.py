@@ -2082,44 +2082,8 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # Supreme God AI Grade S (>= 8.5 Pts) 1-Slot Rotation
-                if "GOD" in participant:
-                    top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
-                                        and float(s.get('confluence_score', 0)) >= 8.5), None)
-                    if top_grade_s:
-                        s_sym = top_grade_s['symbol']
-                        is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
-                        if not is_already_held:
-                            # If open_count >= 5, rotate worst 1 holding to free 1 slot for Grade S entry
-                            if open_count >= 5 and p_holdings:
-                                holding_pnls = []
-                                for h in p_holdings:
-                                    h_sym = h['symbol']
-                                    h_tick = scanner_engine.active_tickers.get(h_sym)
-                                    h_px   = h_tick.get("price", h['entry_price']) if h_tick else h['entry_price']
-                                    h_pnl  = ((h_px - h['entry_price']) / h['entry_price']) * 100.0 if h['entry_price'] > 0 else 0.0
-                                    holding_pnls.append((h_pnl, h_px, h))
-                                holding_pnls.sort(key=lambda x: x[0])
-                                
-                                worst_pct, worst_px, worst_h = holding_pnls[0]
-                                w_cap  = worst_h['entry_price'] * worst_h['amount']
-                                w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
-                                w_fee  = round(w_cap * 0.002, 4)
-                                w_net  = round(w_pnl - w_fee, 4)
-                                db_manager.remove_active_holding(worst_h['id'])
-                                db_manager.add_transaction_history(
-                                    participant=participant,
-                                    action="SELL (GRADE_S_ROTATION)",
-                                    symbol=worst_h['symbol'],
-                                    price=worst_px,
-                                    capital=w_cap,
-                                    pnl=w_net,
-                                    commission_fee=w_fee,
-                                    status="COMPLETED"
-                                )
-                                safe_log(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for Grade S {s_sym}")
-                                p_holdings = db_manager.get_active_holdings(participant)
-                                open_count = len(p_holdings)
+                # V145: Grade S Rotation Exits Disabled per user directive so all 5 holdings run 100% normally to SL/TP without forced rotation
+                pass
 
                 # ENTRY EXECUTION (V124: Adaptive Limit Retest Buffer & High Confluence Immediate Fill)
                 if open_count < 5:
@@ -2283,20 +2247,9 @@ def run_robo_trade_loop():
                         exit_tag    = "SOLD_NEUTRAL"
                         exit_reason = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
 
-                    # 25-MIN FEE-AWARE STAGNANT COIN ROTATION (Stage 7 & Pillar 3 Spec)
-                    elif holding_sec >= 1500 and h_net >= min_net and not is_gr_s_holding:
-                        should_exit = True
-                        exit_tag    = "STATIC_EXIT"
-                        exit_reason = f"⚡ 25-Min Fee-Aware Stagnant Exit (PnL:+${h_net:.4f} after {holding_sec/60:.1f}m)"
-
-                    # GOLDEN OPPORTUNITY EXIT (12AM-2AM & 12PM-2PM MYT)
-                    elif is_golden_window and h_net >= min_net:
-                        if curr_pnl_pct < 3.0:
-                            should_exit    = True
-                            exit_tag       = "CLEARED_REENTRY_PRIORITY"
-                            session_str    = "12AM-2AM" if 0 <= myt_hour < 2 else "12PM-2PM"
-                            exit_reason    = f"Golden Window Exit [{session_str}] PnL:+${h_net:.4f}"
-                            exit_is_profit = True
+                    # V145: Golden 2-Hour Opportunity Exit and 25-Min Stagnant Exit DISABLED per user instruction
+                    # All coins now run 100% normally to -$0.25 Net SL or +2.50% TP at all times for consistency measurement
+                    pass
 
                     # STAGED CENT STOP LOSS & PROFIT LOCK MATRIX (Stage 9 Spec)
                     # Slot Capital = h_cap ($20.00 standard, $40.00 Grade S 2-lot)
