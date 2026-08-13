@@ -283,23 +283,30 @@ window.updateRoboTradeModule = async function () {
       gcCumEl.style.color = gcCumPnl >= 0 ? "#10b981" : "#ef4444";
     }
 
-    // ── 4. Timer Countdown ──
-    const rawNextSec = (sRes && sRes.next_update_in_seconds !== undefined) ? sRes.next_update_in_seconds : 120;
-    const nextSec = rawNextSec > 0 ? rawNextSec : 120;
-    window.roboTradeNextSec = nextSec;
+    // ── 4. Timer Countdown (60s Unified Timer) ──
+    const rawNextSec = (sRes && sRes.next_update_in_seconds !== undefined) ? sRes.next_update_in_seconds : 60;
+    const nextSec = (rawNextSec > 0 && rawNextSec <= 60) ? rawNextSec : 60;
+    
+    // Only update window.roboTradeNextSec if backend timer differs by > 3s or is uninitialized
+    if (window.roboTradeNextSec === undefined || Math.abs(window.roboTradeNextSec - nextSec) > 3) {
+      window.roboTradeNextSec = nextSec;
+    }
+
     function fmtTimer(s) {
       const validS = Math.max(0, s);
       return String(Math.floor(validS / 60)).padStart(2, "0") + ":" + String(validS % 60).padStart(2, "0");
     }
-    rtSetTxt("godSchedTimerText",    fmtTimer(nextSec));
-    rtSetTxt("groupCSchedTimerText", fmtTimer(nextSec));
+
+    const curSec = window.roboTradeNextSec !== undefined ? window.roboTradeNextSec : nextSec;
+    rtSetTxt("godSchedTimerText",    fmtTimer(curSec));
+    rtSetTxt("groupCSchedTimerText", fmtTimer(curSec));
 
     if (!window._roboCountdown) {
       window._roboCountdown = setInterval(() => {
-        if (window.roboTradeNextSec > 0) {
+        if (window.roboTradeNextSec !== undefined && window.roboTradeNextSec > 0) {
           window.roboTradeNextSec -= 1;
         } else {
-          window.roboTradeNextSec = 120;
+          window.roboTradeNextSec = 60;
         }
         rtSetTxt("godSchedTimerText",    fmtTimer(window.roboTradeNextSec));
         rtSetTxt("groupCSchedTimerText", fmtTimer(window.roboTradeNextSec));

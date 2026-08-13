@@ -1004,6 +1004,7 @@ def clear_all_active_holdings():
 
 # ROBO TRADE STATE ENGINE GLOBALS
 participants_global    = ["👑 SUPREME GOD AI BOT", "⚡ GROUP C OB BOT"]
+global_last_analysis_ts = 0.0
 last_analysis_time     = {p: 0.0 for p in participants_global}
 last_analysis_time_global = {"👑 SUPREME GOD AI BOT": 0, "⚡ GROUP C OB BOT": 0}
 circuit_break_until    = {p: 0.0 for p in participants_global}
@@ -1024,13 +1025,14 @@ last_debug_info        = {}
 
 @app.get("/api/robo/schedules")
 def get_robo_schedules():
-    """VERSION 124: GET ROBO TRADE SCHEDULES WITH DYNAMIC AUTO-RESETTING 1-MINUTE TIMER"""
+    """VERSION 141.2: GET ROBO TRADE SCHEDULES WITH DYNAMIC UNIFIED 60s TIMER"""
     now_ts = time.time()
-    god_last = last_analysis_time_global.get("👑 SUPREME GOD AI BOT", 0)
-    c_last = last_analysis_time_global.get("⚡ GROUP C OB BOT", 0)
-    last_ts = max(god_last, c_last)
+    last_ts = global_last_analysis_ts if global_last_analysis_ts > 0 else max(
+        last_analysis_time_global.get("👑 SUPREME GOD AI BOT", 0),
+        last_analysis_time_global.get("⚡ GROUP C OB BOT", 0)
+    )
     elapsed = int(now_ts - last_ts) if last_ts > 0 else 0
-    next_in = max(1, int(60 - (elapsed % 60)))
+    next_in = max(1, int(60 - (elapsed % 60))) if last_ts > 0 else 60
     
     return {
         "status": "success",
@@ -1742,7 +1744,7 @@ def run_robo_trade_loop():
     except Exception as ex_fresh:
         safe_log(f"[V124 STARTUP ERROR] {ex_fresh}")
 
-    global last_analysis_time, last_analysis_time_global, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, circuit_break_date, smart_reentry_pending, coin_static_cooldown, coin_consecutive_losses, coin_exit_registry, btc_freeze_until, btc_last_chg_at_freeze
+    global last_analysis_time, last_analysis_time_global, global_last_analysis_ts, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, circuit_break_date, smart_reentry_pending, coin_static_cooldown, coin_consecutive_losses, coin_exit_registry, btc_freeze_until, btc_last_chg_at_freeze
     participants = participants_global
     last_db_prune_time = time.time()
     last_daily_backtest_time = time.time()
@@ -1758,13 +1760,6 @@ def run_robo_trade_loop():
                 continue
 
             now_ts = time.time()
-
-            # DB Maintenance
-            if now_ts - last_db_prune_time >= 21600:
-                pruned = db_manager.prune_old_crypto_ticks(48)
-                last_db_prune_time = now_ts
-                if pruned > 0:
-                    safe_log(f"[DB CLEANER] Pruned {pruned:,} tick rows older than 48h.")
 
             if now_ts - last_daily_backtest_time >= 86400:
                 last_daily_backtest_time = now_ts
