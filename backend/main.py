@@ -2082,7 +2082,7 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # Supreme God AI Grade S (>= 8.5 Pts) 2-Lot & 2-Slot Rotation
+                # Supreme God AI Grade S (>= 8.5 Pts) 1-Slot Rotation
                 if "GOD" in participant:
                     top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
                                         and float(s.get('confluence_score', 0)) >= 8.5), None)
@@ -2090,8 +2090,8 @@ def run_robo_trade_loop():
                         s_sym = top_grade_s['symbol']
                         is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
                         if not is_already_held:
-                            # Need 2 free slots for 2-lot entry ($40 capital). If open_count >= 4, rotate worst holdings to bring open_count down to 3
-                            if open_count >= 4 and p_holdings:
+                            # If open_count >= 5, rotate worst 1 holding to free 1 slot for Grade S entry
+                            if open_count >= 5 and p_holdings:
                                 holding_pnls = []
                                 for h in p_holdings:
                                     h_sym = h['symbol']
@@ -2101,25 +2101,23 @@ def run_robo_trade_loop():
                                     holding_pnls.append((h_pnl, h_px, h))
                                 holding_pnls.sort(key=lambda x: x[0])
                                 
-                                num_to_rotate = 2 if open_count == 5 else (1 if open_count == 4 else 0)
-                                for r_idx in range(min(num_to_rotate, len(holding_pnls))):
-                                    worst_pct, worst_px, worst_h = holding_pnls[r_idx]
-                                    w_cap  = worst_h['entry_price'] * worst_h['amount']
-                                    w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
-                                    w_fee  = round(w_cap * 0.002, 4)
-                                    w_net  = round(w_pnl - w_fee, 4)
-                                    db_manager.remove_active_holding(worst_h['id'])
-                                    db_manager.add_transaction_history(
-                                        participant=participant,
-                                        action="SELL (GRADE_S_ROTATION)",
-                                        symbol=worst_h['symbol'],
-                                        price=worst_px,
-                                        capital=w_cap,
-                                        pnl=w_net,
-                                        commission_fee=w_fee,
-                                        status="COMPLETED"
-                                    )
-                                    safe_log(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
+                                worst_pct, worst_px, worst_h = holding_pnls[0]
+                                w_cap  = worst_h['entry_price'] * worst_h['amount']
+                                w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
+                                w_fee  = round(w_cap * 0.002, 4)
+                                w_net  = round(w_pnl - w_fee, 4)
+                                db_manager.remove_active_holding(worst_h['id'])
+                                db_manager.add_transaction_history(
+                                    participant=participant,
+                                    action="SELL (GRADE_S_ROTATION)",
+                                    symbol=worst_h['symbol'],
+                                    price=worst_px,
+                                    capital=w_cap,
+                                    pnl=w_net,
+                                    commission_fee=w_fee,
+                                    status="COMPLETED"
+                                )
+                                safe_log(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for Grade S {s_sym}")
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
 
@@ -2143,10 +2141,9 @@ def run_robo_trade_loop():
                                     safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                # Grade S (>= 8.5 Pts) 2-Lot position ($40.00) for Supreme God AI Bot if space allows (<= 3 holdings open)
-                                is_grade_s_trade = ("GOD" in participant) and (score_val >= 8.5)
-                                num_lots = 2 if (is_grade_s_trade and open_count <= 3) else 1
-                                capital = 20.0 * num_lots
+                                # V144 USER-REQUESTED UNIFORM 1-LOT POSITION SIZING ($20.00 CAPITAL FOR ALL COINS):
+                                num_lots = 1
+                                capital = 20.0
 
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
