@@ -2039,13 +2039,14 @@ def run_robo_trade_loop():
                         is_pullback_trend = (chg_val < 0.0) or (price <= c.get("open", price) * 0.999)
                         is_bullish_trend  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
 
-                        # V141.8 USER-REQUESTED 0.9985 ENTRY DISCOUNT CUSHION:
-                        # Sets entry price target to 0.9985 * live price (0.15% discount buffer),
-                        # giving all Grade A and Grade S trades an immediate safety cushion against dips.
-                        entry = price * 0.9985
+                        # V142 INSTANT GRADE S ENTRY EXECUTION ENGINE (1.0000):
+                        # Grade S entries set entry price target to 1.0000 * live price for 100% immediate fill execution,
+                        # while Grade A entries retain the 0.9985 discount limit cushion.
+                        is_grade_s = ("GOD" in participant) or (score_val >= 8.5)
+                        entry = price * 1.0000 if is_grade_s else price * 0.9985
 
                         if "GOD" in participant:
-                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V124 DYNAMIC" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
+                            tier_str = f"👑 GRADE S ({score_val:.1f} Pts)" if score_val >= 8.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
 
