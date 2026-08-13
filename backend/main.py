@@ -1685,7 +1685,7 @@ def fetch_order_book_depth_ratio_cached(symbol: str) -> float:
     """
     now = time.time()
     cached = depth_cache.get(symbol)
-    if cached and (now - cached["ts"] < 10):
+    if cached and (now - cached["ts"] < 120):  # 120s cache — OB data stable enough for 2 min
         return cached["ratio"]
 
     url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20"
@@ -1888,6 +1888,22 @@ def run_robo_trade_loop():
                     if is_recovery_phase and market_regime != "BULLISH":
                         valid_coins = []
 
+                    # V140.4 PERFORMANCE GATE: Pre-filter using ticker data ONLY before any API calls
+                    # Sort by volume, keep top 50 candidates — prevents 1000+ API calls per scan cycle
+                    valid_coins = [
+                        c for c in valid_coins
+                        if c.get("quote_volume", 0) >= 15000000  # Pre-apply vol floor
+                        and c.get("change_pct", 0) >= -2.0       # Pre-reject hard downtrends
+                    ]
+                    valid_coins.sort(key=lambda x: x.get("quote_volume", 0), reverse=True)
+                    valid_coins = valid_coins[:50]  # Cap at top 50 by volume before API calls
+
+                    # Fetch BTC 5M ONCE before the coin loop (shared for all coins this cycle)
+                    btc_5m_global = fetch_symbol_klines_cached("BTCUSDT", "5m", limit=3)
+                    is_btc_5m_bullish_global = True
+                    if btc_5m_global and len(btc_5m_global) >= 2:
+                        is_btc_5m_bullish_global = (btc_5m_global[-1]["close"] >= btc_5m_global[-1]["open"])
+
                     scored_coins = []
                     for c in valid_coins:
                         vol        = c.get("quote_volume", 0)
@@ -1905,13 +1921,11 @@ def run_robo_trade_loop():
 
                         # ============================================================
                         # V140 PROFESSIONAL BASE DETECTION ENGINE
-                        # 6-Gate proactive base detection — quality over quantity
+                        # 7-Gate proactive base detection — quality over quantity
                         # ============================================================
 
-                        # GATE 1: $15M Institutional Volume Floor
+                        # GATE 1: $15M Institutional Volume Floor (pre-filtered above, re-check)
                         if vol < 15000000:
-                            if sym_c in ["UTKUSDT", "WLDUSDT", "ACTUSDT", "TSTUSDT", "NILUSDT"]:
-                                last_debug_info[participant]["rejections"][sym_c] = f"Vol ${vol/1e6:.2f}M < $15M Floor"
                             continue
 
                         # GATE 2: Hard reject coins in active macro downtrend
@@ -1921,12 +1935,8 @@ def run_robo_trade_loop():
                         if is_macro_dump:
                             continue
 
-                        # GATE 3: BTC 5-Minute Real-Time Momentum Gate (Freeze altcoin longs when BTC 5m is RED)
-                        btc_5m = fetch_symbol_klines_cached("BTCUSDT", "5m", limit=3)
-                        is_btc_5m_bullish = True
-                        if btc_5m and len(btc_5m) >= 2:
-                            is_btc_5m_bullish = (btc_5m[-1]["close"] >= btc_5m[-1]["open"])
-                        if not is_btc_5m_bullish and market_regime != "SUPER_BULLISH":
+                        # GATE 3: BTC 5-Minute Gate (pre-fetched once outside loop)
+                        if not is_btc_5m_bullish_global and market_regime != "SUPER_BULLISH":
                             last_debug_info[participant]["rejections"][sym_c] = "BTC 5M Red Candle Gate"
                             continue
 
