@@ -1938,30 +1938,68 @@ def run_robo_trade_loop():
                             last_debug_info[participant]["rejections"][sym_c] = "1D Daily Structure Bearish"
                             continue
 
-                        # GATE 6: Real 4H Support Base Detection (multi-touch solid support)
+                        # GATE 6: 1H Zoom-In — Trend Structure & Consolidation Validation
+                        # Zooms from Daily into 1H to confirm the coin is building a proper
+                        # higher-low accumulation structure at the base level on the 1H timeframe.
+                        k_1h = fetch_symbol_klines_cached(sym_c, "1h", limit=8)  # Last 8 hours
+                        has_1h_valid_structure = True
+                        h1_confirmation_bonus = 0.0
+                        if k_1h and len(k_1h) >= 4:
+                            h1_lows  = [k["low"]  for k in k_1h[-4:]]
+                            h1_highs = [k["high"] for k in k_1h[-4:]]
+                            h1_closes = [k["close"] for k in k_1h[-4:]]
+                            h1_opens  = [k["open"]  for k in k_1h[-4:]]
+
+                            # 1H Range Tightness (consolidation quality)
+                            h1_range_pct = ((max(h1_highs) - min(h1_lows)) / min(h1_lows)) * 100.0 if min(h1_lows) > 0 else 999.0
+
+                            # 1H Higher-Low Check (last low >= 2nd-to-last low = upward pressure building)
+                            h1_has_higher_low = (h1_lows[-1] >= h1_lows[-2]) or (h1_lows[-2] >= h1_lows[-3])
+
+                            # 1H Hard Downtrend Check (3+ consecutive red closes = NOT a valid base)
+                            h1_consecutive_red = sum(1 for i in range(len(h1_closes)) if h1_closes[i] < h1_opens[i])
+                            h1_is_hard_downtrend = (h1_consecutive_red >= 4)  # All 4 of last 4 candles red
+
+                            if h1_is_hard_downtrend:
+                                has_1h_valid_structure = False
+                                last_debug_info[participant]["rejections"][sym_c] = f"1H Hard Downtrend ({h1_consecutive_red}/4 red candles)"
+                                continue
+
+                            # 1H Confirmation Bonus for scoring (max +1.5 pts)
+                            if h1_has_higher_low and h1_range_pct <= 3.0:
+                                h1_confirmation_bonus = 1.5  # Tight base + higher lows = ideal accumulation
+                            elif h1_has_higher_low:
+                                h1_confirmation_bonus = 1.0  # Higher lows but wider range
+                            elif h1_range_pct <= 3.0:
+                                h1_confirmation_bonus = 0.5  # Tight range but no clear higher low yet
+
+                        # GATE 7: Real 4H Support Base Detection (multi-touch solid support)
                         base_info = detect_4h_support_base(sym_c)
                         if not base_info["has_base"]:
                             last_debug_info[participant]["rejections"][sym_c] = f"No 4H Base (touches:{base_info['touches']}, range:{base_info['range_pct']:.1f}%)"
                             continue
 
-                        # ---- ALL 6 GATES PASSED: Now compute confluence score ----
-                        # V140 Streamlined Confluence Score (Max 10.0 Pts)
-                        # Based on base quality, volume, BTC macro, and 5M trigger
+                        # ---- ALL 7 GATES PASSED: Now compute confluence score ----
+                        # V140.1 Streamlined Confluence Score (Max 10.0 Pts)
+                        # 5-Component: Base Quality + Volume + BTC Macro + 1H Structure + 5M Trigger
                         k_5m = fetch_symbol_klines_cached(sym_c, "5m", limit=6)
                         chg_30m = float(c.get("change_pct_30m", chg) or 0)
 
-                        # Base quality score (0–3.5 Pts): more touches = stronger base
+                        # Base quality score (0–3.0 Pts): more touches = stronger base
                         base_touches = base_info["touches"]
                         base_range = base_info["range_pct"]
-                        base_pts = 3.5 if base_touches >= 4 else (3.0 if base_touches == 3 else (2.5 if base_touches == 2 else 1.5))
+                        base_pts = 3.0 if base_touches >= 4 else (2.5 if base_touches == 3 else 2.0)
                         if base_range > 6.0:
                             base_pts = max(0.0, base_pts - 0.5)  # Wider base = slightly weaker
 
-                        # Volume & order flow (0–3.0 Pts)
-                        vol_pts  = 3.0 if vol > 30000000 else (2.5 if vol > 15000000 else 2.0)
+                        # Volume & order flow (0–2.5 Pts)
+                        vol_pts  = 2.5 if vol > 30000000 else (2.0 if vol > 15000000 else 1.5)
 
-                        # BTC & daily macro (0–2.0 Pts)
-                        macro_pts = 2.0 if (chg_30m >= 0 and chg >= 0) else 1.5
+                        # BTC & daily macro (0–1.5 Pts)
+                        macro_pts = 1.5 if (chg_30m >= 0 and chg >= 0) else 1.0
+
+                        # 1H Structure confirmation bonus (0–1.5 Pts) — from Gate 6
+                        h1_pts = h1_confirmation_bonus
 
                         # 5M trigger confirmation (0–1.5 Pts)
                         trigger_pts = 0.0
@@ -1977,7 +2015,7 @@ def run_robo_trade_loop():
                             elif price > open_price and upper_wick_ratio <= 0.45:
                                 trigger_pts = 0.5  # Minimum: current candle is green and clean
 
-                        total_score = round(base_pts + vol_pts + macro_pts + trigger_pts, 2)
+                        total_score = round(base_pts + vol_pts + macro_pts + h1_pts + trigger_pts, 2)
 
                         # Overextension penalty (already pumped >3.5% without a base retest)
                         prior_25m_chg = chg_30m - chg
