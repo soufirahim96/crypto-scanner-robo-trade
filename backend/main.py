@@ -1144,24 +1144,22 @@ def get_robo_trade_stats():
         p_txs = [t for t in all_txs if normalize_participant_name(t.get("participant")) == norm_p]
         
         # Cumulative / Lifetime Stats
-        wins = [t for t in p_txs if float(t.get("pnl", 0) or 0) > 0]
+        wins   = [t for t in p_txs if float(t.get("pnl", 0) or 0) > 0]
         losses = [t for t in p_txs if float(t.get("pnl", 0) or 0) <= 0]
         total_profit = sum(float(t.get("pnl", 0) or 0) for t in wins)
-        total_loss = sum(abs(float(t.get("pnl", 0) or 0)) for t in losses)
-        total_comm = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in p_txs)
-        # Requirement 3 & 5: Net PnL = Profit - Loss - Commission Fee
-        total_pnl = total_profit - total_loss - total_comm
+        total_loss   = sum(abs(float(t.get("pnl", 0) or 0)) for t in losses)
+        total_comm   = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in p_txs)
+        total_pnl    = sum(float(t.get("pnl", 0) or 0) for t in p_txs)
         
-        # Today Stats (Requirement 2: Resets daily at 12:00 AM MYT)
+        # Today Stats (Resets daily at 12:00 AM MYT)
         today_txs = [t for t in p_txs if str(t.get("created_at", "")).startswith(today_str)]
-        today_wins_tx = [t for t in today_txs if float(t.get("pnl", 0) or 0) > 0]
+        today_wins_tx   = [t for t in today_txs if float(t.get("pnl", 0) or 0) > 0]
         today_losses_tx = [t for t in today_txs if float(t.get("pnl", 0) or 0) <= 0]
         today_profit = sum(float(t.get("pnl", 0) or 0) for t in today_wins_tx)
-        today_loss = sum(abs(float(t.get("pnl", 0) or 0)) for t in today_losses_tx)
-        today_comm = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in today_txs)
-        # Requirement 3: Today Net PnL = Today Profit - Today Loss - Today Comm. Fee
-        today_pnl = today_profit - today_loss - today_comm
-        today_pnl_pct = (today_pnl / 100.0) * 100.0 if today_pnl != 0 else 0.0
+        today_loss   = sum(abs(float(t.get("pnl", 0) or 0)) for t in today_losses_tx)
+        today_comm   = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in today_txs)
+        today_pnl    = sum(float(t.get("pnl", 0) or 0) for t in today_txs)
+        today_pnl_pct= (today_pnl / 100.0) * 100.0 if today_pnl != 0 else 0.0
         
         stats[p] = {
             "total_wins": len(wins),
@@ -2111,9 +2109,14 @@ def run_robo_trade_loop():
                                     w_net  = round(w_pnl - w_fee, 4)
                                     db_manager.remove_active_holding(worst_h['id'])
                                     db_manager.add_transaction_history(
-                                        participant=participant, symbol=worst_h['symbol'], action="SELL (GRADE_S_ROTATION)",
-                                        entry_price=worst_h['entry_price'], exit_price=worst_px,
-                                        amount=worst_h['amount'], pnl=w_net
+                                        participant=participant,
+                                        action="SELL (GRADE_S_ROTATION)",
+                                        symbol=worst_h['symbol'],
+                                        price=worst_px,
+                                        capital=w_cap,
+                                        pnl=w_net,
+                                        commission_fee=w_fee,
+                                        status="COMPLETED"
                                     )
                                     safe_log(f"[V124 GRADE S ROTATION] Exited {worst_h['symbol']} PnL:{worst_pct:+.2f}% to free slot for 2-Lot Grade S {s_sym}")
                                 p_holdings = db_manager.get_active_holdings(participant)

@@ -319,10 +319,13 @@ window.updateRoboTradeModule = async function () {
     try { rtRenderSchedules("GOD",     schedules, "godScheduleList"); }    catch(e) { console.error("GOD sched:", e); }
     try { rtRenderSchedules("GROUP C", schedules, "groupCScheduleList"); } catch(e) { console.error("GrpC sched:", e); }
 
-    // ── 6. Summary Cards & Ledger ──
+    // ── 6. Summary Cards & Ledger & Transaction History ──
     try { rtRenderSummaryCard(stRes && stRes.weekly_summary,  "weeklySummaryContainer");  } catch(e) { console.error("Weekly:", e); }
     try { rtRenderSummaryCard(stRes && stRes.monthly_summary, "monthlySummaryContainer"); } catch(e) { console.error("Monthly:", e); }
     try { rtRenderLedger((stRes && stRes.daily_ledger) || []);                            } catch(e) { console.error("Ledger:", e); }
+    if (typeof window.fetchTransactionHistoryFromDB === "function") {
+      try { window.fetchTransactionHistoryFromDB(); } catch(e) { console.error("TxHistory:", e); }
+    }
 
   } catch (err) {
     console.error("[RoboTrade V100 Error]", err);
