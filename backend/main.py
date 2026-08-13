@@ -4,6 +4,7 @@ import datetime
 import asyncio
 import threading
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Request
@@ -1904,6 +1905,32 @@ def run_robo_trade_loop():
                     if btc_5m_global and len(btc_5m_global) >= 2:
                         is_btc_5m_bullish_global = (btc_5m_global[-1]["close"] >= btc_5m_global[-1]["open"])
 
+                    # ================================================================
+                    # V141: PARALLEL PRE-FETCH ENGINE (20 Concurrent Worker Threads)
+                    # Pre-fetch all klines + order book for all 50 candidates in
+                    # parallel BEFORE the evaluation loop. Each worker handles one
+                    # coin completely (1D + 1H + 4H + 5M klines + OB depth).
+                    # After this block, ALL data is in cache — the loop reads ZERO
+                    # blocking API calls during coin scoring.
+                    # ================================================================
+                    def _prefetch_coin_data(sym_pf):
+                        """Worker: pre-fetch all required data for one coin."""
+                        try:
+                            fetch_symbol_klines_cached(sym_pf, "1d", limit=6)
+                            fetch_symbol_klines_cached(sym_pf, "1h", limit=8)
+                            fetch_symbol_klines_cached(sym_pf, "4h", limit=12)
+                            fetch_symbol_klines_cached(sym_pf, "5m", limit=6)
+                            fetch_order_book_depth_ratio_cached(sym_pf)
+                        except Exception:
+                            pass
+
+                    candidate_symbols = [c.get("symbol", "") for c in valid_coins if c.get("symbol")]
+                    with ThreadPoolExecutor(max_workers=20) as pf_pool:
+                        pf_futures = [pf_pool.submit(_prefetch_coin_data, sym) for sym in candidate_symbols]
+                        for pf_f in as_completed(pf_futures):
+                            pass  # Wait for all parallel fetches to complete
+
+                    # Evaluation loop — all API data is now in cache, zero blocking calls
                     scored_coins = []
                     for c in valid_coins:
                         vol        = c.get("quote_volume", 0)
