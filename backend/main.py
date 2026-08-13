@@ -2039,10 +2039,10 @@ def run_robo_trade_loop():
                         is_pullback_trend = (chg_val < 0.0) or (price <= c.get("open", price) * 0.999)
                         is_bullish_trend  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
 
-                        # V136 INSTANT ENTRY EXECUTION ENGINE (1.0000):
-                        # For Oliver Kell Base 'n Break confirmed breakouts, set entry price target to 1.0000 * live price
-                        # without discount offset, ensuring 100% immediate fill execution on high-conviction breakouts!
-                        entry = price * 1.0000
+                        # V141.8 USER-REQUESTED 0.9985 ENTRY DISCOUNT CUSHION:
+                        # Sets entry price target to 0.9985 * live price (0.15% discount buffer),
+                        # giving all Grade A and Grade S trades an immediate safety cushion against dips.
+                        entry = price * 0.9985
 
                         if "GOD" in participant:
                             tier_str = f"👑 GRADE S ({score_val:.1f} Pts) V124 DYNAMIC" if score_val >= 9.5 else f"GRADE A ({score_val:.1f} Pts)"
@@ -2285,8 +2285,8 @@ def run_robo_trade_loop():
                         exit_tag    = "SOLD_NEUTRAL"
                         exit_reason = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
 
-                    # PRIORITY 2: SCORE INVALIDATION (V126: Buffer score invalidation to h_score < 7.5)
-                    elif h_veto or h_score < 7.5:
+                    # PRIORITY 2: SCORE INVALIDATION (V141.8: Buffer score invalidation to h_score < 5.0 to eliminate early -$0.04/-$0.07 noise exits)
+                    elif h_veto or h_score < 5.0:
                         should_exit = True
                         exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
                         exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
