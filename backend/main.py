@@ -1022,6 +1022,7 @@ btc_freeze_until       = {p: 0.0 for p in participants_global}
 btc_last_chg_at_freeze = {p: 0.0 for p in participants_global}
 last_loop_error_msg    = "None"
 last_debug_info        = {}
+last_grade_s_rotation_time = {p: 0.0 for p in participants_global}
 
 
 @app.get("/api/robo/schedules")
@@ -2082,8 +2083,47 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # V145: Grade S Rotation Exits Disabled per user directive so all 5 holdings run 100% normally to SL/TP without forced rotation
-                pass
+                # V146 2-MINUTE GRADE S 1-LOT ROTATION ENGINE
+                # Every 2 minutes (120s), if a pending Grade S setup (>= 8.5 Pts) exists and 5 holdings are full,
+                # rotate ONLY 1 holding (the coin with the lowest PnL) to free 1 slot for the Grade S 1-lot ($20) entry.
+                last_rot_ts = last_grade_s_rotation_time.get(participant, 0.0)
+                if (now_ts - last_rot_ts) >= 120.0:
+                    top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
+                                        and float(s.get('confluence_score', 0)) >= 8.5), None)
+                    if top_grade_s:
+                        s_sym = top_grade_s['symbol']
+                        is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
+                        if not is_already_held and open_count >= 5 and p_holdings:
+                            holding_pnls = []
+                            for h in p_holdings:
+                                h_sym = h['symbol']
+                                h_tick = scanner_engine.active_tickers.get(h_sym)
+                                h_px   = h_tick.get("price", h['entry_price']) if h_tick else h['entry_price']
+                                h_pnl  = ((h_px - h['entry_price']) / h['entry_price']) * 100.0 if h['entry_price'] > 0 else 0.0
+                                holding_pnls.append((h_pnl, h_px, h))
+                            holding_pnls.sort(key=lambda x: x[0])  # Sort by lowest PnL
+                            
+                            worst_pct, worst_px, worst_h = holding_pnls[0]
+                            w_cap  = worst_h['entry_price'] * worst_h['amount']
+                            w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
+                            w_fee  = round(w_cap * 0.002, 4)
+                            w_net  = round(w_pnl - w_fee, 4)
+                            
+                            db_manager.remove_active_holding(worst_h['id'])
+                            db_manager.add_transaction_history(
+                                participant=participant,
+                                action="SELL (GRADE_S_ROTATION)",
+                                symbol=worst_h['symbol'],
+                                price=worst_px,
+                                capital=w_cap,
+                                pnl=w_net,
+                                commission_fee=w_fee,
+                                status="COMPLETED"
+                            )
+                            last_grade_s_rotation_time[participant] = now_ts
+                            safe_log(f"🔄 [V146 2-MIN GRADE S ROTATION] {participant} exited lowest PnL {worst_h['symbol']} ({worst_pct:+.2f}%) to free slot for Grade S {s_sym}")
+                            p_holdings = db_manager.get_active_holdings(participant)
+                            open_count = len(p_holdings)
 
                 # ENTRY EXECUTION (V124: Adaptive Limit Retest Buffer & High Confluence Immediate Fill)
                 if open_count < 5:
