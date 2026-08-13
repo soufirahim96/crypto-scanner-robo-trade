@@ -2263,7 +2263,7 @@ def run_robo_trade_loop():
                     h_bchoch = (h_chg < -2.5) or (h_high > curr_price * 1.03 and curr_price == h_low)
                     h_vveto  = (h_svr > 2.0)
                     h_vdiv   = (h_chg > 0.5) and (h_svr > 1.8 or h_vol < 5000000)
-                    h_veto   = h_bchoch or h_vveto or h_vdiv
+                    h_veto   = False  # V141.9: Disabled legacy indicator vetoes on open holdings to prevent premature -$0.04/-$0.07 noise exits
                     h_sw     = 2.5 if h_chg > 1.2 else 2.2
                     h_cvd    = 2.5 if h_vol > 7500000 else 2.1
                     h_fund   = 2.0 if h_chg >= 0 else 1.8
@@ -2271,25 +2271,19 @@ def run_robo_trade_loop():
                     h_fvg_rt = (h_chg > 0.3) and (curr_price <= h_open * 1.003) and (h_high > h_open * 1.008)
                     h_fvg_pts= 1.5 if h_fvg_rt else 0.0
                     h_raw    = round(h_sw + h_cvd + h_fund + h_bos + h_fvg_pts, 2)
-                    h_score  = 0.0 if h_veto else (max(0.0, h_raw - 2.0) if h_chg < 0 else h_raw)
+                    h_score  = h_raw
 
                     should_exit    = False
                     exit_reason    = ""
                     exit_tag       = "SOLD_NEUTRAL"
                     exit_is_profit = False
-                    is_gr_s_holding = h_score >= 9.5
+                    is_gr_s_holding = h_score >= 8.5
 
-                    # PRIORITY 1: BTC CRASH EMERGENCY EXIT
+                    # PRIORITY 1: BTC CRASH EMERGENCY EXIT (Only trigger on extreme market crashes BTC < -2.5%)
                     if btc_emergency_exit_active:
                         should_exit = True
                         exit_tag    = "SOLD_NEUTRAL"
                         exit_reason = f"BTC CRASH EMERGENCY EXIT (BTC {btc_now_chg:+.2f}%)"
-
-                    # PRIORITY 2: SCORE INVALIDATION (V141.8: Buffer score invalidation to h_score < 5.0 to eliminate early -$0.04/-$0.07 noise exits)
-                    elif h_veto or h_score < 5.0:
-                        should_exit = True
-                        exit_tag    = "BEARISH" if (h_chg < -1.5 or h_veto) else "PULLBACK_WATCH"
-                        exit_reason = f"Score Invalidation (Score:{h_score:.1f}, Veto:{h_veto})"
 
                     # 25-MIN FEE-AWARE STAGNANT COIN ROTATION (Stage 7 & Pillar 3 Spec)
                     elif holding_sec >= 1500 and h_net >= min_net and not is_gr_s_holding:
