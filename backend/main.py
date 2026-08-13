@@ -1659,8 +1659,9 @@ def detect_4h_support_base(symbol: str) -> dict:
     else:
         range_pct = 999.0
 
-    # A "solid base" requires: support tested >= 2 times AND consolidation range <= 8%
-    has_solid_base = (support_touches >= 2) and (range_pct <= 8.0)
+    # A "solid base" requires: support tested >= 2 times AND consolidation range <= 15%
+    # (Crypto altcoins naturally consolidate in 8-15% ranges over 48 hours, 8% was too tight)
+    has_solid_base = (support_touches >= 2) and (range_pct <= 15.0)
 
     return {
         "has_base": has_solid_base,
@@ -1966,11 +1967,11 @@ def run_robo_trade_loop():
                                 continue
 
                             # 1H Confirmation Bonus for scoring (max +1.5 pts)
-                            if h1_has_higher_low and h1_range_pct <= 3.0:
+                            if h1_has_higher_low and h1_range_pct <= 5.0:
                                 h1_confirmation_bonus = 1.5  # Tight base + higher lows = ideal accumulation
                             elif h1_has_higher_low:
                                 h1_confirmation_bonus = 1.0  # Higher lows but wider range
-                            elif h1_range_pct <= 3.0:
+                            elif h1_range_pct <= 5.0:
                                 h1_confirmation_bonus = 0.5  # Tight range but no clear higher low yet
 
                         # GATE 7: Real 4H Support Base Detection (multi-touch solid support)
@@ -2049,8 +2050,8 @@ def run_robo_trade_loop():
                         if not lock_bypassed:
                             continue
 
-                        # Minimum score gate: 8.0 normal, 8.5 recovery
-                        min_score = 8.5 if is_recovery_phase else 8.0
+                        # Minimum score gate: 7.5 normal, 8.0 recovery
+                        min_score = 8.0 if is_recovery_phase else 7.5
                         if total_score >= min_score:
                             scored_coins.append((total_score, c, lock_bypassed))
 
