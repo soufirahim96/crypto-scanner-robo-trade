@@ -1845,8 +1845,8 @@ def run_robo_trade_loop():
                 open_count         = len(p_holdings)
                 schedules          = db_manager.get_robo_schedules(participant)
                 pending            = [s for s in schedules if s['status'] == 'PENDING']
-                # Re-analyze every 60s (1 min) or if pending schedules < 5
-                needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 60) or (len(pending) < 5)
+                # Re-analyze STRICTLY every 60s (1 min) — removes early timer resets
+                needs_reanalysis   = (now_ts - last_analysis_time[participant] >= 60)
 
                 # V124 HIGH-FREQUENCY ENTRY SCANNING ENGINE
                 if needs_reanalysis:
@@ -1878,26 +1878,16 @@ def run_robo_trade_loop():
 
                     valid_coins = [
                         t for t in tickers
-                        if t.get("quote_volume", 0) > 1000000
+                        if float(t.get("quote_volume") or t.get("quoteVolume") or 0) >= 10000000
                         and "USDT" in t.get("symbol", "")
                         and t.get("symbol") not in held_symbols
                         and t.get("symbol") not in excluded_symbols
                         and t.get("symbol") not in coin_static_cooldown
                     ]
 
-                    # Recovery phase: only bullish regime allowed
-                    if is_recovery_phase and market_regime != "BULLISH":
-                        valid_coins = []
-
-                    # V140.4 PERFORMANCE GATE: Pre-filter using ticker data ONLY before any API calls
-                    # Sort by volume, keep top 50 candidates — prevents 1000+ API calls per scan cycle
-                    valid_coins = [
-                        c for c in valid_coins
-                        if c.get("quote_volume", 0) >= 15000000  # Pre-apply vol floor
-                        and c.get("change_pct", 0) >= -2.0       # Pre-reject hard downtrends
-                    ]
-                    valid_coins.sort(key=lambda x: x.get("quote_volume", 0), reverse=True)
-                    valid_coins = valid_coins[:50]  # Cap at top 50 by volume before API calls
+                    # Sort by volume, cap at top 40 candidates before parallel API pre-fetch
+                    valid_coins.sort(key=lambda x: float(x.get("quote_volume") or x.get("quoteVolume") or 0), reverse=True)
+                    valid_coins = valid_coins[:40]
 
                     # Fetch BTC 5M ONCE before the coin loop (shared for all coins this cycle)
                     btc_5m_global = fetch_symbol_klines_cached("BTCUSDT", "5m", limit=3)
@@ -1933,168 +1923,94 @@ def run_robo_trade_loop():
                     # Evaluation loop — all API data is now in cache, zero blocking calls
                     scored_coins = []
                     for c in valid_coins:
-                        vol        = c.get("quote_volume", 0)
-                        chg        = c.get("change_pct", 0)
-                        price      = c.get("price", 0)
-                        high       = c.get("high", price)
-                        low        = c.get("low", price)
-                        open_price = c.get("open", price)
+                        vol        = float(c.get("quote_volume") or c.get("quoteVolume") or 0)
+                        chg        = float(c.get("change_pct") or c.get("priceChangePercent") or 0)
+                        price      = float(c.get("price") or c.get("lastPrice") or 0)
+                        high       = float(c.get("high") or c.get("highPrice") or price)
+                        low        = float(c.get("low") or c.get("lowPrice") or price)
+                        open_price = float(c.get("open") or c.get("openPrice") or price)
                         sym_c      = c.get("symbol", "")
                         if price <= 0: continue
 
-                        rvol_5m = float(c.get("rvol") or 0.0)
-                        if rvol_5m <= 0:
-                            rvol_5m = 2.5 if (chg > 1.2 and vol > 7500000) else (2.0 if (chg >= 0.5 and vol > 5000000) else 1.0)
-
-                        # ============================================================
-                        # V140 PROFESSIONAL BASE DETECTION ENGINE
-                        # 7-Gate proactive base detection — quality over quantity
-                        # ============================================================
-
-                        # GATE 1: $15M Institutional Volume Floor (pre-filtered above, re-check)
-                        if vol < 15000000:
+                        # Hard reject extreme dumps (-5.0% or worse)
+                        if chg < -5.0:
                             continue
 
-                        # GATE 2: Hard reject coins in active macro downtrend
-                        candle_range = high - low
-                        upper_wick_ratio = ((high - price) / candle_range) if candle_range > 0 else 0.0
-                        is_macro_dump = (chg < -3.0) or (upper_wick_ratio > 0.70 and chg > 0.5) or (high > price * 1.04 and price == low)
-                        if is_macro_dump:
-                            continue
+                        # 1. 4H Support Base Floor (Gate 7)
+                        base_info    = detect_4h_support_base(sym_c)
+                        base_touches = base_info["touches"]
+                        base_range   = base_info["range_pct"]
+                        base_has     = base_info["has_base"]
 
-                        # GATE 3: BTC 5-Minute Gate (pre-fetched once outside loop)
-                        if not is_btc_5m_bullish_global and market_regime != "SUPER_BULLISH":
-                            last_debug_info[participant]["rejections"][sym_c] = "BTC 5M Red Candle Gate"
-                            continue
+                        base_pts = 3.0 if base_touches >= 3 else (2.5 if base_touches == 2 else (2.0 if base_has else 1.0))
+                        if base_range > 15.0:
+                            base_pts = max(0.0, base_pts - 0.5)
 
-                        # GATE 4: Live Order Book Imbalance (Bid/Ask Depth Ratio >= 1.5)
-                        ob_ratio = fetch_order_book_depth_ratio_cached(sym_c)
-                        if ob_ratio < 1.5 and market_regime != "SUPER_BULLISH":
-                            last_debug_info[participant]["rejections"][sym_c] = f"Order Book Sell Wall ({ob_ratio:.2f}x)"
-                            continue
+                        # 2. Volume Strength (Gate 1)
+                        vol_pts = 2.5 if vol > 30000000 else (2.0 if vol > 15000000 else 1.5)
 
-                        # GATE 5: 1D Daily 2-Bar Structure Shift (Yesterday Close >= 2 Days Ago Open)
-                        k_1d = fetch_symbol_klines_cached(sym_c, "1d", limit=6)
-                        has_daily_bullish_structure_shift = True
-                        if k_1d and len(k_1d) >= 3:
-                            has_daily_bullish_structure_shift = (k_1d[-2]["close"] >= k_1d[-3]["open"])
-                        if not has_daily_bullish_structure_shift:
-                            last_debug_info[participant]["rejections"][sym_c] = "1D Daily Structure Bearish"
-                            continue
-
-                        # GATE 6: 1H Zoom-In — Trend Structure & Consolidation Validation
-                        # Zooms from Daily into 1H to confirm the coin is building a proper
-                        # higher-low accumulation structure at the base level on the 1H timeframe.
-                        k_1h = fetch_symbol_klines_cached(sym_c, "1h", limit=8)  # Last 8 hours
-                        has_1h_valid_structure = True
-                        h1_confirmation_bonus = 0.0
+                        # 3. 1H Zoom-In Accumulation Structure (Gate 6)
+                        k_1h = fetch_symbol_klines_cached(sym_c, "1h", limit=8)
+                        h1_pts = 1.0
                         if k_1h and len(k_1h) >= 4:
-                            h1_lows  = [k["low"]  for k in k_1h[-4:]]
-                            h1_highs = [k["high"] for k in k_1h[-4:]]
+                            h1_lows   = [k["low"]   for k in k_1h[-4:]]
+                            h1_highs  = [k["high"]  for k in k_1h[-4:]]
                             h1_closes = [k["close"] for k in k_1h[-4:]]
                             h1_opens  = [k["open"]  for k in k_1h[-4:]]
+                            h1_range  = ((max(h1_highs) - min(h1_lows)) / min(h1_lows)) * 100.0 if min(h1_lows) > 0 else 999.0
+                            h1_hl     = (h1_lows[-1] >= h1_lows[-2]) or (h1_lows[-2] >= h1_lows[-3])
+                            h1_red    = sum(1 for i in range(4) if h1_closes[i] < h1_opens[i])
 
-                            # 1H Range Tightness (consolidation quality)
-                            h1_range_pct = ((max(h1_highs) - min(h1_lows)) / min(h1_lows)) * 100.0 if min(h1_lows) > 0 else 999.0
+                            if h1_red >= 4:
+                                h1_pts = -1.0
+                            elif h1_hl and h1_range <= 5.0:
+                                h1_pts = 1.5
+                            elif h1_hl:
+                                h1_pts = 1.0
+                            elif h1_range <= 5.0:
+                                h1_pts = 0.8
 
-                            # 1H Higher-Low Check (last low >= 2nd-to-last low = upward pressure building)
-                            h1_has_higher_low = (h1_lows[-1] >= h1_lows[-2]) or (h1_lows[-2] >= h1_lows[-3])
+                        # 4. 1D Daily 2-Bar Structure Shift (Gate 5)
+                        k_1d = fetch_symbol_klines_cached(sym_c, "1d", limit=6)
+                        d1_pts = 1.0
+                        if k_1d and len(k_1d) >= 3:
+                            if k_1d[-2]["close"] >= k_1d[-3]["open"]:
+                                d1_pts = 1.5
+                            else:
+                                d1_pts = 0.5
 
-                            # 1H Hard Downtrend Check (3+ consecutive red closes = NOT a valid base)
-                            h1_consecutive_red = sum(1 for i in range(len(h1_closes)) if h1_closes[i] < h1_opens[i])
-                            h1_is_hard_downtrend = (h1_consecutive_red >= 4)  # All 4 of last 4 candles red
+                        # 5. Live Order Book Imbalance (Gate 4)
+                        ob_pts = 0.2
+                        ob_ratio = fetch_order_book_depth_ratio_cached(sym_c)
+                        if ob_ratio >= 1.5:
+                            ob_pts = 1.5
+                        elif ob_ratio >= 1.0:
+                            ob_pts = 1.0
 
-                            if h1_is_hard_downtrend:
-                                has_1h_valid_structure = False
-                                last_debug_info[participant]["rejections"][sym_c] = f"1H Hard Downtrend ({h1_consecutive_red}/4 red candles)"
-                                continue
+                        # 6. BTC 5M Macro Momentum (Gate 3)
+                        btc_pts = 1.0 if is_btc_5m_bullish_global else 0.0
 
-                            # 1H Confirmation Bonus for scoring (max +1.5 pts)
-                            if h1_has_higher_low and h1_range_pct <= 5.0:
-                                h1_confirmation_bonus = 1.5  # Tight base + higher lows = ideal accumulation
-                            elif h1_has_higher_low:
-                                h1_confirmation_bonus = 1.0  # Higher lows but wider range
-                            elif h1_range_pct <= 5.0:
-                                h1_confirmation_bonus = 0.5  # Tight range but no clear higher low yet
-
-                        # GATE 7: Real 4H Support Base Detection (multi-touch solid support)
-                        base_info = detect_4h_support_base(sym_c)
-                        if not base_info["has_base"]:
-                            last_debug_info[participant]["rejections"][sym_c] = f"No 4H Base (touches:{base_info['touches']}, range:{base_info['range_pct']:.1f}%)"
-                            continue
-
-                        # ---- ALL 7 GATES PASSED: Now compute confluence score ----
-                        # V140.1 Streamlined Confluence Score (Max 10.0 Pts)
-                        # 5-Component: Base Quality + Volume + BTC Macro + 1H Structure + 5M Trigger
+                        # 7. 5M Retest/Rebound Trigger
                         k_5m = fetch_symbol_klines_cached(sym_c, "5m", limit=6)
-                        chg_30m = float(c.get("change_pct_30m", chg) or 0)
-
-                        # Base quality score (0–3.0 Pts): more touches = stronger base
-                        base_touches = base_info["touches"]
-                        base_range = base_info["range_pct"]
-                        base_pts = 3.0 if base_touches >= 4 else (2.5 if base_touches == 3 else 2.0)
-                        if base_range > 6.0:
-                            base_pts = max(0.0, base_pts - 0.5)  # Wider base = slightly weaker
-
-                        # Volume & order flow (0–2.5 Pts)
-                        vol_pts  = 2.5 if vol > 30000000 else (2.0 if vol > 15000000 else 1.5)
-
-                        # BTC & daily macro (0–1.5 Pts)
-                        macro_pts = 1.5 if (chg_30m >= 0 and chg >= 0) else 1.0
-
-                        # 1H Structure confirmation bonus (0–1.5 Pts) — from Gate 6
-                        h1_pts = h1_confirmation_bonus
-
-                        # 5M trigger confirmation (0–1.5 Pts)
-                        trigger_pts = 0.0
+                        trigger_pts = 0.5
                         if k_5m and len(k_5m) >= 3:
                             c1, c2, c3 = k_5m[-3], k_5m[-2], k_5m[-1]
                             is_c1_break = c1["close"] >= c1["open"] * 1.002
                             is_c2_hold  = c2["low"] <= c1["close"] * 1.001 and c2["close"] >= c1["open"] * 0.998
                             is_c3_go    = c3["close"] > c3["open"] and c3["close"] >= c2["high"]
                             if is_c1_break and is_c2_hold and is_c3_go:
-                                trigger_pts = 1.5  # Full 3-candle retest+rebound
-                            elif is_c1_break and (c3["close"] > c3["open"]):
-                                trigger_pts = 1.0  # Partial: breakout + green candle
-                            elif price > open_price and upper_wick_ratio <= 0.45:
-                                trigger_pts = 0.5  # Minimum: current candle is green and clean
+                                trigger_pts = 1.0
 
-                        total_score = round(base_pts + vol_pts + macro_pts + h1_pts + trigger_pts, 2)
+                        total_score = round(base_pts + vol_pts + h1_pts + d1_pts + ob_pts + btc_pts + trigger_pts, 2)
 
-                        # Overextension penalty (already pumped >3.5% without a base retest)
-                        prior_25m_chg = chg_30m - chg
-                        if prior_25m_chg > 3.5:
-                            total_score = max(0.0, total_score - 2.0)
-
-                        # Determine grade
-                        is_grade_a_or_s_exempt = total_score >= 8.5
-                        sell_vol_ratio = 2.4 if (chg < -1.5 and vol > 10000000) else (1.2 if chg < 0 else 1.0)
-                        has_bearish_choch = (chg < -2.5) or is_macro_dump
-
-                        # BTC 15-Minute Flash-Dump Guard
-                        btc_ticker = scanner_engine.active_tickers.get("BTCUSDT")
-                        btc_chg_val = btc_ticker.get("change_pct", 0) if btc_ticker else 0
-                        btc_chg_15m = btc_ticker.get("change_pct_15m", btc_chg_val) if btc_ticker else 0
-                        now_check = time.time()
-                        is_btc_flash_dumping = (btc_chg_15m <= -0.40) or (btc_chg_val < -2.5)
-                        if is_btc_flash_dumping:
-                            if now_check >= btc_freeze_until.get(participant, 0):
-                                btc_freeze_until[participant] = now_check + 900
-                                btc_last_chg_at_freeze[participant] = btc_chg_val
-                        elif now_check >= btc_freeze_until.get(participant, 0) and btc_freeze_until.get(participant, 0) > 0:
-                            btc_freeze_until[participant] = 0.0
-
-                        is_btc_frozen = (now_check < btc_freeze_until.get(participant, 0))
-                        if is_btc_frozen and not is_grade_a_or_s_exempt:
-                            continue
-
-                        # Circuit breaker: allow only if not circuit broken OR grade A/S
+                        # Determine grade and lock exemption
+                        is_grade_a_or_s_exempt = (total_score >= 8.5)
                         lock_bypassed = is_grade_a_or_s_exempt or (not is_circuit_broken)
                         if not lock_bypassed:
                             continue
 
-                        # Minimum score gate: 7.5 normal, 8.0 recovery
-                        min_score = 8.0 if is_recovery_phase else 7.5
+                        # Minimum score threshold
+                        min_score = 7.0 if is_recovery_phase else 6.5
                         if total_score >= min_score:
                             scored_coins.append((total_score, c, lock_bypassed))
 
