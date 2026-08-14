@@ -1062,7 +1062,8 @@ body {
 }
 
 .robo-holdings-scroll {
-  max-height: 180px;
+  max-height: 520px;
+  min-height: 220px;
   overflow-y: auto;
   overflow-x: hidden;
   border-radius: 6px;
@@ -1098,7 +1099,8 @@ body {
 }
 
 .robo-sched-scroll {
-  max-height: 120px;
+  max-height: 520px;
+  min-height: 220px;
   overflow-y: auto;
   width: 100%;
   box-sizing: border-box;
