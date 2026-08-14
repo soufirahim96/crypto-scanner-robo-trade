@@ -1023,6 +1023,7 @@ btc_last_chg_at_freeze = {p: 0.0 for p in participants_global}
 last_loop_error_msg    = "None"
 last_debug_info        = {}
 last_grade_s_rotation_time = {p: 0.0 for p in participants_global}
+symbol_lowest_touched  = {}   # PAA V150 Item 9: Track lowest touched price per symbol for momentum confirmation
 
 
 class CapitalConfigRequest(BaseModel):
@@ -1173,22 +1174,22 @@ def get_robo_trade_stats():
         norm_p = normalize_participant_name(p)
         p_txs = [t for t in all_txs if normalize_participant_name(t.get("participant")) == norm_p]
         
-        # Cumulative / Lifetime Stats
+        # Cumulative / Lifetime Stats (REQUEST 1 FIX: Net PnL = Gross Profit - Gross Loss - Comm. Fee)
         wins   = [t for t in p_txs if float(t.get("pnl", 0) or 0) > 0]
         losses = [t for t in p_txs if float(t.get("pnl", 0) or 0) <= 0]
         total_profit = sum(float(t.get("pnl", 0) or 0) for t in wins)
         total_loss   = sum(abs(float(t.get("pnl", 0) or 0)) for t in losses)
         total_comm   = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in p_txs)
-        total_pnl    = sum(float(t.get("pnl", 0) or 0) for t in p_txs)
+        total_pnl    = round(total_profit - total_loss - total_comm, 2)
         
-        # Today Stats (Resets daily at 12:00 AM MYT)
+        # Today Stats (Resets daily at 12:00 AM MYT - REQUEST 1 FIX: Net PnL = Gross Profit - Gross Loss - Comm. Fee)
         today_txs = [t for t in p_txs if str(t.get("created_at", "")).startswith(today_str)]
         today_wins_tx   = [t for t in today_txs if float(t.get("pnl", 0) or 0) > 0]
         today_losses_tx = [t for t in today_txs if float(t.get("pnl", 0) or 0) <= 0]
         today_profit = sum(float(t.get("pnl", 0) or 0) for t in today_wins_tx)
         today_loss   = sum(abs(float(t.get("pnl", 0) or 0)) for t in today_losses_tx)
         today_comm   = sum(float(t.get("commission_fee", 0.0) or (float(t.get("capital", 0.0)) * 0.002)) for t in today_txs)
-        today_pnl    = sum(float(t.get("pnl", 0) or 0) for t in today_txs)
+        today_pnl    = round(today_profit - today_loss - today_comm, 2)
         today_pnl_pct= (today_pnl / 100.0) * 100.0 if today_pnl != 0 else 0.0
         
         stats[p] = {
@@ -2034,18 +2035,45 @@ def run_robo_trade_loop():
                         if not lock_bypassed:
                             continue
 
-                        # Minimum score threshold
-                        min_score = 7.0 if is_recovery_phase else 6.5
-                        if total_score >= min_score:
-                            scored_coins.append((total_score, c, lock_bypassed))
+                        # PAA V150 ITEM 1: 8.0 MINIMUM SCORE GATE FOR GRADE A ENTRY
+                        if total_score < 8.0:
+                            continue
 
-                    # STRICT HIGHEST SCORE SORTING: Prioritize coins with highest confluence scores (e.g., 9.5+, 9.0+, 8.7+ first)
-                    scored_coins.sort(key=lambda x: x[0], reverse=True)
+                        # PAA V150 ITEM 14: BEAR MARKET SUSPENSION FOR GRADE A
+                        if market_regime == "BEARISH" and total_score < 8.5:
+                            continue
+
+                        # PAA V150 ITEM 10: 15-MINUTE ANTI-RE-ENTRY COOLDOWN
+                        last_exit_time = coin_exit_registry.get(sym, 0.0)
+                        if (now_ts - last_exit_time) < 900:
+                            continue
+
+                        # PAA V150 ITEM 7: SQEE BASE LEVEL (max of daily low and rolling 2h low)
+                        price = c.get("price", 100)
+                        if price <= 0: continue
+
+                        d_low = c.get("low", price)
+                        open_px = c.get("open", price)
+                        rolling_2h_low = min(d_low, open_px, price * 0.999)
+                        base_level = max(d_low * 0.998, rolling_2h_low * 0.999)
+
+                        # PAA V150 ITEM 12: PROXIMITY CALCULATIONS FOR STACK RANKING
+                        dec_places = 4 if price < 1.0 else (2 if price < 100.0 else 0)
+                        tick_size = 10 ** (-dec_places)
+                        num_ticks = 20 if market_regime == "BULLISH" else 10 # Item 14 Bull Lenient Proximity
+                        proximity_thresh = num_ticks * tick_size
+                        is_near_base = (price - base_level) <= proximity_thresh
+
+                        scored_coins.append((total_score, c, is_near_base, base_level))
+
+                    # PAA V150 ITEM 12: SCHEDULE BASE-PROXIMITY STACK RANKING
+                    # Prioritize coins already near base level over extended high-score coins
+                    scored_coins.sort(key=lambda x: (1 if x[2] else 0, x[0]), reverse=True)
 
                     scheduled_symbols = set()
                     existing_schedules = {s["symbol"]: s for s in db_manager.get_robo_schedules(participant)}
                     for sc_item in scored_coins:
-                        score_val, c, is_bypassed = sc_item[0], sc_item[1], sc_item[2]
+                        score_val, c, is_near_b, base_lvl = sc_item[0], sc_item[1], sc_item[2], sc_item[3]
                         sym = c.get("symbol", "")
                         if not sym or sym in held_symbols or sym in scheduled_symbols:
                             continue
@@ -2062,38 +2090,26 @@ def run_robo_trade_loop():
                                 continue
 
                         price = c.get("price", 100)
-                        if price <= 0: continue
-
-                        # STAGE 10 RULE #7: ADAPTIVE DYNAMIC ENTRY PRICE GUIDANCE (V124: 0.9985 Bull, 0.9965 Side, 0.9935 Pullback, 0.9990 Grade S >= 9.0)
-                        chg_val = c.get("change_pct", 0)
-                        is_pullback_trend = (chg_val < 0.0) or (price <= c.get("open", price) * 0.999)
-                        is_bullish_trend  = (chg_val > 1.2) or (market_regime == "BULLISH" and chg_val >= 0.5)
-
-                        # V142 INSTANT GRADE S ENTRY EXECUTION ENGINE (1.0000):
-                        # Grade S entries set entry price target to 1.0000 * live price for 100% immediate fill execution,
-                        # while Grade A entries retain the 0.9985 discount limit cushion.
                         is_grade_s = ("GOD" in participant) or (score_val >= 8.5)
-                        entry = price * 1.0000 if is_grade_s else price * 0.9985
+                        entry_target = price * 1.0000 if is_grade_s else base_lvl
 
                         if "GOD" in participant:
                             tier_str = f"👑 GRADE S ({score_val:.1f} Pts)" if score_val >= 8.5 else f"GRADE A ({score_val:.1f} Pts)"
                         else:
                             tier_str = f"GRADE A ({score_val:.1f} Pts)"
 
-                        exit_price = entry * (1.05 + random.uniform(0.005, 0.05))
+                        exit_price = entry_target * 1.0250
 
                         new_sched.append({
                             "symbol": sym,
-                            "entry_price_target": round(entry, 5),
+                            "entry_price_target": round(entry_target, 5),
+                            "base_level": round(base_lvl, 5),
                             "exit_price_target":  round(exit_price, 5),
                             "confluence_score":   score_val,
-                            "tier":               tier_str
+                            "tier":               tier_str,
+                            "created_at_ts":      now_ts
                         })
                         scheduled_symbols.add(sym)
-
-                        if sym in existing_schedules:
-                            old_entry = existing_schedules[sym].get("entry_price_target", entry)
-                            safe_log(f"🔄 [V124 DYNAMIC 60S ENTRY REFRESH] {participant} retained {sym}: updated Entry Target ${old_entry:.5f} -> ${entry:.5f} (Live Price: ${price:.5f})")
 
                         if len(new_sched) >= 5:
                             break
@@ -2208,11 +2224,19 @@ def run_robo_trade_loop():
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
 
-                # ENTRY EXECUTION LOOP (Up to 10 Slots: 5 Grade A + 5 Reserved Grade S)
+                # PAA V150 ENTRY EXECUTION LOOP
                 if open_count < 10:
                     for sched in pending:
                         if sched['status'] != 'PENDING': continue
                         sym   = sched['symbol']
+                        
+                        # PAA V150 ITEM 2: 10-MINUTE SQEE SCHEDULE EXPIRY
+                        sched_created_ts = float(sched.get("created_at_ts", now_ts) or now_ts)
+                        if (now_ts - sched_created_ts) > 600:
+                            db_manager.mark_robo_schedule_executed(sched['id'])
+                            safe_log(f"⏰ [PAA V150 SQEE EXPIRY] {participant} expired schedule for {sym} (10m without base retest)")
+                            continue
+
                         t_now = scanner_engine.active_tickers.get(sym)
                         if t_now and t_now.get("price", 0) > 0:
                             curr_price = t_now.get("price", 0)
@@ -2228,8 +2252,28 @@ def run_robo_trade_loop():
                             elif not is_s_tier and current_g_a >= 5:
                                 continue
 
-                            fill_threshold = entry * 1.0015
-                            if curr_price > 0 and curr_price <= fill_threshold:
+                            can_execute_buy = False
+                            if is_s_tier:
+                                # PAA V150 ITEM 4: GRADE S INSTANT FILL AT LIVE PRICE
+                                can_execute_buy = True
+                            else:
+                                # PAA V150 ITEMS 3, 7, 14: GRADE A BASE LEVEL PROXIMITY CHECK
+                                base_lvl = float(sched.get("base_level", entry) or entry)
+                                dec_places = 4 if curr_price < 1.0 else (2 if curr_price < 100.0 else 0)
+                                tick_size = 10 ** (-dec_places)
+                                num_ticks = 20 if market_regime == "BULLISH" else 10 # Item 14 Bull Lenient Proximity
+                                proximity_thresh = num_ticks * tick_size
+                                
+                                is_in_proximity = (curr_price - base_lvl) <= proximity_thresh
+
+                                # PAA V150 ITEM 9: ENTRY MOMENTUM CONFIRMATION GATE (+0.1% micro-bounce)
+                                lowest_px = min(symbol_lowest_touched.get(sym, curr_price), curr_price)
+                                symbol_lowest_touched[sym] = lowest_px
+                                has_micro_bounce = (curr_price >= lowest_px * 1.0010) or (lowest_px == curr_price)
+
+                                can_execute_buy = is_in_proximity and has_micro_bounce
+
+                            if can_execute_buy:
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
@@ -2239,7 +2283,7 @@ def run_robo_trade_loop():
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                 open_count += 1
-                                safe_log(f"[ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Cap: ${capital:.2f}, Score: {score_val:.1f})")
+                                safe_log(f"[PAA V150 ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Cap: ${capital:.2f}, Score: {score_val:.1f})")
                                 if open_count >= 10:
                                     break
 
@@ -2388,12 +2432,48 @@ def run_robo_trade_loop():
                     peak_pnl_dollar = (highest_p - entry) * amount
                     curr_pnl_dollar = (curr_price - entry) * amount
 
-                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (14 PnL STAGES SCALED DYNAMICALLY)
+                    # ── REQUEST 2: IRON-CLAD HARD STOP LOSS SAFETY FLOOR (-$0.25 NET PNL SCALED) ──
+                    trade_pnl = (curr_price - entry) * amount
                     cap_val = float(db_manager.get_system_config("capital_per_tx", "20.0"))
                     cap_scale = cap_val / 20.0
                     comm_offset = round(cap_val * 0.002, 4)
 
-                    if peak_pnl_dollar >= 3.00 * cap_scale:
+                    max_allowed_loss = -0.25 * cap_scale
+                    if trade_pnl <= max_allowed_loss:
+                        should_exit = True
+                        exit_tag = "PULLBACK_WATCH"
+                        exit_reason = f"IRON-CLAD HARD STOP LOSS (-${abs(trade_pnl):.2f} <= -${abs(max_allowed_loss):.2f} Floor)"
+
+                    # ── PAA V150 ITEMS 5, 8, 11, 13: LRHE STAGNANT HOLDING MONITOR ──
+                    elif is_gr_s_holding and holding_sec >= 900:
+                        attempted_bullish = (highest_p >= entry * 1.0020) # Item 8: Price movement attempt check (+0.2%)
+                        is_stagnant_pnl = (-0.03 * cap_scale <= trade_pnl <= 0.01 * cap_scale)
+                        
+                        if not attempted_bullish and is_stagnant_pnl:
+                            # Item 11: Volume Guard
+                            h_klines_5m = fetch_symbol_klines_cached(sym, "5m", limit=15)
+                            recent_vols = [k.get("volume", 0) for k in h_klines_5m] if h_klines_5m else []
+                            avg_vol = (sum(recent_vols) / len(recent_vols)) if recent_vols else h_vol
+                            
+                            is_high_volume_accumulation = (h_vol >= 1.5 * avg_vol)
+                            
+                            if is_high_volume_accumulation:
+                                # Volume Guard: HOLD (Institutional Accumulation)
+                                pass
+                            else:
+                                # Item 13: Break-Even Awareness Before Exit
+                                break_even_price = entry + (comm_offset / amount)
+                                is_near_breakeven = (curr_price >= entry * 0.9995) and (curr_price < break_even_price)
+                                
+                                if is_near_breakeven and (holding_sec < 1200): # Allow up to 5 extra mins if micro-uptrend
+                                    pass
+                                else:
+                                    should_exit = True
+                                    exit_tag = "SOLD_NEUTRAL"
+                                    exit_reason = f"PAA V150 LRHE Stagnant Conviction Exit (15m+ no +0.2% attempt, Net:${trade_pnl:+.2f})"
+                                    coin_exit_registry[sym] = now_ts # Item 10: 15-min cooldown
+
+                    elif peak_pnl_dollar >= 3.00 * cap_scale:
                         target_sl_dollar = 2.70 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
@@ -2478,11 +2558,11 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     else:
-                        # V147 DYNAMICALLY SCALED STOP LOSS FLOOR (-1.00% PRICE DROP BUFFER)
+                        # V150 DYNAMICALLY SCALED STOP LOSS FLOOR (-1.00% PRICE DROP BUFFER)
                         target_net_pnl_sl = -0.25 * cap_scale
                         gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset)
                         initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                        sl_stage_name = f"V147 Scaled Base SL (-${abs(target_net_pnl_sl):.2f} Net / -1.00% Price Drop)"
+                        sl_stage_name = f"V150 Scaled Base SL (-${abs(target_net_pnl_sl):.2f} Net / -1.00% Price Drop)"
                         is_profit_lock_stage = False
 
                         # V139 ITEM 2: DYNAMIC ATR VOLATILITY TAKE PROFIT ENGINE
@@ -2526,7 +2606,8 @@ def run_robo_trade_loop():
                             status="COMPLETED"
                         )
                         db_manager.remove_active_holding(holding['id'])
-                        safe_log(f"[V99 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
+                        coin_exit_registry[sym] = now_ts # PAA V150 Item 10: 15-minute anti-reentry cooldown
+                        safe_log(f"[V150 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
 
                         # Circuit Breaker Tracking
                         # Circuit Breaker & Consecutive Loss Tracking

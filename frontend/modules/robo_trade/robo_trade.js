@@ -237,46 +237,68 @@ window.updateRoboTradeModule = async function () {
     rtSetTxt("commMoText",    "$" + (Number(comm.monthly) || 0).toFixed(4));
     rtSetTxt("commTotalText", "$" + (Number(comm.lifetime) || 0).toFixed(4));
 
-    // ── 2. GOD AI Stats ──
+    // ── 2. GOD AI Stats (REQUEST 1 FIX: Net PnL = Gross Profit - Gross Loss - Comm. Fee) ──
     const godS = rtFindKey(statsData, "GOD") || {};
+    const godTodayProfit = Number(godS.today_profit) || 0;
+    const godTodayLoss   = Number(godS.today_loss) || 0;
+    const godTodayComm   = Number(godS.today_commission_fee) || 0;
+    const godTodayPnl    = godTodayProfit - godTodayLoss - godTodayComm;
+
     rtSetTxt("godTodayWins",         Number(godS.today_wins) || 0);
     rtSetTxt("godTodayLosses",       Number(godS.today_losses) || 0);
-    rtSetTxt("godTodayProfit",       "+$" + (Number(godS.today_profit) || 0).toFixed(2));
-    rtSetTxt("godTodayLossIncurred", "-$" + (Number(godS.today_loss) || 0).toFixed(2));
-    rtSetTxt("godTodayComm",         "-$" + (Number(godS.today_commission_fee) || 0).toFixed(4));
-    const godTodayPnl = Number(godS.today_pnl) || 0;
+    rtSetTxt("godTodayProfit",       "+$" + godTodayProfit.toFixed(2));
+    rtSetTxt("godTodayLossIncurred", "-$" + godTodayLoss.toFixed(2));
+    rtSetTxt("godTodayComm",         "-$" + godTodayComm.toFixed(4));
+    
     const godPnlEl = document.getElementById("godTodayPnL");
     if (godPnlEl) {
       godPnlEl.innerText = (godTodayPnl >= 0 ? "+" : "") + "$" + godTodayPnl.toFixed(2);
       godPnlEl.style.color = godTodayPnl >= 0 ? "#10b981" : "#ef4444";
     }
-    rtSetTxt("godCumProfit",  "+$" + (Number(godS.total_profit) || 0).toFixed(2));
-    rtSetTxt("godCumLoss",    "-$" + (Number(godS.total_loss) || 0).toFixed(2));
-    rtSetTxt("godCumComm",    "-$" + (Number(godS.total_commission_fee) || 0).toFixed(4));
-    const godCumPnl = Number(godS.total_pnl) || 0;
+
+    const godCumProfit = Number(godS.total_profit) || 0;
+    const godCumLoss   = Number(godS.total_loss) || 0;
+    const godCumComm   = Number(godS.total_commission_fee) || 0;
+    const godCumPnl    = godCumProfit - godCumLoss - godCumComm;
+
+    rtSetTxt("godCumProfit",  "+$" + godCumProfit.toFixed(2));
+    rtSetTxt("godCumLoss",    "-$" + godCumLoss.toFixed(2));
+    rtSetTxt("godCumComm",    "-$" + godCumComm.toFixed(4));
+    
     const godCumEl = document.getElementById("godCumNetPnL");
     if (godCumEl) {
       godCumEl.innerText = (godCumPnl >= 0 ? "+" : "") + "$" + godCumPnl.toFixed(2);
       godCumEl.style.color = godCumPnl >= 0 ? "#10b981" : "#ef4444";
     }
 
-    // ── 3. GROUP C Stats ──
+    // ── 3. GROUP C Stats (REQUEST 1 FIX: Net PnL = Gross Profit - Gross Loss - Comm. Fee) ──
     const gcS = rtFindKey(statsData, "GROUP C") || rtFindKey(statsData, "C BOT") || {};
+    const gcTodayProfit = Number(gcS.today_profit) || 0;
+    const gcTodayLoss   = Number(gcS.today_loss) || 0;
+    const gcTodayComm   = Number(gcS.today_commission_fee) || 0;
+    const gcTodayPnl    = gcTodayProfit - gcTodayLoss - gcTodayComm;
+
     rtSetTxt("groupCTodayWins",         Number(gcS.today_wins) || 0);
     rtSetTxt("groupCTodayLosses",       Number(gcS.today_losses) || 0);
-    rtSetTxt("groupCTodayProfit",       "+$" + (Number(gcS.today_profit) || 0).toFixed(2));
-    rtSetTxt("groupCTodayLossIncurred", "-$" + (Number(gcS.today_loss) || 0).toFixed(2));
-    rtSetTxt("groupCTodayComm",         "-$" + (Number(gcS.today_commission_fee) || 0).toFixed(4));
-    const gcTodayPnl = Number(gcS.today_pnl) || 0;
+    rtSetTxt("groupCTodayProfit",       "+$" + gcTodayProfit.toFixed(2));
+    rtSetTxt("groupCTodayLossIncurred", "-$" + gcTodayLoss.toFixed(2));
+    rtSetTxt("groupCTodayComm",         "-$" + gcTodayComm.toFixed(4));
+    
     const gcPnlEl = document.getElementById("groupCTodayPnL");
     if (gcPnlEl) {
       gcPnlEl.innerText = (gcTodayPnl >= 0 ? "+" : "") + "$" + gcTodayPnl.toFixed(2);
       gcPnlEl.style.color = gcTodayPnl >= 0 ? "#10b981" : "#ef4444";
     }
-    rtSetTxt("groupCCumProfit",  "+$" + (Number(gcS.total_profit) || 0).toFixed(2));
-    rtSetTxt("groupCCumLoss",    "-$" + (Number(gcS.total_loss) || 0).toFixed(2));
-    rtSetTxt("groupCCumComm",    "-$" + (Number(gcS.total_commission_fee) || 0).toFixed(4));
-    const gcCumPnl = Number(gcS.total_pnl) || 0;
+
+    const gcCumProfit = Number(gcS.total_profit) || 0;
+    const gcCumLoss   = Number(gcS.total_loss) || 0;
+    const gcCumComm   = Number(gcS.total_commission_fee) || 0;
+    const gcCumPnl    = gcCumProfit - gcCumLoss - gcCumComm;
+
+    rtSetTxt("groupCCumProfit",  "+$" + gcCumProfit.toFixed(2));
+    rtSetTxt("groupCCumLoss",    "-$" + gcCumLoss.toFixed(2));
+    rtSetTxt("groupCCumComm",    "-$" + gcCumComm.toFixed(4));
+    
     const gcCumEl = document.getElementById("groupCCumNetPnL");
     if (gcCumEl) {
       gcCumEl.innerText = (gcCumPnl >= 0 ? "+" : "") + "$" + gcCumPnl.toFixed(2);
