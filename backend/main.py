@@ -1025,6 +1025,32 @@ last_debug_info        = {}
 last_grade_s_rotation_time = {p: 0.0 for p in participants_global}
 
 
+class CapitalConfigRequest(BaseModel):
+    capital_per_tx: float
+
+@app.get("/api/robo/config")
+def get_robo_config():
+    cap_val = float(db_manager.get_system_config("capital_per_tx", "20.0"))
+    comm_fee = round(cap_val * 0.002, 4)
+    return {
+        "status": "success",
+        "capital_per_tx": cap_val,
+        "commission_fee": comm_fee
+    }
+
+@app.post("/api/robo/config/capital")
+def update_robo_capital(req: CapitalConfigRequest):
+    cap_val = max(1.0, round(float(req.capital_per_tx), 2))
+    db_manager.set_system_config("capital_per_tx", str(cap_val))
+    comm_fee = round(cap_val * 0.002, 4)
+    safe_log(f"⚙️ [CONFIG UPDATE] Capital per transaction updated to ${cap_val:.2f} (Comm. Fee: ${comm_fee:.4f})")
+    return {
+        "status": "success",
+        "capital_per_tx": cap_val,
+        "commission_fee": comm_fee,
+        "message": f"Capital updated to ${cap_val:.2f}"
+    }
+
 @app.get("/api/robo/schedules")
 def get_robo_schedules():
     """VERSION 141.2: GET ROBO TRADE SCHEDULES WITH DYNAMIC UNIFIED 60s TIMER"""
@@ -1035,10 +1061,13 @@ def get_robo_schedules():
     )
     elapsed = int(now_ts - last_ts) if last_ts > 0 else 0
     next_in = max(1, int(60 - (elapsed % 60))) if last_ts > 0 else 60
+    cap_val = float(db_manager.get_system_config("capital_per_tx", "20.0"))
     
     return {
         "status": "success",
         "schedules": db_manager.get_robo_schedules(),
+        "capital_per_tx": cap_val,
+        "commission_fee": round(cap_val * 0.002, 4),
         "next_update_in_seconds": next_in,
         "interval_seconds": 60,
         "last_analysis_timestamp": last_ts,
@@ -2083,50 +2112,104 @@ def run_robo_trade_loop():
 
                 pending = db_manager.get_robo_schedules(participant)
 
-                # V146 2-MINUTE GRADE S 1-LOT ROTATION ENGINE
-                # Every 2 minutes (120s), if a pending Grade S setup (>= 8.5 Pts) exists and 5 holdings are full,
-                # rotate ONLY 1 holding (the coin with the lowest PnL) to free 1 slot for the Grade S 1-lot ($20) entry.
+                # ── V147 10-SLOT DUAL PORTFOLIO & FEE-COVERED ROTATION ENGINE ──
+                user_capital_per_tx = float(db_manager.get_system_config("capital_per_tx", "20.0"))
+                comm_fee_tx = round(user_capital_per_tx * 0.002, 4)
+
+                # 30-MINUTE STAGNANT REFRESH RULE (Rule 2.3)
+                for h in list(p_holdings):
+                    h_sec = now_ts - float(h.get("created_at_ts", now_ts) or now_ts)
+                    h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
+                    h_pnl = (h_px - h["entry_price"]) * h["amount"]
+                    h_net = round(h_pnl - comm_fee_tx, 4)
+                    if h_sec >= 1800 and abs(h_net) <= comm_fee_tx:
+                        db_manager.remove_active_holding(h['id'])
+                        db_manager.add_transaction_history(
+                            participant=participant,
+                            action="SELL (30M_STAGNANT_REFRESH)",
+                            symbol=h['symbol'],
+                            price=h_px,
+                            capital=user_capital_per_tx,
+                            pnl=h_net,
+                            commission_fee=comm_fee_tx,
+                            status="COMPLETED"
+                        )
+                        safe_log(f"⏰ [30M STAGNANT REFRESH] {participant} exited stagnant {h['symbol']} after {h_sec/60:.1f}m (Net: ${h_net:+.2f})")
+                        p_holdings = db_manager.get_active_holdings(participant)
+
+                grade_a_holdings = [h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) < 8.5]
+                grade_s_holdings = [h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) >= 8.5]
+                open_count = len(p_holdings)
+
+                # FEE-COVERED GRADE S ROTATION ENGINE (Rule 2.2 & 2.4)
                 last_rot_ts = last_grade_s_rotation_time.get(participant, 0.0)
                 if (now_ts - last_rot_ts) >= 120.0:
-                    top_grade_s = next((s for s in pending if s['status'] == 'PENDING'
-                                        and float(s.get('confluence_score', 0)) >= 8.5), None)
-                    if top_grade_s:
+                    pending_s = [s for s in pending if s['status'] == 'PENDING' and float(s.get('confluence_score', 0)) >= 8.5]
+                    pending_s.sort(key=lambda x: float(x.get('confluence_score', 0)), reverse=True)
+                    top_grade_s = next((s for s in pending_s if not any(h['symbol'] == s['symbol'] for h in p_holdings)), None)
+                    
+                    if top_grade_s and open_count >= 10:
+                        s_score = float(top_grade_s.get('confluence_score', 8.5))
                         s_sym = top_grade_s['symbol']
-                        is_already_held = any(h['symbol'] == s_sym for h in p_holdings)
-                        if not is_already_held and open_count >= 5 and p_holdings:
-                            holding_pnls = []
-                            for h in p_holdings:
-                                h_sym = h['symbol']
-                                h_tick = scanner_engine.active_tickers.get(h_sym)
-                                h_px   = h_tick.get("price", h['entry_price']) if h_tick else h['entry_price']
-                                h_pnl  = ((h_px - h['entry_price']) / h['entry_price']) * 100.0 if h['entry_price'] > 0 else 0.0
-                                holding_pnls.append((h_pnl, h_px, h))
-                            holding_pnls.sort(key=lambda x: x[0])  # Sort by lowest PnL
-                            
-                            worst_pct, worst_px, worst_h = holding_pnls[0]
-                            w_cap  = worst_h['entry_price'] * worst_h['amount']
-                            w_pnl  = (worst_px - worst_h['entry_price']) * worst_h['amount']
-                            w_fee  = round(w_cap * 0.002, 4)
-                            w_net  = round(w_pnl - w_fee, 4)
-                            
-                            db_manager.remove_active_holding(worst_h['id'])
+                        
+                        # Rule 2.2: Rotate Grade A holding ONLY IF Net PnL >= Commission Fee (recovers fee!)
+                        eligible_a = []
+                        for h in grade_a_holdings:
+                            h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
+                            h_pnl = (h_px - h["entry_price"]) * h["amount"]
+                            h_net = round(h_pnl - comm_fee_tx, 4)
+                            if h_net >= comm_fee_tx:
+                                eligible_a.append((h_net, h_px, h))
+                        
+                        if eligible_a:
+                            eligible_a.sort(key=lambda x: x[0], reverse=True)
+                            best_net, best_px, best_h = eligible_a[0]
+                            db_manager.remove_active_holding(best_h['id'])
                             db_manager.add_transaction_history(
                                 participant=participant,
-                                action="SELL (GRADE_S_ROTATION)",
-                                symbol=worst_h['symbol'],
-                                price=worst_px,
-                                capital=w_cap,
-                                pnl=w_net,
-                                commission_fee=w_fee,
+                                action="SELL (GRADE_S_ROTATION_FEE_COVERED)",
+                                symbol=best_h['symbol'],
+                                price=best_px,
+                                capital=user_capital_per_tx,
+                                pnl=best_net,
+                                commission_fee=comm_fee_tx,
                                 status="COMPLETED"
                             )
                             last_grade_s_rotation_time[participant] = now_ts
-                            safe_log(f"🔄 [V146 2-MIN GRADE S ROTATION] {participant} exited lowest PnL {worst_h['symbol']} ({worst_pct:+.2f}%) to free slot for Grade S {s_sym}")
+                            safe_log(f"🔄 [FEE-COVERED ROTATION] Exited Grade A {best_h['symbol']} (Net: +${best_net:.2f} >= ${comm_fee_tx:.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
                             p_holdings = db_manager.get_active_holdings(participant)
                             open_count = len(p_holdings)
+                        elif len(grade_s_holdings) >= 10:
+                            # Rule 2.4 Exception: Replaced Grade S coin ONLY IF held score < new candidate score!
+                            g_s_candidates = []
+                            for h in grade_s_holdings:
+                                h_score = float(h.get("confluence_score", 8.5) or 8.5)
+                                if h_score < s_score:
+                                    h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
+                                    h_pnl = (h_px - h["entry_price"]) * h["amount"]
+                                    h_net = round(h_pnl - comm_fee_tx, 4)
+                                    g_s_candidates.append((h_net, h_score, h_px, h))
+                            if g_s_candidates:
+                                g_s_candidates.sort(key=lambda x: (x[1], x[0]))
+                                worst_net, worst_sc, worst_px, worst_h = g_s_candidates[0]
+                                db_manager.remove_active_holding(worst_h['id'])
+                                db_manager.add_transaction_history(
+                                    participant=participant,
+                                    action="SELL (GRADE_S_SCORE_SUPERIORITY)",
+                                    symbol=worst_h['symbol'],
+                                    price=worst_px,
+                                    capital=user_capital_per_tx,
+                                    pnl=worst_net,
+                                    commission_fee=comm_fee_tx,
+                                    status="COMPLETED"
+                                )
+                                last_grade_s_rotation_time[participant] = now_ts
+                                safe_log(f"🔄 [SCORE SUPERIORITY ROTATION] Replaced Grade S {worst_h['symbol']} (Score:{worst_sc:.1f}) with superior Grade S {s_sym} (Score:{s_score:.1f})")
+                                p_holdings = db_manager.get_active_holdings(participant)
+                                open_count = len(p_holdings)
 
-                # ENTRY EXECUTION (V124: Adaptive Limit Retest Buffer & High Confluence Immediate Fill)
-                if open_count < 5:
+                # ENTRY EXECUTION LOOP (Up to 10 Slots: 5 Grade A + 5 Reserved Grade S)
+                if open_count < 10:
                     for sched in pending:
                         if sched['status'] != 'PENDING': continue
                         sym   = sched['symbol']
@@ -2135,25 +2218,29 @@ def run_robo_trade_loop():
                             curr_price = t_now.get("price", 0)
                             entry      = sched['entry_price_target']
                             score_val  = float(sched.get('confluence_score', 8.5) or 8.5)
+                            is_s_tier  = score_val >= 8.5
 
-                            # V136 INSTANT FILL EXECUTION: All confirmed Base 'n Break entries fill immediately (fill_threshold = entry * 1.0015)
-                            fill_threshold = entry * 1.0015
+                            current_g_a = len([h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) < 8.5])
+                            current_g_s = len([h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) >= 8.5])
                             
+                            if is_s_tier and current_g_s >= 5 and current_g_a < 5:
+                                pass
+                            elif not is_s_tier and current_g_a >= 5:
+                                continue
+
+                            fill_threshold = entry * 1.0015
                             if curr_price > 0 and curr_price <= fill_threshold:
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                # V144 USER-REQUESTED UNIFORM 1-LOT POSITION SIZING ($20.00 CAPITAL FOR ALL COINS):
-                                num_lots = 1
-                                capital = 20.0
-
+                                capital = user_capital_per_tx
                                 db_manager.mark_robo_schedule_executed(sched['id'])
                                 db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
-                                open_count += num_lots
-                                safe_log(f"[V124 ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Target: ${entry:.5f}, Score: {score_val:.1f})")
-                                if open_count >= 5:
+                                open_count += 1
+                                safe_log(f"[ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Cap: ${capital:.2f}, Score: {score_val:.1f})")
+                                if open_count >= 10:
                                     break
 
                 # SMART RE-ENTRY CHECK (Stage 11 & Grade S Zero-Timer Re-Entry on -0.5% Dip)
@@ -2301,115 +2388,101 @@ def run_robo_trade_loop():
                     peak_pnl_dollar = (highest_p - entry) * amount
                     curr_pnl_dollar = (curr_price - entry) * amount
 
-                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (14 PnL STAGES SCALED PER $20 LOT - V130)
-                    # 1. PnL >= $0.18/lot -> Lock SL @ $0.15/lot
-                    # 2. PnL >= $0.21/lot -> Lock SL @ $0.17/lot
-                    # 3. PnL >= $0.25/lot -> Lock SL @ $0.22/lot
-                    # 4. PnL >= $0.30/lot -> Lock SL @ $0.26/lot
-                    # 5. PnL >= $0.36/lot -> Lock SL @ $0.33/lot
-                    # 6. PnL >= $0.40/lot -> Lock SL @ $0.37/lot
-                    # 7. PnL >= $0.50/lot -> Lock SL @ $0.45/lot
-                    # 8. PnL >= $0.60/lot -> Lock SL @ $0.55/lot
-                    # 9. PnL >= $0.70/lot -> Lock SL @ $0.65/lot
-                    # 10. PnL >= $0.90/lot -> Lock SL @ $0.83/lot
-                    # 11. PnL >= $1.00/lot -> Lock SL @ $0.90/lot
-                    # 12. PnL >= $1.50/lot -> Lock SL @ $1.20/lot
-                    # 13. PnL >= $2.00/lot -> Lock SL @ $1.70/lot
-                    # 14. PnL >= $3.00/lot -> Lock SL @ $2.70/lot
-                    lot_scale = max(1.0, round(h_cap / 20.0, 2))
-                    if peak_pnl_dollar >= 3.00 * lot_scale:
-                        target_sl_dollar = 2.70 * lot_scale
+                    # USER SPECIFIED DOLLAR PNL PROFIT TAKING & TRAILING SL MATRIX (14 PnL STAGES SCALED DYNAMICALLY)
+                    cap_val = float(db_manager.get_system_config("capital_per_tx", "20.0"))
+                    cap_scale = cap_val / 20.0
+                    comm_offset = round(cap_val * 0.002, 4)
+
+                    if peak_pnl_dollar >= 3.00 * cap_scale:
+                        target_sl_dollar = 2.70 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 14 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 2.00 * lot_scale:
-                        target_sl_dollar = 1.70 * lot_scale
+                    elif peak_pnl_dollar >= 2.00 * cap_scale:
+                        target_sl_dollar = 1.70 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 13 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 1.50 * lot_scale:
-                        target_sl_dollar = 1.20 * lot_scale
+                    elif peak_pnl_dollar >= 1.50 * cap_scale:
+                        target_sl_dollar = 1.20 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 12 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 1.00 * lot_scale:
-                        target_sl_dollar = 0.90 * lot_scale
+                    elif peak_pnl_dollar >= 1.00 * cap_scale:
+                        target_sl_dollar = 0.90 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 11 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.90 * lot_scale:
-                        target_sl_dollar = 0.83 * lot_scale
+                    elif peak_pnl_dollar >= 0.90 * cap_scale:
+                        target_sl_dollar = 0.83 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 10 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.70 * lot_scale:
-                        target_sl_dollar = 0.65 * lot_scale
+                    elif peak_pnl_dollar >= 0.70 * cap_scale:
+                        target_sl_dollar = 0.65 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 9 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.60 * lot_scale:
-                        target_sl_dollar = 0.55 * lot_scale
+                    elif peak_pnl_dollar >= 0.60 * cap_scale:
+                        target_sl_dollar = 0.55 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 8 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.50 * lot_scale:
-                        target_sl_dollar = 0.45 * lot_scale
+                    elif peak_pnl_dollar >= 0.50 * cap_scale:
+                        target_sl_dollar = 0.45 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 7 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.40 * lot_scale:
-                        target_sl_dollar = 0.37 * lot_scale
+                    elif peak_pnl_dollar >= 0.40 * cap_scale:
+                        target_sl_dollar = 0.37 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 6 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.36 * lot_scale:
-                        target_sl_dollar = 0.33 * lot_scale
+                    elif peak_pnl_dollar >= 0.36 * cap_scale:
+                        target_sl_dollar = 0.33 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 5 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.30 * lot_scale:
-                        target_sl_dollar = 0.26 * lot_scale
+                    elif peak_pnl_dollar >= 0.30 * cap_scale:
+                        target_sl_dollar = 0.26 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 4 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.25 * lot_scale:
-                        target_sl_dollar = 0.22 * lot_scale
+                    elif peak_pnl_dollar >= 0.25 * cap_scale:
+                        target_sl_dollar = 0.22 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 3 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.21 * lot_scale:
-                        target_sl_dollar = 0.17 * lot_scale
+                    elif peak_pnl_dollar >= 0.21 * cap_scale:
+                        target_sl_dollar = 0.17 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 2 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
-                    elif peak_pnl_dollar >= 0.18 * lot_scale:
-                        target_sl_dollar = 0.15 * lot_scale
+                    elif peak_pnl_dollar >= 0.18 * cap_scale:
+                        target_sl_dollar = 0.15 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
                         if curr_price <= sl_p:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             exit_reason = f"Stage 1 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     else:
-                        # V143 USER-REQUESTED FIXED -0.25 NET SL FLOOR (-1.00% PRICE BUFFER)
-                        # Position SL remains strictly fixed at -1.00% price drop (-$0.25 Net PnL per $20 lot)
-                        # without time-decay shrinking during drawdown, allowing base consolidation to reach +2.50% TP.
-                        comm_offset = 0.04
-                        target_net_pnl_sl = -0.25
-                        gross_target_dollar = (abs(target_net_pnl_sl) - comm_offset) * lot_scale
+                        # V147 DYNAMICALLY SCALED STOP LOSS FLOOR (-1.00% PRICE DROP BUFFER)
+                        target_net_pnl_sl = -0.25 * cap_scale
+                        gross_target_dollar = max(0.0, abs(target_net_pnl_sl) - comm_offset)
                         initial_sl_price = entry * (1.0 - (gross_target_dollar / h_cap))
-                        sl_stage_name = "V143 Fixed Base SL (-$0.25 Net / -1.00% Price Drop)"
+                        sl_stage_name = f"V147 Scaled Base SL (-${abs(target_net_pnl_sl):.2f} Net / -1.00% Price Drop)"
                         is_profit_lock_stage = False
 
                         # V139 ITEM 2: DYNAMIC ATR VOLATILITY TAKE PROFIT ENGINE

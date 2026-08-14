@@ -151,6 +151,15 @@ class DatabaseManager:
             except Exception:
                 pass
 
+            # VERSION 147: PERSISTENT SYSTEM CONFIG TABLE (CAPITAL PER TX, FEES, ETC.)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_config (
+                    config_key TEXT PRIMARY KEY,
+                    config_val TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # VERSION 38: PAST PATTERN DATABASE TABLE (STORE 10-YEAR ANALYSIS BY GROUP E)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS past_pattern (
@@ -651,6 +660,27 @@ class DatabaseManager:
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM transaction_history")
+            conn.commit()
+            return True
+
+    def get_system_config(self, config_key: str, default_val: str = "") -> str:
+        """VERSION 147: Retrieve persistent key-value configuration setting"""
+        with sqlite3.connect(DB_FILE, timeout=10.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT config_val FROM system_config WHERE config_key = ?", (config_key,))
+            row = cursor.fetchone()
+            return str(row[0]) if row else str(default_val)
+
+    def set_system_config(self, config_key: str, config_val: str) -> bool:
+        """VERSION 147: Save or update persistent key-value configuration setting"""
+        myt_ts = get_myt_timestamp_str()
+        with sqlite3.connect(DB_FILE, timeout=10.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO system_config (config_key, config_val, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(config_key) DO UPDATE SET config_val = excluded.config_val, updated_at = excluded.updated_at
+            """, (config_key, str(config_val), myt_ts))
             conn.commit()
             return True
 

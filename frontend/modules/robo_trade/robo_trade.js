@@ -334,11 +334,64 @@ window.updateRoboTradeModule = async function () {
   }
 };
 
+// ─── CAPITAL CONFIG CONTROLLER ────────────────────────────
+async function syncCapitalConfigUI() {
+  const capInput = document.getElementById("capitalPerTxInput");
+  const feeDisplay = document.getElementById("capitalCommFeeDisplay");
+  if (!capInput) return;
+  try {
+    const res = await fetch("/api/robo/config");
+    const d = await res.json();
+    if (d.status === "success") {
+      const capVal = Number(d.capital_per_tx) || 20.00;
+      const feeVal = Number(d.commission_fee) || (capVal * 0.002);
+      if (document.activeElement !== capInput) {
+        capInput.value = capVal.toFixed(2);
+      }
+      if (feeDisplay) feeDisplay.innerText = "$" + feeVal.toFixed(4);
+    }
+  } catch (e) {
+    console.error("Config fetch error:", e);
+  }
+}
+
+async function updateCapitalConfigFromUI() {
+  const capInput = document.getElementById("capitalPerTxInput");
+  const feeDisplay = document.getElementById("capitalCommFeeDisplay");
+  if (!capInput) return;
+  const newCap = parseFloat(capInput.value);
+  if (isNaN(newCap) || newCap < 1.0) {
+    alert("Please enter a valid capital per transaction (min $1.00)");
+    return;
+  }
+  try {
+    const res = await fetch("/api/robo/config/capital", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ capital_per_tx: newCap })
+    });
+    const d = await res.json();
+    if (d.status === "success") {
+      const feeVal = Number(d.commission_fee) || (newCap * 0.002);
+      if (feeDisplay) feeDisplay.innerText = "$" + feeVal.toFixed(4);
+      alert(`✅ Capital per transaction updated to $${newCap.toFixed(2)} (Comm. Fee: $${feeVal.toFixed(4)})`);
+      window.updateRoboTradeModule();
+    }
+  } catch (e) {
+    alert("Failed to update capital config: " + e);
+  }
+}
+
 // ─── INIT (called when tab opened or on login) ───────────
 window.initRoboTradeModule = function () {
   // Wire up buttons
   const refreshBtn = document.getElementById("refreshRoboTradeBtn");
   if (refreshBtn) refreshBtn.onclick = () => window.updateRoboTradeModule();
+
+  const updateCapBtn = document.getElementById("updateCapitalBtn");
+  if (updateCapBtn) updateCapBtn.onclick = () => updateCapitalConfigFromUI();
+
+  syncCapitalConfigUI();
 
   const resetBtn = document.getElementById("resetRoboTradeBtn");
   if (resetBtn) {
