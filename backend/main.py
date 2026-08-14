@@ -2044,7 +2044,7 @@ def run_robo_trade_loop():
                             continue
 
                         # PAA V150 ITEM 10: 15-MINUTE ANTI-RE-ENTRY COOLDOWN
-                        last_exit_time = coin_exit_registry.get(sym, 0.0)
+                        last_exit_time = coin_exit_registry.get(sym_c, 0.0)
                         if (now_ts - last_exit_time) < 900:
                             continue
 
@@ -2445,7 +2445,7 @@ def run_robo_trade_loop():
                         exit_reason = f"IRON-CLAD HARD STOP LOSS (-${abs(trade_pnl):.2f} <= -${abs(max_allowed_loss):.2f} Floor)"
 
                     # ── PAA V150 ITEMS 5, 8, 11, 13: LRHE STAGNANT HOLDING MONITOR ──
-                    elif is_gr_s_holding and holding_sec >= 900:
+                    if not should_exit and is_gr_s_holding and holding_sec >= 900:
                         attempted_bullish = (highest_p >= entry * 1.0020) # Item 8: Price movement attempt check (+0.2%)
                         is_stagnant_pnl = (-0.03 * cap_scale <= trade_pnl <= 0.01 * cap_scale)
                         
@@ -2455,30 +2455,26 @@ def run_robo_trade_loop():
                             recent_vols = [k.get("volume", 0) for k in h_klines_5m] if h_klines_5m else []
                             avg_vol = (sum(recent_vols) / len(recent_vols)) if recent_vols else h_vol
                             
-                            is_high_volume_accumulation = (h_vol >= 1.5 * avg_vol)
+                            is_high_volume_accumulation = (h_vol >= 1.5 * avg_vol) if avg_vol > 0 else False
                             
-                            if is_high_volume_accumulation:
-                                # Volume Guard: HOLD (Institutional Accumulation)
-                                pass
-                            else:
+                            if not is_high_volume_accumulation:
                                 # Item 13: Break-Even Awareness Before Exit
-                                break_even_price = entry + (comm_offset / amount)
+                                break_even_price = entry + (comm_offset / amount) if amount > 0 else entry
                                 is_near_breakeven = (curr_price >= entry * 0.9995) and (curr_price < break_even_price)
                                 
-                                if is_near_breakeven and (holding_sec < 1200): # Allow up to 5 extra mins if micro-uptrend
-                                    pass
-                                else:
+                                if not (is_near_breakeven and holding_sec < 1200): # Allow up to 5 extra mins if micro-uptrend
                                     should_exit = True
                                     exit_tag = "SOLD_NEUTRAL"
                                     exit_reason = f"PAA V150 LRHE Stagnant Conviction Exit (15m+ no +0.2% attempt, Net:${trade_pnl:+.2f})"
                                     coin_exit_registry[sym] = now_ts # Item 10: 15-min cooldown
 
-                    elif peak_pnl_dollar >= 3.00 * cap_scale:
-                        target_sl_dollar = 2.70 * cap_scale
-                        sl_p = entry + (target_sl_dollar / amount)
-                        if curr_price <= sl_p:
-                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            exit_reason = f"Stage 14 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
+                    if not should_exit:
+                        if peak_pnl_dollar >= 3.00 * cap_scale:
+                            target_sl_dollar = 2.70 * cap_scale
+                            sl_p = entry + (target_sl_dollar / amount)
+                            if curr_price <= sl_p:
+                                should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                                exit_reason = f"Stage 14 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
                     elif peak_pnl_dollar >= 2.00 * cap_scale:
                         target_sl_dollar = 1.70 * cap_scale
                         sl_p = entry + (target_sl_dollar / amount)
