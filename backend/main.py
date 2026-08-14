@@ -2568,18 +2568,10 @@ def run_robo_trade_loop():
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
                             tp_pct_str = "+10.00%" if is_gr_s_holding else "+2.50%"
                             exit_reason = f"Standard Take Profit ({tp_pct_str})"
-                        elif curr_price <= initial_sl_price:
-                            should_exit = True
-                            exit_tag = "CLEARED_REENTRY_PRIORITY" if is_profit_lock_stage else "PULLBACK_WATCH"
-                            exit_is_profit = is_profit_lock_stage
-                            sign_str = "+" if target_net_pnl_sl > 0 else ""
-                            exit_reason = f"V133 {sl_stage_name} ({sign_str}${target_net_pnl_sl * lot_scale:.2f} Net PnL)"
-
-                    # EXECUTE EXIT
+                                         # EXECUTE EXIT
                     if should_exit:
                         comm_fee = round(h_cap * 0.002, 4)
                         net_pnl  = round(trade_pnl - comm_fee, 4)
-
                         db_manager.add_transaction_history(
                             participant=participant,
                             action="SELL (ROBO)",
@@ -2591,7 +2583,6 @@ def run_robo_trade_loop():
                             status="COMPLETED"
                         )
                         db_manager.remove_active_holding(holding['id'])
-                        coin_exit_registry[sym] = now_ts # PAA V150 Item 10: 15-minute anti-reentry cooldown
                         safe_log(f"[V150 PRO EXIT] {participant} sold {sym} @ ${curr_price:.5f}. {exit_reason}. Net:${net_pnl:.2f}")
 
                         # Circuit Breaker Tracking
@@ -2628,7 +2619,6 @@ def run_robo_trade_loop():
                             # Reset consecutive loss counter on win
                             if sym in coin_consecutive_losses:
                                 coin_consecutive_losses[sym] = {"count": 0, "last_loss_at": 0.0}
-
                             if is_recovery_phase:
                                 recovery_wins[participant] += 1
                                 if recovery_wins[participant] >= 3:
@@ -2652,23 +2642,15 @@ def run_robo_trade_loop():
                             coin_static_cooldown[sym] = now_ts + 5400  # 90 minutes
                             safe_log(f"[V100 STATIC COOLDOWN] {sym} on 90-min cooldown after static exit.")
 
-                        # ── Write exit registry (ALL LOSS EXITS TAGGED) ──────
-                        if net_pnl < 0 or exit_tag in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH"):
-                            reg_status = exit_tag if exit_tag in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH") else "PULLBACK_WATCH"
-                            coin_exit_registry[sym] = {
-                                "sold_at_price": curr_price, "sold_at_time": now_ts,
-                                "exit_chg": h_chg, "status": reg_status,
-                                "bearish_retry_until": now_ts + 1800
-                            }
-                            safe_log(f"📌 [V124 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (30-Min / 1800s Hard Cooldown Active)")
-                        elif exit_tag in ("CLEARED_REENTRY_PRIORITY",):
-                            coin_exit_registry[sym] = {
-                                "sold_at_price": curr_price, "sold_at_time": now_ts,
-                                "exit_chg": h_chg, "status": "CLEARED_REENTRY_PRIORITY",
-                                "bearish_retry_until": 0.0
-                            }
-                        elif sym in coin_exit_registry:
-                            del coin_exit_registry[sym]
+                        # ── Write exit registry (LOSS & STAGNANT EXITS COOLDOWN 15-MIN, PROFIT WINS UNLOCKED) ──────
+                        if net_pnl <= 0 or exit_tag in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH", "SOLD_NEUTRAL"):
+                            reg_status = exit_tag if exit_tag in ("PULLBACK_WATCH", "EARLY_WARNING_PULLBACK", "BEARISH", "SOLD_NEUTRAL") else "PULLBACK_WATCH"
+                            coin_exit_registry[sym] = now_ts + 900  # 15-minute cooldown for loss/stagnant exits
+                            safe_log(f"📌 [PAA V150 EXIT REGISTRY TAGGED] {sym} tagged as {reg_status} (15-Min Hard Cooldown Active)")
+                        else:
+                            if sym in coin_exit_registry:
+                                del coin_exit_registry[sym]
+                            safe_log(f"⚡ [PROFIT RE-ENTRY UNLOCKED] {sym} won (+${net_pnl:.2f}) — CLEARED FOR IMMEDIATE RE-ENTRY!")
 
         except Exception as e:
             global last_loop_error_msg
