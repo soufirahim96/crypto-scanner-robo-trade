@@ -2066,9 +2066,9 @@ def run_robo_trade_loop():
 
                         scored_coins.append((total_score, c, is_near_base, base_level))
 
-                    # PAA V150 ITEM 12: SCHEDULE BASE-PROXIMITY STACK RANKING
-                    # Prioritize coins already near base level over extended high-score coins
-                    scored_coins.sort(key=lambda x: (1 if x[2] else 0, x[0]), reverse=True)
+                    # PAA V150 ITEM 12: SCHEDULE STACK RANKING
+                    # Grade S (>= 8.5) takes top priority, followed by Grade A coins near base level
+                    scored_coins.sort(key=lambda x: (1 if x[0] >= 8.5 else (1 if x[2] else 0), x[0]), reverse=True)
 
                     scheduled_symbols = set()
                     existing_schedules = {s["symbol"]: s for s in db_manager.get_robo_schedules(participant)}
@@ -2077,17 +2077,6 @@ def run_robo_trade_loop():
                         sym = c.get("symbol", "")
                         if not sym or sym in held_symbols or sym in scheduled_symbols:
                             continue
-
-                        # If other bot holds it and non-overlapping options exist, skip to prefer distinct coins
-                        if sym in other_symbols:
-                            has_non_shared = any(
-                                sc[1]["symbol"] not in other_symbols
-                                and sc[1]["symbol"] not in scheduled_symbols
-                                and sc[1]["symbol"] not in held_symbols
-                                for sc in scored_coins
-                            )
-                            if has_non_shared:
-                                continue
 
                         price = c.get("price", 100)
                         is_grade_s = ("GOD" in participant) or (score_val >= 8.5)
