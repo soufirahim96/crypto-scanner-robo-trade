@@ -1629,8 +1629,15 @@ def has_latest_3_closed_5m_bullish_candles(symbol: str) -> bool:
         except Exception:
             continue
 
-    # Fail-safe default if REST API fails
-    return False
+def is_fiat_or_stable(symbol_or_base: str) -> bool:
+    """Returns True if the token is a fiat, stablecoin, or non-crypto index asset."""
+    s = str(symbol_or_base or "").upper().strip()
+    if s.endswith("USDT"):
+        s = s[:-4]
+    stables = {"U", "USDC", "FDUSD", "BUSD", "TUSD", "EUR", "EURI", "DAI", "AEUR", "WBTC", "CRCL", "SPCX", "USD", "USDS", "PYUSD", "USD0", "USDE", "TRY", "BRL", "GBP", "AUD", "RUB", "BKRW", "IDRT", "ZAR", "VAI", "SNDK", "DRAMB"}
+    if s in stables:
+        return True
+    return any(s.startswith(prefix) for prefix in ["USD", "EUR", "TUSD", "BUSD", "USDC", "FDUSD", "EURI", "DRAMB", "SNDK"])
 
 def run_robo_trade_loop():
     """
@@ -1924,9 +1931,7 @@ def run_robo_trade_loop():
 
                     all_registered = db_manager.get_all_coins()
                     
-                    def is_fiat_or_stable(base_sym: str) -> bool:
-                        stable_fiat_keywords = ["U", "USDC", "FDUSD", "BUSD", "TUSD", "EUR", "DAI", "AEUR", "WBTC", "CRCL", "SPCX", "USD", "EURI", "USDS", "PYUSD", "USD0", "USDE", "TRY", "BRL", "GBP", "AUD", "RUB", "BKRW", "IDRT", "ZAR", "VAI"]
-                        return any(base_sym == kw or base_sym.startswith(kw) for kw in stable_fiat_keywords)
+
 
                     excluded_symbols = set(
                         c["symbol"] for c in all_registered
