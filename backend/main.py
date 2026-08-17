@@ -2313,11 +2313,9 @@ def run_robo_trade_loop():
                                 vol_surge_ok = (live_vol > 0)
 
 
-                                # Gate 2: Live Order Book Bid/Ask >= 0.80 (healthy orderbook, no massive ask wall)
-                                ob_ratio_live = fetch_order_book_depth_ratio_cached(sym)
-                                ob_ok = (ob_ratio_live >= 0.80)
-
-                                ignition_pass = vol_surge_ok and ob_ok
+                                # ── V151 PRE-ENTRY IGNITION GATE ──
+                                # Confirms live tick data and volume are active before executing buy
+                                ignition_pass = (curr_price > 0) and (live_vol > 0)
 
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
@@ -2329,7 +2327,7 @@ def run_robo_trade_loop():
                                     db_manager.mark_robo_schedule_executed(sched['id'])
                                     db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                     open_count += 1
-                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: ${live_vol:,.0f} | OB: {ob_ratio_live:.2f} | Score: {score_val:.1f}")
+                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: ${live_vol:,.0f} | Score: {score_val:.1f}")
                                     if open_count >= 10:
                                         break
                                 else:
