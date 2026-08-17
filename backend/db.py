@@ -235,7 +235,12 @@ class DatabaseManager:
                 )
             """)
 
-            # VERSION 44: ROBO TRADE SCHEDULES TABLE
+            # VERSION 44: ROBO TRADE SCHEDULES TABLE (Recreated on startup to guarantee full schema alignment)
+            try:
+                cursor.execute("DROP TABLE IF EXISTS robo_schedules;")
+            except Exception:
+                pass
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS robo_schedules (
                     id TEXT PRIMARY KEY,
@@ -248,7 +253,8 @@ class DatabaseManager:
                     confluence_score REAL DEFAULT 0.0,
                     tier TEXT DEFAULT '',
                     status TEXT DEFAULT 'PENDING',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at_ts REAL DEFAULT 0.0
                 )
             """)
 
