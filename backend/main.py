@@ -1035,6 +1035,10 @@ coin_vol_30m_cache     = {}   # {symbol: [vol_datapoints]} rolling 30-min volume
 class CapitalConfigRequest(BaseModel):
     capital_per_tx: float
 
+@app.get("/api/system/version")
+def get_system_version():
+    return {"status": "success", "version": "V151.10", "built_at": get_myt_timestamp_str()}
+
 @app.get("/api/robo/config")
 def get_robo_config():
     cap_val = float(db_manager.get_system_config("capital_per_tx", "20.0"))
@@ -2111,7 +2115,8 @@ def run_robo_trade_loop():
                     for sc_item in scored_coins:
                         score_val, c, is_near_b, base_lvl = sc_item[0], sc_item[1], sc_item[2], sc_item[3]
                         sym = c.get("symbol", "")
-                        if not sym or sym in held_symbols or sym in scheduled_symbols:
+                        base_sym = sym[:-4] if sym.endswith("USDT") else sym
+                        if not sym or is_fiat_or_stable(base_sym) or sym in held_symbols or sym in scheduled_symbols:
                             continue
 
                         price = c.get("price", 100)
