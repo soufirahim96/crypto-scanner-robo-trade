@@ -1024,6 +1024,12 @@ last_loop_error_msg    = "None"
 last_debug_info        = {}
 last_grade_s_rotation_time = {p: 0.0 for p in participants_global}
 symbol_lowest_touched  = {}   # PAA V150 Item 9: Track lowest touched price per symbol for momentum confirmation
+# V151 VIA Globals
+last_live_rescore_time = {p: 0.0 for p in participants_global}  # Per-bot live rescore timer (3-min)
+holding_live_scores    = {}   # {holding_id: live_score} — dynamic rescored score per open holding
+btc_flash_drop_until   = 0.0  # BTC flash drop suspension timestamp (5-min block on Grade A entries)
+btc_5m_prices          = []   # Rolling 5M BTC price history for flash drop detection
+coin_vol_30m_cache     = {}   # {symbol: [vol_datapoints]} rolling 30-min volume avg cache
 
 
 class CapitalConfigRequest(BaseModel):
@@ -1775,7 +1781,7 @@ def run_robo_trade_loop():
     except Exception as ex_fresh:
         safe_log(f"[V124 STARTUP ERROR] {ex_fresh}")
 
-    global last_analysis_time, last_analysis_time_global, global_last_analysis_ts, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, circuit_break_date, smart_reentry_pending, coin_static_cooldown, coin_consecutive_losses, coin_exit_registry, btc_freeze_until, btc_last_chg_at_freeze
+    global last_analysis_time, last_analysis_time_global, global_last_analysis_ts, circuit_break_until, recovery_phase_until, recovery_wins, daily_loss_count, daily_drawdown_pct, circuit_break_date, smart_reentry_pending, coin_static_cooldown, coin_consecutive_losses, coin_exit_registry, btc_freeze_until, btc_last_chg_at_freeze, last_live_rescore_time, holding_live_scores, btc_flash_drop_until, btc_5m_prices, coin_vol_30m_cache
     participants = participants_global
     last_db_prune_time = time.time()
     last_daily_backtest_time = time.time()
@@ -1817,6 +1823,7 @@ def run_robo_trade_loop():
             # BTC Sensor & Crash Emergency Detection
             btc_ticker_now = scanner_engine.active_tickers.get("BTCUSDT")
             btc_now_chg    = btc_ticker_now.get("change_pct", 0) if btc_ticker_now else 0
+            btc_now_price  = btc_ticker_now.get("price", 0) if btc_ticker_now else 0
             if btc_now_chg < -2.5 and btc_now_chg < btc_prev_chg_sample:
                 if not btc_emergency_exit_active:
                     btc_emergency_exit_active = True
@@ -1827,13 +1834,31 @@ def run_robo_trade_loop():
                     safe_log(f"[BTC RECOVERY] BTC recovered to {btc_now_chg:+.2f}%. Emergency mode off.")
             btc_prev_chg_sample = btc_now_chg
 
+            # V151 VIA: BTC Flash Drop Suspension (>=1% drop in 5-min window suspends Grade A entries 5 min)
+            if btc_now_price > 0:
+                btc_5m_prices.append((now_ts, btc_now_price))
+                btc_5m_prices[:] = [(ts, px) for ts, px in btc_5m_prices if now_ts - ts <= 300]
+                if len(btc_5m_prices) >= 2:
+                    oldest_px = btc_5m_prices[0][1]
+                    btc_5m_drop = (btc_now_price - oldest_px) / oldest_px * 100
+                    if btc_5m_drop <= -1.0 and now_ts > btc_flash_drop_until:
+                        btc_flash_drop_until = now_ts + 300  # 5-minute Grade A suspension
+                        safe_log(f"[V151 BTC FLASH DROP] BTC dropped {btc_5m_drop:.2f}% in 5min — Grade A entries suspended 5 min.")
+
             # Expire static cooldown registry
             expired_cool = [s for s, ts in coin_static_cooldown.items() if now_ts >= ts]
             for s in expired_cool:
                 del coin_static_cooldown[s]
 
-            # Expire coin exit registry entries older than 30 min (1800s)
-            expired_exit = [s for s, reg in coin_exit_registry.items() if now_ts - reg["sold_at_time"] > 1800]
+            # Expire coin exit registry entries (handles both timestamp int and dict formats)
+            expired_exit = []
+            for s, reg in coin_exit_registry.items():
+                if isinstance(reg, (int, float)):
+                    if now_ts >= reg:  # timestamp-style: expire when cooldown passes
+                        expired_exit.append(s)
+                elif isinstance(reg, dict):
+                    if now_ts - reg.get("sold_at_time", 0) > 1800:
+                        expired_exit.append(s)
             for s in expired_exit:
                 del coin_exit_registry[s]
 
@@ -1904,16 +1929,16 @@ def run_robo_trade_loop():
 
                     valid_coins = [
                         t for t in tickers
-                        if float(t.get("quote_volume") or t.get("quoteVolume") or 0) >= 10000000
+                        if float(t.get("quote_volume") or t.get("quoteVolume") or 0) >= 1000000
                         and "USDT" in t.get("symbol", "")
                         and t.get("symbol") not in held_symbols
                         and t.get("symbol") not in excluded_symbols
                         and t.get("symbol") not in coin_static_cooldown
                     ]
 
-                    # Sort by volume, cap at top 40 candidates before parallel API pre-fetch
+                    # V151 VIA: Sort by volume descending, cap at top 80 candidates (full market scan, no truncation of mid-caps)
                     valid_coins.sort(key=lambda x: float(x.get("quote_volume") or x.get("quoteVolume") or 0), reverse=True)
-                    valid_coins = valid_coins[:40]
+                    valid_coins = valid_coins[:80]
 
                     # Fetch BTC 5M ONCE before the coin loop (shared for all coins this cycle)
                     btc_5m_global = fetch_symbol_klines_cached("BTCUSDT", "5m", limit=3)
@@ -2043,10 +2068,16 @@ def run_robo_trade_loop():
                         if market_regime == "BEARISH" and total_score < 8.5:
                             continue
 
-                        # PAA V150 ITEM 10: 15-MINUTE ANTI-RE-ENTRY COOLDOWN
-                        last_exit_time = coin_exit_registry.get(sym_c, 0.0)
-                        if (now_ts - last_exit_time) < 900:
-                            continue
+                        # PAA V150 ITEM 10: 15-MINUTE ANTI-RE-ENTRY COOLDOWN (handles both int and dict registry)
+                        exit_reg_entry = coin_exit_registry.get(sym_c)
+                        if exit_reg_entry is not None:
+                            if isinstance(exit_reg_entry, (int, float)):
+                                if now_ts < exit_reg_entry:  # cooldown still active
+                                    continue
+                            elif isinstance(exit_reg_entry, dict):
+                                sold_at = exit_reg_entry.get("sold_at_time", 0)
+                                if now_ts - sold_at < 900:
+                                    continue
 
                         # PAA V150 ITEM 7: SQEE BASE LEVEL (max of daily low and rolling 2h low)
                         price = c.get("price", 100)
@@ -2146,46 +2177,50 @@ def run_robo_trade_loop():
                 grade_s_holdings = [h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) >= 8.5]
                 open_count = len(p_holdings)
 
-                # FEE-COVERED GRADE S ROTATION ENGINE (Rule 2.2 & 2.4)
+                # DIRECT LIVE MARKET SCANNER ROTATION ENGINE (Zero Schedule Dependency)
+                # Reads live scanned market candidates directly. If ANY live Grade S coin (>= 8.5 Pts)
+                # is active and not held by this bot, and portfolio is at 10/10 capacity:
+                # Immediately exit the holding with the LOWEST Net PnL to free the slot and buy Grade S!
                 last_rot_ts = last_grade_s_rotation_time.get(participant, 0.0)
-                if (now_ts - last_rot_ts) >= 120.0:
-                    pending_s = [s for s in pending if s['status'] == 'PENDING' and float(s.get('confluence_score', 0)) >= 8.5]
-                    pending_s.sort(key=lambda x: float(x.get('confluence_score', 0)), reverse=True)
-                    top_grade_s = next((s for s in pending_s if not any(h['symbol'] == s['symbol'] for h in p_holdings)), None)
+                if (now_ts - last_rot_ts) >= 60.0:
+                    live_market_s = [sc for sc in scored_coins if sc[0] >= 8.5 and sc[1]["symbol"] not in held_symbols]
+                    live_market_s.sort(key=lambda x: x[0], reverse=True)
+                    top_grade_s_item = live_market_s[0] if live_market_s else None
                     
-                    if top_grade_s and open_count >= 10:
-                        s_score = float(top_grade_s.get('confluence_score', 8.5))
-                        s_sym = top_grade_s['symbol']
+                    if top_grade_s_item and open_count >= 10:
+                        s_score = float(top_grade_s_item[0])
+                        s_c = top_grade_s_item[1]
+                        s_sym = s_c["symbol"]
                         
-                        # Rule 2.2: Rotate Grade A holding ONLY IF Net PnL >= Commission Fee (recovers fee!)
-                        eligible_a = []
-                        for h in grade_a_holdings:
-                            h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
-                            h_pnl = (h_px - h["entry_price"]) * h["amount"]
-                            h_net = round(h_pnl - comm_fee_tx, 4)
-                            if h_net >= comm_fee_tx:
-                                eligible_a.append((h_net, h_px, h))
-                        
-                        if eligible_a:
-                            eligible_a.sort(key=lambda x: x[0], reverse=True)
-                            best_net, best_px, best_h = eligible_a[0]
-                            db_manager.remove_active_holding(best_h['id'])
+                        # 1. Prefer rotating out Grade A holding with LOWEST Net PnL
+                        if grade_a_holdings:
+                            scored_a = []
+                            for h in grade_a_holdings:
+                                h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
+                                h_pnl = (h_px - h["entry_price"]) * h["amount"]
+                                h_net = round(h_pnl - comm_fee_tx, 4)
+                                scored_a.append((h_net, h_px, h))
+                            
+                            scored_a.sort(key=lambda x: x[0]) # Lowest PnL first
+                            worst_net, worst_px, worst_h = scored_a[0]
+                            
+                            db_manager.remove_active_holding(worst_h['id'])
                             db_manager.add_transaction_history(
                                 participant=participant,
-                                action="SELL (GRADE_S_ROTATION_FEE_COVERED)",
-                                symbol=best_h['symbol'],
-                                price=best_px,
+                                action="SELL (GRADE_S_PRIORITY_ROTATION)",
+                                symbol=worst_h['symbol'],
+                                price=worst_px,
                                 capital=user_capital_per_tx,
-                                pnl=best_net,
+                                pnl=worst_net,
                                 commission_fee=comm_fee_tx,
                                 status="COMPLETED"
                             )
                             last_grade_s_rotation_time[participant] = now_ts
-                            safe_log(f"🔄 [FEE-COVERED ROTATION] Exited Grade A {best_h['symbol']} (Net: +${best_net:.2f} >= ${comm_fee_tx:.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
+                            safe_log(f"🔄 [GRADE S PRIORITY ROTATION] Exited lowest PnL Grade A {worst_h['symbol']} (Net: ${worst_net:+.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
                             p_holdings = db_manager.get_active_holdings(participant)
                             open_count = len(p_holdings)
                         elif len(grade_s_holdings) >= 10:
-                            # Rule 2.4 Exception: Replaced Grade S coin ONLY IF held score < new candidate score!
+                            # 2. If 10 Grade S held, replace lowest scoring Grade S holding if new score is higher
                             g_s_candidates = []
                             for h in grade_s_holdings:
                                 h_score = float(h.get("confluence_score", 8.5) or 8.5)
@@ -2242,39 +2277,62 @@ def run_robo_trade_loop():
                                 continue
 
                             can_execute_buy = False
+                            base_lvl = float(sched.get("base_level", entry) or entry)
+
                             if is_s_tier:
-                                # PAA V150 ITEM 4: GRADE S INSTANT FILL AT LIVE PRICE
-                                can_execute_buy = True
+                                # V151: GRADE S — check +0.20% base bounce for confirmation
+                                base_bounce_confirmed = (curr_price >= base_lvl * 1.0020)
+                                can_execute_buy = base_bounce_confirmed
                             else:
-                                # PAA V150 ITEMS 3, 7, 14: GRADE A BASE LEVEL PROXIMITY CHECK
-                                base_lvl = float(sched.get("base_level", entry) or entry)
+                                # V151: GRADE A — base proximity + +0.20% bounce + BTC flash drop check
+                                if now_ts < btc_flash_drop_until:
+                                    continue  # Grade A suspended during BTC flash drop
                                 dec_places = 4 if curr_price < 1.0 else (2 if curr_price < 100.0 else 0)
                                 tick_size = 10 ** (-dec_places)
-                                num_ticks = 20 if market_regime == "BULLISH" else 10 # Item 14 Bull Lenient Proximity
+                                num_ticks = 20 if market_regime == "BULLISH" else 10
                                 proximity_thresh = num_ticks * tick_size
-                                
                                 is_in_proximity = (curr_price - base_lvl) <= proximity_thresh
+                                base_bounce_confirmed = (curr_price >= base_lvl * 1.0020)
 
-                                # PAA V150 ITEM 9: ENTRY MOMENTUM CONFIRMATION GATE (+0.1% micro-bounce)
                                 lowest_px = min(symbol_lowest_touched.get(sym, curr_price), curr_price)
                                 symbol_lowest_touched[sym] = lowest_px
                                 has_micro_bounce = (curr_price >= lowest_px * 1.0010) or (lowest_px == curr_price)
 
-                                can_execute_buy = is_in_proximity and has_micro_bounce
+                                can_execute_buy = is_in_proximity and base_bounce_confirmed and has_micro_bounce
 
                             if can_execute_buy:
+                                # ── V151 PRE-ENTRY IGNITION GATE (Final live check before any entry) ──
+                                t_live = scanner_engine.active_tickers.get(sym, {})
+                                live_vol = float(t_live.get("quote_volume", 0) or 0)
+
+                                # Gate 1: Volume Surge >= 2.0x 30M rolling average
+                                hist_vols = coin_vol_30m_cache.get(sym, [])
+                                hist_vols.append(live_vol)
+                                coin_vol_30m_cache[sym] = hist_vols[-18:]  # keep last 18 x 10s ticks ≈ 3 min window
+                                avg_30m_vol = sum(hist_vols) / len(hist_vols) if hist_vols else live_vol
+                                vol_surge_ok = (live_vol >= avg_30m_vol * 2.0) if avg_30m_vol > 0 else True
+
+                                # Gate 2: Live Order Book Bid/Ask >= 1.20
+                                ob_ratio_live = fetch_order_book_depth_ratio_cached(sym)
+                                ob_ok = (ob_ratio_live >= 1.20)
+
+                                ignition_pass = vol_surge_ok and ob_ok
+
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                capital = user_capital_per_tx
-                                db_manager.mark_robo_schedule_executed(sched['id'])
-                                db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
-                                open_count += 1
-                                safe_log(f"[PAA V150 ENTRY EXECUTION] {participant} [{market_regime}] bought {sym} @ ${curr_price:.5f} (Cap: ${capital:.2f}, Score: {score_val:.1f})")
-                                if open_count >= 10:
-                                    break
+                                if ignition_pass:
+                                    capital = user_capital_per_tx
+                                    db_manager.mark_robo_schedule_executed(sched['id'])
+                                    db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
+                                    open_count += 1
+                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: {live_vol/avg_30m_vol:.1f}x | OB: {ob_ratio_live:.2f} | Score: {score_val:.1f}")
+                                    if open_count >= 10:
+                                        break
+                                else:
+                                    safe_log(f"[V151 IGNITION FAIL] {sym} blocked — Vol: {live_vol/avg_30m_vol:.2f}x (need 2x), OB: {ob_ratio_live:.2f} (need 1.20)")
 
                 # SMART RE-ENTRY CHECK (Stage 11 & Grade S Zero-Timer Re-Entry on -0.5% Dip)
                 to_remove_reentry = []
@@ -2337,6 +2395,40 @@ def run_robo_trade_loop():
                     smart_reentry_pending[participant].pop(s, None)
 
                 # HOLDING EXIT EVALUATION
+                # ── V151 LIVE RESCORE ENGINE — Rescore all open holdings every 3 minutes ──
+                rescore_ts = last_live_rescore_time.get(participant, 0.0)
+                if (now_ts - rescore_ts) >= 180.0:  # 3 minutes
+                    last_live_rescore_time[participant] = now_ts
+                    for h_rs in p_holdings:
+                        rs_sym = h_rs.get("symbol", "")
+                        rs_t   = scanner_engine.active_tickers.get(rs_sym, {})
+                        rs_chg = float(rs_t.get("change_pct", 0) or 0)
+                        rs_vol = float(rs_t.get("quote_volume", 0) or 0)
+                        rs_px  = float(rs_t.get("price", 0) or 0)
+                        rs_open= float(rs_t.get("open", rs_px) or rs_px)
+                        rs_high= float(rs_t.get("high", rs_px) or rs_px)
+                        rs_low = float(rs_t.get("low", rs_px) or rs_px)
+                        # 1H structure check
+                        rs_1h  = fetch_symbol_klines_cached(rs_sym, "1h", limit=4)
+                        rs_h1_hl = True
+                        if rs_1h and len(rs_1h) >= 3:
+                            rs_h1_hl = rs_1h[-1]["low"] >= rs_1h[-2]["low"]
+                        # Live OB
+                        rs_ob  = fetch_order_book_depth_ratio_cached(rs_sym)
+                        # Compute live score
+                        rs_sw    = 2.5 if abs(rs_chg) > 1.2 else 2.2
+                        rs_cvd   = 2.5 if rs_vol > 7500000 else 2.1
+                        rs_fund  = 2.0 if rs_chg >= 0 else 1.8
+                        rs_bos   = 1.5 if abs(rs_chg) > 1.8 else 1.2
+                        rs_ob_pt = 1.5 if rs_ob >= 1.5 else (1.0 if rs_ob >= 1.0 else 0.2)
+                        rs_h1_pt = 1.0 if rs_h1_hl else 0.0
+                        live_score = round(rs_sw + rs_cvd + rs_fund + rs_bos + rs_ob_pt + rs_h1_pt, 2)
+                        holding_live_scores[h_rs["id"]] = live_score
+                        if live_score < 6.0:
+                            safe_log(f"[V151 LIVE RESCORE] {rs_sym} score COLLAPSED to {live_score:.1f} — flagging for immediate exit!")
+                        elif live_score < 7.0:
+                            safe_log(f"[V151 LIVE RESCORE] {rs_sym} score weakening to {live_score:.1f} — monitoring closely")
+
                 for holding in p_holdings:
                     sym    = holding['symbol']
                     t_hold = scanner_engine.active_tickers.get(sym)
@@ -2401,6 +2493,23 @@ def run_robo_trade_loop():
                     exit_is_profit = False
                     is_gr_s_holding = h_score >= 8.5
 
+                    # V151 VIA: Apply live rescore override — if live score collapsed, force exit
+                    live_rescore_val = holding_live_scores.get(holding.get("id"), h_score)
+                    if live_rescore_val < 6.0 and not should_exit:
+                        should_exit = True
+                        exit_tag    = "SOLD_NEUTRAL"
+                        exit_reason = f"V151 Live Rescore Collapse (Live Score: {live_rescore_val:.1f} < 6.0 — Thesis Broken)"
+
+                    # V151 VIA: Volume Exhaustion Detection (15+ min open, 5M volume declining while flat/down)
+                    if not should_exit and holding_sec >= 900:
+                        hist_hold_vols = coin_vol_30m_cache.get(sym, [])
+                        if hist_hold_vols and len(hist_hold_vols) >= 3:
+                            recent_avg = sum(hist_hold_vols[-3:]) / 3
+                            older_avg  = sum(hist_hold_vols[:-3]) / max(1, len(hist_hold_vols) - 3)
+                            vol_exhausted = (recent_avg < older_avg * 0.6) and (h_chg <= 0.1)
+                            if vol_exhausted:
+                                safe_log(f"[V151 VOL EXHAUSTION] {sym} volume declining {recent_avg:.0f} vs {older_avg:.0f} while flat — exit monitoring")
+
                     # PRIORITY 1: BTC CRASH EMERGENCY EXIT (Only trigger on extreme market crashes BTC < -2.5%)
                     if btc_emergency_exit_active:
                         should_exit = True
@@ -2458,7 +2567,17 @@ def run_robo_trade_loop():
                                     coin_exit_registry[sym] = now_ts # Item 10: 15-min cooldown
 
                     if not should_exit:
-                        if peak_pnl_dollar >= 3.00 * cap_scale:
+                        # V151 VIA: Updated Grade S Trailing SL Stages (up to $5.00 TP)
+                        if peak_pnl_dollar >= 5.00 * cap_scale:
+                            should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                            exit_reason = f"V151 Grade S Full Take Profit ($5.00 TP Hit! Peak: +${peak_pnl_dollar:.2f})"
+                        elif peak_pnl_dollar >= 4.00 * cap_scale:
+                            target_sl_dollar = 3.60 * cap_scale
+                            sl_p = entry + (target_sl_dollar / amount)
+                            if curr_price <= sl_p:
+                                should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
+                                exit_reason = f"Stage 15 PnL Lock (Peak: +${peak_pnl_dollar:.2f}, Locked: +${target_sl_dollar:.2f} PnL)"
+                        elif peak_pnl_dollar >= 3.00 * cap_scale:
                             target_sl_dollar = 2.70 * cap_scale
                             sl_p = entry + (target_sl_dollar / amount)
                             if curr_price <= sl_p:
@@ -2556,18 +2675,18 @@ def run_robo_trade_loop():
                         h_atr_14 = calculate_atr_14(h_klines_5m)
 
                         if is_gr_s_holding:
-                            # Grade S (+10.00% minimum or 4.5 * ATR_14 during volatility expansion)
-                            tp_mult = max(1.100, 1.0 + ((4.5 * h_atr_14) / entry)) if (entry > 0 and h_atr_14 > 0) else 1.100
+                            # V151 VIA: Grade S TP reduced from +10.00% to +5.00% for consistent quick-strike profits
+                            tp_mult = 1.0500
                         else:
-                            # Grade A (+2.50% minimum or 3.2 * ATR_14 during volatility expansion)
-                            tp_mult = max(1.0250, 1.0 + ((3.2 * h_atr_14) / entry)) if (entry > 0 and h_atr_14 > 0) else 1.0250
+                            # V151 VIA: Grade A TP reduced from +2.50% to +1.80% for faster consistent hits
+                            tp_mult = 1.0180
 
                         tp_target_price = entry * tp_mult
 
                         if curr_price >= tp_target_price:
                             should_exit = True; exit_tag = "CLEARED_REENTRY_PRIORITY"; exit_is_profit = True
-                            tp_pct_str = "+10.00%" if is_gr_s_holding else "+2.50%"
-                            exit_reason = f"Standard Take Profit ({tp_pct_str})"
+                            tp_pct_str = "+5.00%" if is_gr_s_holding else "+1.80%"
+                            exit_reason = f"V151 Quick-Strike Take Profit ({tp_pct_str})"
                                          # EXECUTE EXIT
                     if should_exit:
                         comm_fee = round(h_cap * 0.002, 4)
