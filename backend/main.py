@@ -1037,7 +1037,7 @@ class CapitalConfigRequest(BaseModel):
 
 @app.get("/api/system/version")
 def get_system_version():
-    return {"status": "success", "version": "V151.10", "built_at": get_myt_timestamp_str()}
+    return {"status": "success", "version": "V151.12", "built_at": get_myt_timestamp_str()}
 
 @app.get("/api/robo/config")
 def get_robo_config():
@@ -2192,12 +2192,13 @@ def run_robo_trade_loop():
                 grade_s_holdings = [h for h in p_holdings if float(h.get("confluence_score", 8.0) or 8.0) >= 8.5]
                 open_count = len(p_holdings)
 
-                # DIRECT LIVE MARKET SCANNER ROTATION ENGINE (Zero Schedule Dependency)
-                # Reads live scanned market candidates directly. If ANY live Grade S coin (>= 8.5 Pts)
-                # is active and not held by this bot, and portfolio is at 10/10 capacity:
-                # Immediately exit the holding with the LOWEST Net PnL to free the slot and buy Grade S!
+                # DIRECT LIVE MARKET SCANNER ROTATION ENGINE (V151.12 Protected Rotation)
+                # Rules to prevent premature churn losses:
+                # 1. Position MUST have minimum age of 10 minutes (600s) before rotation.
+                # 2. Position MUST NOT be rotated out at a Net Loss (must be net_pnl > 0).
+                # 3. New candidate score must be >= 1.5 Pts higher than the holding score.
                 last_rot_ts = last_grade_s_rotation_time.get(participant, 0.0)
-                if (now_ts - last_rot_ts) >= 60.0:
+                if (now_ts - last_rot_ts) >= 120.0:
                     live_market_s = [sc for sc in scored_coins if sc[0] >= 8.5 and sc[1]["symbol"] not in held_symbols]
                     live_market_s.sort(key=lambda x: x[0], reverse=True)
                     top_grade_s_item = live_market_s[0] if live_market_s else None
@@ -2207,33 +2208,38 @@ def run_robo_trade_loop():
                         s_c = top_grade_s_item[1]
                         s_sym = s_c["symbol"]
                         
-                        # 1. Prefer rotating out Grade A holding with LOWEST Net PnL
+                        # 1. Rotate out Grade A holding ONLY if age >= 600s AND Net PnL > 0
                         if grade_a_holdings:
                             scored_a = []
                             for h in grade_a_holdings:
+                                h_age = now_ts - float(h.get("created_at_ts", now_ts) or now_ts)
+                                if h_age < 600.0: # Protect young trades from premature rotation
+                                    continue
                                 h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
                                 h_pnl = (h_px - h["entry_price"]) * h["amount"]
                                 h_net = round(h_pnl - comm_fee_tx, 4)
-                                scored_a.append((h_net, h_px, h))
+                                if h_net >= 0.0: # Only rotate positions that are IN PROFIT
+                                    scored_a.append((h_net, h_px, h))
                             
-                            scored_a.sort(key=lambda x: x[0]) # Lowest PnL first
-                            worst_net, worst_px, worst_h = scored_a[0]
-                            
-                            db_manager.remove_active_holding(worst_h['id'])
-                            db_manager.add_transaction_history(
-                                participant=participant,
-                                action="SELL (GRADE_S_PRIORITY_ROTATION)",
-                                symbol=worst_h['symbol'],
-                                price=worst_px,
-                                capital=user_capital_per_tx,
-                                pnl=worst_net,
-                                commission_fee=comm_fee_tx,
-                                status="COMPLETED"
-                            )
-                            last_grade_s_rotation_time[participant] = now_ts
-                            safe_log(f"🔄 [GRADE S PRIORITY ROTATION] Exited lowest PnL Grade A {worst_h['symbol']} (Net: ${worst_net:+.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
-                            p_holdings = db_manager.get_active_holdings(participant)
-                            open_count = len(p_holdings)
+                            if scored_a:
+                                scored_a.sort(key=lambda x: x[0], reverse=True) # Take highest profit unlocked
+                                worst_net, worst_px, worst_h = scored_a[0]
+                                
+                                db_manager.remove_active_holding(worst_h['id'])
+                                db_manager.add_transaction_history(
+                                    participant=participant,
+                                    action="SELL (GRADE_S_PROTECTED_ROTATION)",
+                                    symbol=worst_h['symbol'],
+                                    price=worst_px,
+                                    capital=user_capital_per_tx,
+                                    pnl=worst_net,
+                                    commission_fee=comm_fee_tx,
+                                    status="COMPLETED"
+                                )
+                                last_grade_s_rotation_time[participant] = now_ts
+                                safe_log(f"🔄 [GRADE S PROTECTED ROTATION] Rotated profitable Grade A {worst_h['symbol']} (Net: ${worst_net:+.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
+                                p_holdings = db_manager.get_active_holdings(participant)
+                                open_count = len(p_holdings)
                         elif len(grade_s_holdings) >= 10:
                             # 2. If 10 Grade S held, replace lowest scoring Grade S holding if new score is higher
                             g_s_candidates = []
