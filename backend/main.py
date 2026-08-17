@@ -1918,23 +1918,25 @@ def run_robo_trade_loop():
                     }
 
                     all_registered = db_manager.get_all_coins()
-                    stable_or_fiat = ["USDCUSDT", "FDUSDUSDT", "BUSDUSDT", "TUSDUSDT", "EURUSDT", "DAIUSDT", "AEURUSDT", "WBTCUSDT", "CRCLBUSDT", "SPCXBUSDT", "USD1USDT"]
+                    stable_fiat_keywords = ["USDC", "FDUSD", "BUSD", "TUSD", "EUR", "DAI", "AEUR", "WBTC", "CRCL", "SPCX", "USD", "EURI", "USDS", "PYUSD", "USD0", "USDE", "TRY", "BRL", "GBP", "AUD", "RUB", "BKRW", "IDRT", "ZAR", "VAI"]
                     excluded_symbols = set(
                         c["symbol"] for c in all_registered
                         if str(c.get("coin_type","")).lower() in ["currency","meme","delisted","stablecoin"]
                         or str(c.get("status","")).lower() in ["delisted","inactive","break","halted"]
                     )
-                    for s in stable_or_fiat:
-                        excluded_symbols.add(s)
 
-                    valid_coins = [
-                        t for t in tickers
-                        if float(t.get("quote_volume") or t.get("quoteVolume") or 0) >= 1000000
-                        and "USDT" in t.get("symbol", "")
-                        and t.get("symbol") not in held_symbols
-                        and t.get("symbol") not in excluded_symbols
-                        and t.get("symbol") not in coin_static_cooldown
-                    ]
+
+                    valid_coins = []
+                    for t in tickers:
+                        sym = t.get("symbol", "")
+                        if not sym.endswith("USDT"): continue
+                        base_sym = sym[:-4]
+                        is_stbl = any(kw == base_sym or base_sym.startswith(kw) for kw in stable_fiat_keywords)
+                        if is_stbl or sym in held_symbols or sym in excluded_symbols or sym in coin_static_cooldown:
+                            continue
+                        vol = float(t.get("quote_volume") or t.get("quoteVolume") or 0)
+                        if vol >= 1000000:
+                            valid_coins.append(t)
 
                     # V151 VIA: Sort by volume descending, cap at top 80 candidates (full market scan, no truncation of mid-caps)
                     valid_coins.sort(key=lambda x: float(x.get("quote_volume") or x.get("quoteVolume") or 0), reverse=True)
