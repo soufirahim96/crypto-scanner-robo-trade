@@ -1648,28 +1648,29 @@ klines_cache = {}
 
 def fetch_symbol_klines_cached(symbol: str, interval: str, limit: int = 6):
     now = time.time()
-    cache_key = f"{symbol}_{interval}_{limit}"
-    cached = klines_cache.get(cache_key)
     ttl = 300 if interval in ["1d", "4h", "1h"] else 15
-    if cached and (now - cached["ts"] < ttl):
-        return cached["data"]
+    prefix = f"{symbol}_{interval}_"
 
+    for key, cached in list(klines_cache.items()):
+        if key.startswith(prefix) and (now - cached["ts"] < ttl):
+            data = cached["data"]
+            return data[-limit:] if len(data) >= limit else data
+
+    cache_key = f"{symbol}_{interval}_{limit}"
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
     try:
-        r = requests.get(url, timeout=3)
+        r = requests.get(url, timeout=2.5)
         if r.status_code == 200:
             raw = r.json()
-            parsed = []
-            for item in raw:
-                parsed.append({
-                    "open": float(item[1]),
-                    "high": float(item[2]),
-                    "low": float(item[3]),
-                    "close": float(item[4]),
-                    "volume": float(item[5])
-                })
+            parsed = [{
+                "open": float(item[1]),
+                "high": float(item[2]),
+                "low": float(item[3]),
+                "close": float(item[4]),
+                "volume": float(item[5])
+            } for item in raw]
             klines_cache[cache_key] = {"ts": now, "data": parsed}
-            return parsed
+            return parsed[-limit:]
     except Exception:
         pass
     return []
