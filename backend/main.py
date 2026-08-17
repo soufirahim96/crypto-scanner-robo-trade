@@ -2305,14 +2305,8 @@ def run_robo_trade_loop():
                                 t_live = scanner_engine.active_tickers.get(sym, {})
                                 live_vol = float(t_live.get("quote_volume", 0) or 0)
 
-                                # Gate 1: Volume Surge >= 1.5x 30M rolling average (cold-start bypass for first 5 samples)
-                                hist_vols = coin_vol_30m_cache.get(sym, [])
-                                hist_vols.append(live_vol)
-                                coin_vol_30m_cache[sym] = hist_vols[-30:]  # keep last 30 ticks
-                                avg_30m_vol = sum(hist_vols) / len(hist_vols) if hist_vols else live_vol
-                                # Bypass volume gate during cache warmup (first 5 data points) or if avg is zero
-                                vol_cache_warmed = len(hist_vols) >= 5
-                                vol_surge_ok = (live_vol >= avg_30m_vol * 1.5) if (vol_cache_warmed and avg_30m_vol > 0) else True
+                                # Gate 1: Live Volume Activity Check
+                                vol_surge_ok = (live_vol > 0)
 
 
                                 # Gate 2: Live Order Book Bid/Ask >= 0.80 (healthy orderbook, no massive ask wall)
@@ -2331,11 +2325,11 @@ def run_robo_trade_loop():
                                     db_manager.mark_robo_schedule_executed(sched['id'])
                                     db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
                                     open_count += 1
-                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: {live_vol/avg_30m_vol:.1f}x | OB: {ob_ratio_live:.2f} | Score: {score_val:.1f}")
+                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: ${live_vol:,.0f} | OB: {ob_ratio_live:.2f} | Score: {score_val:.1f}")
                                     if open_count >= 10:
                                         break
                                 else:
-                                    safe_log(f"[V151 IGNITION FAIL] {sym} blocked — Vol: {live_vol/avg_30m_vol:.2f}x (need 2x), OB: {ob_ratio_live:.2f} (need 1.20)")
+                                    safe_log(f"[V151 IGNITION FAIL] {sym} blocked — Vol: ${live_vol:,.0f}, OB: {ob_ratio_live:.2f} (need >= 0.80)")
 
                 # SMART RE-ENTRY CHECK (Stage 11 & Grade S Zero-Timer Re-Entry on -0.5% Dip)
                 to_remove_reentry = []
