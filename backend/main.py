@@ -1037,7 +1037,7 @@ class CapitalConfigRequest(BaseModel):
 
 @app.get("/api/system/version")
 def get_system_version():
-    return {"status": "success", "version": "V151.12", "built_at": get_myt_timestamp_str()}
+    return {"status": "success", "version": "V152", "built_at": get_myt_timestamp_str()}
 
 @app.get("/api/robo/config")
 def get_robo_config():
@@ -1639,6 +1639,35 @@ def is_fiat_or_stable(symbol_or_base: str) -> bool:
         return True
     return any(s.startswith(prefix) for prefix in ["USD", "EUR", "TUSD", "BUSD", "USDC", "FDUSD", "EURI", "DRAMB", "SNDK"])
 
+def check_live_momentum(symbol: str, curr_price: float) -> tuple:
+    """
+    V152 Live Momentum Confirmation Engine:
+    1. Recent price movement increased by >= +0.20% from 5m/micro low.
+    2. Live market volume streaming above average towards bullish (>= 1.20x).
+    Returns (is_confirmed, price_change_pct, vol_ratio).
+    """
+    t_live = scanner_engine.active_tickers.get(symbol, {})
+    live_vol = float(t_live.get("quote_volume", 0) or 0)
+
+    lowest_px = min(symbol_lowest_touched.get(symbol, curr_price), curr_price)
+    symbol_lowest_touched[symbol] = lowest_px
+
+    k_5m = fetch_symbol_klines_cached(symbol, "5m", limit=3)
+    if k_5m and len(k_5m) > 0:
+        ref_low = min([k["low"] for k in k_5m] + [lowest_px])
+    else:
+        ref_low = lowest_px
+
+    price_change_pct = ((curr_price - ref_low) / ref_low * 100.0) if ref_low > 0 else 0.0
+    is_price_momentum = (price_change_pct >= 0.20)
+
+    avg_vol_30m = coin_vol_30m_cache.get(symbol, 0.0)
+    vol_ratio = (live_vol / avg_vol_30m) if avg_vol_30m > 0 else 1.0
+    is_vol_surge = (vol_ratio >= 1.20) or (live_vol > 15000000 and live_vol > avg_vol_30m)
+
+    is_confirmed = is_price_momentum or is_vol_surge
+    return (is_confirmed, round(price_change_pct, 2), round(vol_ratio, 2))
+
 def run_robo_trade_loop():
     """
     VERSION 124 HYBRID LOGIC — GOD OF TRADE MASTER ENGINE (LIVE RAILWAY DEPLOYMENT V124)
@@ -2074,9 +2103,24 @@ def run_robo_trade_loop():
                         if not lock_bypassed:
                             continue
 
-                        # PAA V150 ITEM 1: 8.0 MINIMUM SCORE GATE FOR GRADE A ENTRY
+                        # V152 MOMENTUM FAST-TRACK FOR MID/LOW SCORE COINS
+                        # Even if initial score is < 8.0, if live momentum (+0.20% move or vol surge) AND solid base level are confirmed, fast-track candidate!
                         if total_score < 8.0:
-                            continue
+                            is_confirmed, price_pct, vol_ratio = check_live_momentum(sym_c, price)
+                            if is_confirmed:
+                                base_level = base_info.get("base_level", price)
+                                dec_places = 4 if price < 1.0 else (2 if price < 100.0 else 0)
+                                tick_size = 10 ** (-dec_places)
+                                num_ticks = 20 if market_regime == "BULLISH" else 10
+                                proximity_thresh = num_ticks * tick_size
+                                is_near_base = (price - base_level) <= proximity_thresh
+                                if is_near_base:
+                                    total_score = 8.25  # Qualified for High-Momentum Base Entry
+                                    safe_log(f"🚀 [V152 FAST-TRACK] Qualified {sym_c} @ ${price:.5f} (Price: +{price_pct:.2f}%, Vol: {vol_ratio:.2f}x, Base: ${base_level:.5f})")
+                                else:
+                                    continue
+                            else:
+                                continue
 
                         # PAA V150 ITEM 14: BEAR MARKET SUSPENSION FOR GRADE A
                         if market_regime == "BEARISH" and total_score < 8.5:
@@ -2199,36 +2243,40 @@ def run_robo_trade_loop():
                 # 3. New candidate score must be >= 1.5 Pts higher than the holding score.
                 last_rot_ts = last_grade_s_rotation_time.get(participant, 0.0)
                 if (now_ts - last_rot_ts) >= 120.0:
-                    live_market_s = [sc for sc in scored_coins if sc[0] >= 8.5 and sc[1]["symbol"] not in held_symbols]
+                    live_market_s = [sc for sc in scored_coins if sc[0] >= 8.0 and sc[1]["symbol"] not in held_symbols]
                     live_market_s.sort(key=lambda x: x[0], reverse=True)
-                    top_grade_s_item = live_market_s[0] if live_market_s else None
+                    top_candidate_item = live_market_s[0] if live_market_s else None
                     
-                    if top_grade_s_item and open_count >= 10:
-                        s_score = float(top_grade_s_item[0])
-                        s_c = top_grade_s_item[1]
-                        s_sym = s_c["symbol"]
+                    if top_candidate_item and open_count >= 10:
+                        cand_score = float(top_candidate_item[0])
+                        cand_c     = top_candidate_item[1]
+                        cand_sym   = cand_c["symbol"]
+                        cand_px    = float(cand_c.get("price") or 0)
                         
-                        # 1. Rotate out Grade A holding ONLY if age >= 600s AND Net PnL > 0
-                        if grade_a_holdings:
-                            scored_a = []
-                            for h in grade_a_holdings:
-                                h_age = now_ts - float(h.get("created_at_ts", now_ts) or now_ts)
-                                if h_age < 600.0: # Protect young trades from premature rotation
-                                    continue
-                                h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
-                                h_pnl = (h_px - h["entry_price"]) * h["amount"]
-                                h_net = round(h_pnl - comm_fee_tx, 4)
-                                if h_net >= 0.0: # Only rotate positions that are IN PROFIT
-                                    scored_a.append((h_net, h_px, h))
-                            
-                            if scored_a:
-                                scored_a.sort(key=lambda x: x[0], reverse=True) # Take highest profit unlocked
-                                worst_net, worst_px, worst_h = scored_a[0]
-                                
+                        # Find holding with lowest Net PnL
+                        all_holdings_scored = []
+                        for h in p_holdings:
+                            h_age = now_ts - float(h.get("created_at_ts", now_ts) or now_ts)
+                            h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
+                            h_pnl = (h_px - h["entry_price"]) * h["amount"]
+                            h_net = round(h_pnl - comm_fee_tx, 4)
+                            h_sc  = float(h.get("confluence_score", 8.0) or 8.0)
+                            all_holdings_scored.append((h_net, h_sc, h_age, h_px, h))
+                        
+                        all_holdings_scored.sort(key=lambda x: x[0])  # Lowest Net PnL first
+                        worst_net, worst_sc, worst_age, worst_px, worst_h = all_holdings_scored[0]
+
+                        # Perform Final Live Momentum Check for candidate
+                        is_cand_confirmed, cand_price_pct, cand_vol_ratio = check_live_momentum(cand_sym, cand_px)
+                        
+                        if cand_score > worst_sc:
+                            # ── CASE A: STANDARD SCORE SUPERIORITY ROTATION ──
+                            # Only rotate if holding age >= 600s or Net PnL >= 0, and candidate momentum is confirmed
+                            if (worst_age >= 600.0 or worst_net >= 0.0) and is_cand_confirmed:
                                 db_manager.remove_active_holding(worst_h['id'])
                                 db_manager.add_transaction_history(
                                     participant=participant,
-                                    action="SELL (GRADE_S_PROTECTED_ROTATION)",
+                                    action="SELL (V152_SUPERIORITY_ROTATION)",
                                     symbol=worst_h['symbol'],
                                     price=worst_px,
                                     capital=user_capital_per_tx,
@@ -2237,37 +2285,33 @@ def run_robo_trade_loop():
                                     status="COMPLETED"
                                 )
                                 last_grade_s_rotation_time[participant] = now_ts
-                                safe_log(f"🔄 [GRADE S PROTECTED ROTATION] Rotated profitable Grade A {worst_h['symbol']} (Net: ${worst_net:+.2f}) for Grade S {s_sym} ({s_score:.1f} Pts)")
+                                safe_log(f"🔄 [V152 SUPERIORITY ROTATION] Exited {worst_h['symbol']} (Net: ${worst_net:+.2f}) for superior candidate {cand_sym} (Score: {cand_score:.1f} vs {worst_sc:.1f} Pts | Price: +{cand_price_pct:.2f}%, Vol: {cand_vol_ratio:.2f}x)")
                                 p_holdings = db_manager.get_active_holdings(participant)
                                 open_count = len(p_holdings)
-                        elif len(grade_s_holdings) >= 10:
-                            # 2. If 10 Grade S held, replace lowest scoring Grade S holding if new score is higher
-                            g_s_candidates = []
-                            for h in grade_s_holdings:
-                                h_score = float(h.get("confluence_score", 8.5) or 8.5)
-                                if h_score < s_score:
-                                    h_px  = scanner_engine.active_tickers.get(h["symbol"], {}).get("price", h["entry_price"])
-                                    h_pnl = (h_px - h["entry_price"]) * h["amount"]
-                                    h_net = round(h_pnl - comm_fee_tx, 4)
-                                    g_s_candidates.append((h_net, h_score, h_px, h))
-                            if g_s_candidates:
-                                g_s_candidates.sort(key=lambda x: (x[1], x[0]))
-                                worst_net, worst_sc, worst_px, worst_h = g_s_candidates[0]
-                                db_manager.remove_active_holding(worst_h['id'])
-                                db_manager.add_transaction_history(
-                                    participant=participant,
-                                    action="SELL (GRADE_S_SCORE_SUPERIORITY)",
-                                    symbol=worst_h['symbol'],
-                                    price=worst_px,
-                                    capital=user_capital_per_tx,
-                                    pnl=worst_net,
-                                    commission_fee=comm_fee_tx,
-                                    status="COMPLETED"
-                                )
-                                last_grade_s_rotation_time[participant] = now_ts
-                                safe_log(f"🔄 [SCORE SUPERIORITY ROTATION] Replaced Grade S {worst_h['symbol']} (Score:{worst_sc:.1f}) with superior Grade S {s_sym} (Score:{s_score:.1f})")
-                                p_holdings = db_manager.get_active_holdings(participant)
-                                open_count = len(p_holdings)
+                        else:
+                            # ── CASE B: LOWER-GRADE HIGH-SCORE MOMENTUM EXCEPTION ──
+                            # Candidate score is lower than holding, but evaluate its live momentum confirmation!
+                            if is_cand_confirmed:
+                                # MOMENTUM CONFIRMED (+0.20% move or vol surge) -> ALLOW EXCEPTION!
+                                if worst_age >= 300.0 or worst_net >= 0.0:
+                                    db_manager.remove_active_holding(worst_h['id'])
+                                    db_manager.add_transaction_history(
+                                        participant=participant,
+                                        action="SELL (V152_MOMENTUM_EXCEPTION_ROTATION)",
+                                        symbol=worst_h['symbol'],
+                                        price=worst_px,
+                                        capital=user_capital_per_tx,
+                                        pnl=worst_net,
+                                        commission_fee=comm_fee_tx,
+                                        status="COMPLETED"
+                                    )
+                                    last_grade_s_rotation_time[participant] = now_ts
+                                    safe_log(f"⚡ [V152 MOMENTUM EXCEPTION] Allowed immediate entry exception for {cand_sym} @ ${cand_px:.5f} (Price: +{cand_price_pct:.2f}%, Vol: {cand_vol_ratio:.2f}x) — Replaced {worst_h['symbol']}")
+                                    p_holdings = db_manager.get_active_holdings(participant)
+                                    open_count = len(p_holdings)
+                            else:
+                                # MOMENTUM NOT CONFIRMED -> PUT ON HOLD FOR FURTHER ANALYSIS
+                                safe_log(f"⏸️ [V152 ROTATION HOLD] Candidate {cand_sym} momentum unconfirmed (Price: +{cand_price_pct:.2f}%, Vol: {cand_vol_ratio:.2f}x) — Candidate on hold.")
 
                 # PAA V150 ENTRY EXECUTION LOOP
                 if open_count < 10:
@@ -2297,58 +2341,38 @@ def run_robo_trade_loop():
                             elif not is_s_tier and current_g_a >= 5:
                                 continue
 
-                            can_execute_buy = False
                             base_lvl = float(sched.get("base_level", entry) or entry)
+                            
+                            # 1. Solid Base Level Proximity Check
+                            dec_places = 4 if curr_price < 1.0 else (2 if curr_price < 100.0 else 0)
+                            tick_size = 10 ** (-dec_places)
+                            num_ticks = 20 if market_regime == "BULLISH" else 10
+                            proximity_thresh = num_ticks * tick_size
+                            is_in_base_range = (curr_price - base_lvl) <= proximity_thresh
 
-                            if is_s_tier:
-                                # V151: GRADE S — Instant fill at market price when Ignition Gate (Vol + OB) passes
-                                can_execute_buy = True
+                            # 2. Final Live Momentum Confirmation Check (+0.20% move OR bullish volume surge)
+                            is_confirmed, price_pct, vol_ratio = check_live_momentum(sym, curr_price)
 
-                            else:
-                                # V151: GRADE A — base proximity + +0.20% bounce + BTC flash drop check
-                                if now_ts < btc_flash_drop_until:
-                                    continue  # Grade A suspended during BTC flash drop
-                                dec_places = 4 if curr_price < 1.0 else (2 if curr_price < 100.0 else 0)
-                                tick_size = 10 ** (-dec_places)
-                                num_ticks = 20 if market_regime == "BULLISH" else 10
-                                proximity_thresh = num_ticks * tick_size
-                                is_in_proximity = (curr_price - base_lvl) <= proximity_thresh
-                                base_bounce_confirmed = (curr_price >= base_lvl)
-
-                                lowest_px = min(symbol_lowest_touched.get(sym, curr_price), curr_price)
-                                symbol_lowest_touched[sym] = lowest_px
-                                has_micro_bounce = (curr_price >= lowest_px * 1.0010) or (lowest_px == curr_price)
-
-                                can_execute_buy = is_in_proximity and base_bounce_confirmed and has_micro_bounce
+                            can_execute_buy = is_in_base_range and is_confirmed
 
                             if can_execute_buy:
-                                # ── V151 PRE-ENTRY IGNITION GATE (Final live check before any entry) ──
-                                t_live = scanner_engine.active_tickers.get(sym, {})
-                                live_vol = float(t_live.get("quote_volume", 0) or 0)
-
-                                # Gate 1: Live Volume Activity Check
-                                vol_surge_ok = (live_vol > 0)
-
-
-                                # ── V151 PRE-ENTRY IGNITION GATE ──
-                                # Confirms live tick data and volume are active before executing buy
-                                ignition_pass = (curr_price > 0) and (live_vol > 0)
-
                                 requested_leverage = float(sched.get('leverage', 1.0) or 1.0)
                                 if requested_leverage > 1.0:
                                     safe_log(f"[STAGE 14 IRON VETO] {participant} blocked {sym} — leverage {requested_leverage}x detected!")
                                     continue
 
-                                if ignition_pass:
-                                    capital = user_capital_per_tx
-                                    db_manager.mark_robo_schedule_executed(sched['id'])
-                                    db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
-                                    open_count += 1
-                                    safe_log(f"[V151 IGNITION ENTRY] {participant} [{market_regime}] IGNITION CONFIRMED {sym} @ ${curr_price:.5f} | Vol: ${live_vol:,.0f} | Score: {score_val:.1f}")
-                                    if open_count >= 10:
-                                        break
-                                else:
-                                    safe_log(f"[V151 IGNITION FAIL] {sym} blocked — Vol: ${live_vol:,.0f}, OB: {ob_ratio_live:.2f} (need >= 0.80)")
+                                capital = user_capital_per_tx
+                                db_manager.mark_robo_schedule_executed(sched['id'])
+                                db_manager.add_active_holding(participant, sym, curr_price, capital / curr_price)
+                                open_count += 1
+                                safe_log(f"🚀 [V152 CONFIRMED ENTRY] {participant} [{market_regime}] EXECUTED {sym} @ ${curr_price:.5f} | Base Range: OK | Price: +{price_pct:.2f}% | Vol: {vol_ratio:.2f}x | Score: {score_val:.1f}")
+                                if open_count >= 10:
+                                    break
+                            else:
+                                if is_in_base_range and not is_confirmed:
+                                    safe_log(f"⏸️ [V152 PRE-ENTRY HOLD] {sym} in base range (${base_lvl:.5f}) awaiting momentum (Price: +{price_pct:.2f}%, Vol: {vol_ratio:.2f}x)")
+
+
 
                 # SMART RE-ENTRY CHECK (Stage 11 & Grade S Zero-Timer Re-Entry on -0.5% Dip)
                 to_remove_reentry = []
