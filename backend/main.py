@@ -2305,12 +2305,15 @@ def run_robo_trade_loop():
                                 t_live = scanner_engine.active_tickers.get(sym, {})
                                 live_vol = float(t_live.get("quote_volume", 0) or 0)
 
-                                # Gate 1: Volume Surge >= 2.0x 30M rolling average
+                                # Gate 1: Volume Surge >= 1.5x 30M rolling average (cold-start bypass for first 5 samples)
                                 hist_vols = coin_vol_30m_cache.get(sym, [])
                                 hist_vols.append(live_vol)
-                                coin_vol_30m_cache[sym] = hist_vols[-18:]  # keep last 18 x 10s ticks ≈ 3 min window
+                                coin_vol_30m_cache[sym] = hist_vols[-30:]  # keep last 30 ticks
                                 avg_30m_vol = sum(hist_vols) / len(hist_vols) if hist_vols else live_vol
-                                vol_surge_ok = (live_vol >= avg_30m_vol * 2.0) if avg_30m_vol > 0 else True
+                                # Bypass volume gate during cache warmup (first 5 data points) or if avg is zero
+                                vol_cache_warmed = len(hist_vols) >= 5
+                                vol_surge_ok = (live_vol >= avg_30m_vol * 1.5) if (vol_cache_warmed and avg_30m_vol > 0) else True
+
 
                                 # Gate 2: Live Order Book Bid/Ask >= 1.20
                                 ob_ratio_live = fetch_order_book_depth_ratio_cached(sym)

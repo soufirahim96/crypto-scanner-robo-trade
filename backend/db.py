@@ -243,6 +243,7 @@ class DatabaseManager:
                     schedule_index INTEGER NOT NULL,
                     symbol TEXT NOT NULL,
                     entry_price_target REAL NOT NULL,
+                    base_level REAL DEFAULT 0.0,
                     exit_price_target REAL NOT NULL,
                     confluence_score REAL DEFAULT 0.0,
                     tier TEXT DEFAULT '',
@@ -257,6 +258,14 @@ class DatabaseManager:
                 pass
             try:
                 cursor.execute("ALTER TABLE robo_schedules ADD COLUMN tier TEXT DEFAULT ''")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE robo_schedules ADD COLUMN base_level REAL DEFAULT 0.0")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE robo_schedules ADD COLUMN created_at_ts REAL DEFAULT 0.0")
             except Exception:
                 pass
 
@@ -885,10 +894,12 @@ class DatabaseManager:
                 s_id = generate_32_hash_id()
                 score_val = float(s.get("confluence_score", 0.0) or 0.0)
                 tier_val = str(s.get("tier", "") or "")
+                base_lvl_val = float(s.get("base_level", s["entry_price_target"]) or s["entry_price_target"])
+                created_at_ts_val = float(s.get("created_at_ts", 0.0) or 0.0)
                 cursor.execute("""
-                    INSERT INTO robo_schedules (id, participant, schedule_index, symbol, entry_price_target, exit_price_target, confluence_score, tier)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (s_id, participant, idx + 1, s["symbol"], s["entry_price_target"], s["exit_price_target"], score_val, tier_val))
+                    INSERT INTO robo_schedules (id, participant, schedule_index, symbol, entry_price_target, base_level, exit_price_target, confluence_score, tier, created_at_ts)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (s_id, participant, idx + 1, s["symbol"], s["entry_price_target"], base_lvl_val, s["exit_price_target"], score_val, tier_val, created_at_ts_val))
             conn.commit()
 
     def get_robo_schedules(self, participant: str = None) -> List[Dict[str, Any]]:
