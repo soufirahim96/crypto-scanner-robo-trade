@@ -2315,9 +2315,9 @@ def run_robo_trade_loop():
                                 vol_surge_ok = (live_vol >= avg_30m_vol * 1.5) if (vol_cache_warmed and avg_30m_vol > 0) else True
 
 
-                                # Gate 2: Live Order Book Bid/Ask >= 1.20
+                                # Gate 2: Live Order Book Bid/Ask >= 0.80 (healthy orderbook, no massive ask wall)
                                 ob_ratio_live = fetch_order_book_depth_ratio_cached(sym)
-                                ob_ok = (ob_ratio_live >= 1.20)
+                                ob_ok = (ob_ratio_live >= 0.80)
 
                                 ignition_pass = vol_surge_ok and ob_ok
 
