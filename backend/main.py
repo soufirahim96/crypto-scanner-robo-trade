@@ -2280,9 +2280,9 @@ def run_robo_trade_loop():
                             base_lvl = float(sched.get("base_level", entry) or entry)
 
                             if is_s_tier:
-                                # V151: GRADE S — check +0.20% base bounce for confirmation
-                                base_bounce_confirmed = (curr_price >= base_lvl * 1.0020)
-                                can_execute_buy = base_bounce_confirmed
+                                # V151: GRADE S — Instant fill at market price when Ignition Gate (Vol + OB) passes
+                                can_execute_buy = True
+
                             else:
                                 # V151: GRADE A — base proximity + +0.20% bounce + BTC flash drop check
                                 if now_ts < btc_flash_drop_until:
@@ -2292,7 +2292,7 @@ def run_robo_trade_loop():
                                 num_ticks = 20 if market_regime == "BULLISH" else 10
                                 proximity_thresh = num_ticks * tick_size
                                 is_in_proximity = (curr_price - base_lvl) <= proximity_thresh
-                                base_bounce_confirmed = (curr_price >= base_lvl * 1.0020)
+                                base_bounce_confirmed = (curr_price >= base_lvl)
 
                                 lowest_px = min(symbol_lowest_touched.get(sym, curr_price), curr_price)
                                 symbol_lowest_touched[sym] = lowest_px
