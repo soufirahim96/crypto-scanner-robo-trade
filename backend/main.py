@@ -1,8 +1,9 @@
 ﻿import asyncio
 import os
+import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from backend.config import config
@@ -29,19 +30,25 @@ async def dashboard(request: Request):
 
 @app.get("/api/state")
 async def get_state():
-    ticker = binance_adapter.fetch_ticker(config.TARGET_SYMBOL)
-    account = binance_adapter.get_account_summary()
-    thoughts = get_recent_thoughts(15)
-    trades = get_recent_trades(15)
-    return {
-        "symbol": config.TARGET_SYMBOL,
-        "price": ticker.get("price"),
-        "account": account,
-        "thoughts": thoughts,
-        "trades": trades
-    }
+    try:
+        ticker = binance_adapter.fetch_ticker(config.TARGET_SYMBOL)
+        account = binance_adapter.get_account_summary()
+        thoughts = get_recent_thoughts(15)
+        trades = get_recent_trades(15)
+        return {
+            "symbol": config.TARGET_SYMBOL,
+            "price": ticker.get("price"),
+            "account": account,
+            "thoughts": thoughts,
+            "trades": trades
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
 
 @app.post("/api/cycle/trigger")
 async def trigger_manual_cycle():
-    result = await hermes_agent.execute_cycle()
-    return result
+    try:
+        result = await hermes_agent.execute_cycle()
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
