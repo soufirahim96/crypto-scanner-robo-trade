@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HaG (Hermes + Gemini) — Binance Demo Live Journey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0b0e14; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
+        .card { background-color: #151a23; border: 1px solid #242c3d; border-radius: 0.75rem; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex justify-between items-center pb-4 border-b border-gray-800">
+            <div>
+                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-yellow-500">
+                    HaG Autonomous Robo Trader
+                </h1>
+                <p class="text-sm text-gray-400 mt-1">
+                    Body: <span class="text-indigo-400 font-semibold">Hermes AI Agent</span> | Brain: <span class="text-emerald-400 font-semibold">Gemini Multi-Account Key Pool</span> | Platform: <span class="text-amber-400 font-semibold">Binance Futures Demo</span>
+                </p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse">
+                    ● AUTONOMOUS BOT ACTIVE (24/7)
+                </span>
+                <button onclick="triggerCycle()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition">
+                    ⚡ Trigger Instant Cycle
+                </button>
+            </div>
+        </header>
+
+        <!-- Top Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="card p-4">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Target Asset</p>
+                <div class="flex items-baseline justify-between mt-2">
+                    <h2 class="text-2xl font-bold text-white" id="val-symbol">PAXG/USDT</h2>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-yellow-950 text-yellow-300">Gold Futures</span>
+                </div>
+                <p class="text-lg font-semibold text-yellow-400 mt-1" id="val-price">Loading...</p>
+            </div>
+
+            <div class="card p-4">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Virtual Wallet Balance</p>
+                <h2 class="text-2xl font-bold text-emerald-400 mt-2" id="val-balance">Loading...</h2>
+                <p class="text-xs text-gray-500 mt-1">Binance Testnet USDT</p>
+            </div>
+
+            <div class="card p-4">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Active Position</p>
+                <h2 class="text-2xl font-bold text-white mt-2" id="val-position">NONE</h2>
+                <p class="text-xs text-gray-400 mt-1" id="val-unrealized-pnl">P&L: $0.00</p>
+            </div>
+
+            <div class="card p-4">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Gemini Brain Pool</p>
+                <h2 class="text-2xl font-bold text-indigo-400 mt-2">3 Accounts</h2>
+                <p class="text-xs text-emerald-400 mt-1">● Auto-Failover Active</p>
+            </div>
+        </div>
+
+        <!-- Main Content: Thoughts Journey & Order History -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Left: Gemini Thought & Reasoning Journey -->
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        🧠 Gemini Live Thought Journey
+                    </h3>
+                    <span class="text-xs text-gray-400">Auto-updating every 5s</span>
+                </div>
+                <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2" id="thought-list">
+                    <p class="text-gray-500 text-sm italic">Listening for Gemini thoughts...</p>
+                </div>
+            </div>
+
+            <!-- Right: Executed Trades & Positions -->
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        📋 Executed Testnet Trades
+                    </h3>
+                    <span class="text-xs text-gray-400">Binance Futures Log</span>
+                </div>
+                <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2" id="trade-list">
+                    <p class="text-gray-500 text-sm italic">No trades executed yet...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchState() {
+            try {
+                const res = await fetch('/api/state');
+                const data = await res.json();
+                
+                // Update metrics
+                document.getElementById('val-symbol').innerText = data.symbol;
+                document.getElementById('val-price').innerText = '$' + (data.price ? data.price.toFixed(2) : '--');
+                
+                const bal = data.account ? data.account.walletBalance : 0;
+                document.getElementById('val-balance').innerText = '$' + bal.toFixed(2) + ' USDT';
+                
+                const pos = data.account ? data.account.activePosition : null;
+                if (pos) {
+                    document.getElementById('val-position').innerHTML = `<span class="${pos.side === 'LONG' ? 'text-emerald-400' : 'text-rose-400'} font-black">${pos.side} ${pos.size} PAXG</span>`;
+                    document.getElementById('val-unrealized-pnl').innerText = `Floating PnL: $${pos.unrealizedProfit.toFixed(2)}`;
+                } else {
+                    document.getElementById('val-position').innerText = 'FLAT (No Position)';
+                    document.getElementById('val-unrealized-pnl').innerText = 'Ready for setup';
+                }
+
+                // Render Thoughts
+                const thoughtContainer = document.getElementById('thought-list');
+                if (data.thoughts && data.thoughts.length > 0) {
+                    thoughtContainer.innerHTML = data.thoughts.map(t => {
+                        const date = new Date(t.timestamp * 1000).toLocaleTimeString();
+                        let badgeColor = 'bg-gray-800 text-gray-300';
+                        if (t.action === 'BUY') badgeColor = 'bg-emerald-900 text-emerald-200 border border-emerald-600';
+                        if (t.action === 'SELL') badgeColor = 'bg-rose-900 text-rose-200 border border-rose-600';
+                        if (t.action === 'CLOSE') badgeColor = 'bg-yellow-900 text-yellow-200 border border-yellow-600';
+
+                        return `
+                            <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800 space-y-1">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="font-mono text-gray-400">${date}</span>
+                                    <span class="font-semibold ${badgeColor} px-2 py-0.5 rounded text-[10px]">${t.action} (${Math.round(t.confidence * 100)}%)</span>
+                                </div>
+                                <p class="text-sm text-gray-200 font-sans mt-1">"${t.reasoning}"</p>
+                                <div class="text-[11px] text-gray-500 flex justify-between pt-1 border-t border-gray-800/40">
+                                    <span>Price: $${t.price.toFixed(2)} | RSI: ${t.rsi} | Trend: ${t.trend}</span>
+                                    <span class="text-indigo-400">${t.key_used}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Render Trades
+                const tradeContainer = document.getElementById('trade-list');
+                if (data.trades && data.trades.length > 0) {
+                    tradeContainer.innerHTML = data.trades.map(tr => {
+                        const date = new Date(tr.timestamp * 1000).toLocaleTimeString();
+                        const isBuy = tr.side === 'BUY';
+                        return `
+                            <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800 flex justify-between items-center">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded ${isBuy ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">${tr.side}</span>
+                                        <span class="text-sm font-semibold text-white">${tr.quantity} ${tr.symbol}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-1">Price: $${tr.price.toFixed(2)} | Order: #${tr.order_id}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded">${tr.status}</span>
+                                    <p class="text-xs text-gray-500 mt-1 font-mono">${date}</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+            } catch (err) {
+                console.error("Error fetching state:", err);
+            }
+        }
+
+        async function triggerCycle() {
+            try {
+                await fetch('/api/cycle/trigger', { method: 'POST' });
+                fetchState();
+            } catch(e) {
+                alert("Cycle trigger failed: " + e);
+            }
+        }
+
+        setInterval(fetchState, 4000);
+        fetchState();
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+/tmp/
+opend/opend_linux_x64.bak
+*.log
