@@ -34,7 +34,7 @@ class HaGConfig(BaseModel):
     TARGET_SYMBOL: str = "PAXGUSDT"
     ORDER_QTY: float = 0.01
     LEVERAGE: int = 5
-    EVALUATION_INTERVAL_SECONDS: int = 180
+    EVALUATION_INTERVAL_SECONDS: int = 600
     MAX_DAILY_LOSS_USDT: float = 100.0
 
 config = HaGConfig()
