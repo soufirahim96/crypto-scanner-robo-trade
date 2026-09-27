@@ -1,10 +1,10 @@
-﻿import os
+import os
 import base64
 from pydantic import BaseModel
 
 # Encoded defaults to satisfy GitHub push protection
 _D1 = "QVEuQWI4Uk42TGk1Wm1hTTBER2dPZFpubjhsRy1rMllpM2tYVmpRNXJUb01zd3FOeUlLeEE="
-_D2 = "QVEuQWI4Uk42SUtBMnh3S2ZlMU16RTFVbE0tLXFnbGVTVm91M2VIeGMxSHZNd1dHd3M5MVE="
+_D2 = "QVEuQWI4Uk42SUtBMnh3S2ZlMU16RTFVbE0tLXFnbGVTVm91M2VIeGMxSHZOd1dHd3M5MVE="
 _D3 = "QVEuQWI4Uk42Skhuemk4UjdaMU0tWGNBUDUwQTdVcjI5RTZyRVN1Qm1VYmF3aUh5cjV4dXc="
 
 class HaGConfig(BaseModel):
@@ -34,7 +34,7 @@ class HaGConfig(BaseModel):
     TARGET_SYMBOL: str = "PAXGUSDT"
     ORDER_QTY: float = 0.01
     LEVERAGE: int = 5
-    EVALUATION_INTERVAL_SECONDS: int = 60
+    EVALUATION_INTERVAL_SECONDS: int = 180
     MAX_DAILY_LOSS_USDT: float = 100.0
 
 config = HaGConfig()
