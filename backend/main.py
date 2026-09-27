@@ -1,10 +1,9 @@
-﻿import asyncio
+import asyncio
 import os
 import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 from backend.config import config
 from core.hermes_agent import hermes_agent
@@ -12,7 +11,6 @@ from core.journal import get_recent_thoughts, get_recent_trades
 from adapters.binance_adapter import binance_adapter
 
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
-templates = Jinja2Templates(directory=template_dir)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,8 +23,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="HaG Autonomous Trading Bot (Binance Demo)", lifespan=lifespan)
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def dashboard():
+    index_file = os.path.join(template_dir, "index.html")
+    return FileResponse(index_file)
 
 @app.get("/api/state")
 async def get_state():
