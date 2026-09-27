@@ -120,15 +120,20 @@
                     thoughtContainer.innerHTML = data.thoughts.map(t => {
                         const date = new Date(t.timestamp * 1000).toLocaleTimeString();
                         let badgeColor = 'bg-gray-800 text-gray-300';
+                        let actionLabel = t.action;
                         if (t.action === 'BUY') badgeColor = 'bg-emerald-900 text-emerald-200 border border-emerald-600';
                         if (t.action === 'SELL') badgeColor = 'bg-rose-900 text-rose-200 border border-rose-600';
                         if (t.action === 'CLOSE') badgeColor = 'bg-yellow-900 text-yellow-200 border border-yellow-600';
+                        if (t.action === 'HOLD') {
+                            actionLabel = (data.account && data.account.activePosition) ? 'HOLD POSITION 🟢' : 'WAIT FOR SETUP ⏳';
+                            badgeColor = (data.account && data.account.activePosition) ? 'bg-indigo-900 text-indigo-200 border border-indigo-600' : 'bg-gray-800 text-gray-300';
+                        }
 
                         return `
                             <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800 space-y-1">
                                 <div class="flex justify-between items-center text-xs">
                                     <span class="font-mono text-gray-400">${date}</span>
-                                    <span class="font-semibold ${badgeColor} px-2 py-0.5 rounded text-[10px]">${t.action} (${Math.round(t.confidence * 100)}%)</span>
+                                    <span class="font-semibold ${badgeColor} px-2 py-0.5 rounded text-[10px]">${actionLabel} (${Math.round(t.confidence * 100)}%)</span>
                                 </div>
                                 <p class="text-sm text-gray-200 font-sans mt-1">"${t.reasoning}"</p>
                                 <div class="text-[11px] text-gray-500 flex justify-between pt-1 border-t border-gray-800/40">
