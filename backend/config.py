@@ -32,9 +32,17 @@ class HaGConfig(BaseModel):
         return keys
 
     TARGET_SYMBOL: str = "PAXGUSDT"
+    TIMEFRAME: str = "10m"
     ORDER_QTY: float = 0.01
     LEVERAGE: int = 5
     EVALUATION_INTERVAL_SECONDS: int = 600
+    SL_TICKS: int = 100
+    TP_TICKS: int = 600
+    TICK_VALUE: float = 0.10
+    MAX_HOLD_SECONDS: int = 14400
+    MAX_FLOATING_LOSS_PCT: float = 0.02
+    RISK_PER_TRADE_PCT: float = 0.01
+    MAX_SPREAD_PCT: float = 0.002
     MAX_DAILY_LOSS_USDT: float = 100.0
 
 config = HaGConfig()
