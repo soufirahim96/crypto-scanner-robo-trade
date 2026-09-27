@@ -1,4 +1,4 @@
-﻿from typing import List, Dict, Any
+from typing import List, Dict, Any
 
 def calculate_ema(prices: List[float], period: int) -> float:
     if len(prices) < period:
@@ -48,20 +48,20 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
     lows = [float(c[3]) for c in candles]
     
     current_price = closes[-1]
-    ema20 = calculate_ema(closes, 20)
-    ema50 = calculate_ema(closes, 50)
+    ema9 = calculate_ema(closes, 9)
+    ema21 = calculate_ema(closes, 21)
     rsi = calculate_rsi(closes, 14)
     
     trend = "NEUTRAL"
-    if current_price > ema20 > ema50:
+    if current_price > ema9 > ema21:
         trend = "BULLISH_UPTREND"
-    elif current_price < ema20 < ema50:
+    elif current_price < ema9 < ema21:
         trend = "BEARISH_DOWNTREND"
         
     return {
         "price": current_price,
-        "ema20": ema20,
-        "ema50": ema50,
+        "ema9": ema9,
+        "ema21": ema21,
         "rsi": rsi,
         "high24h": max(highs[-24:]) if len(highs) >= 24 else max(highs),
         "low24h": min(lows[-24:]) if len(lows) >= 24 else min(lows),

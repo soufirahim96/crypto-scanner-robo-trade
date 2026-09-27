@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 from google import genai
 from backend.config import config
@@ -31,18 +31,18 @@ Analyze the following live market state and provide a precision trading decision
 MARKET STATE:
 - Symbol: {market_snapshot.get('symbol')}
 - Current Price: ${market_snapshot.get('price')}
-- 20 EMA: {market_snapshot.get('ema20')}
-- 50 EMA: {market_snapshot.get('ema50')}
+- 9 EMA (Short-stage candle momentum): {market_snapshot.get('ema9')}
+- 21 EMA (Long-stage candle verification baseline): {market_snapshot.get('ema21')}
 - 14 RSI: {market_snapshot.get('rsi')}
 - 24h High: {market_snapshot.get('high24h')}
 - 24h Low: {market_snapshot.get('low24h')}
 - Current Position: {market_snapshot.get('current_position')}
 
 RULES:
-1. BUY/LONG: When Trend is Bullish (Price > 20 EMA > 50 EMA) and RSI is not overbought (< 65).
-2. SELL/SHORT: When Trend is Bearish (Price < 20 EMA < 50 EMA) and RSI is not oversold (> 35).
-3. CLOSE: If holding a position and momentum exhausts or trend reverses.
-4. HOLD: If market is uncertain, choppy, or inside an unconfirmed range.
+1. BUY/LONG: When short stage candle momentum is Bullish (Price > 9 EMA) verified by long stage trend (9 EMA > 21 EMA), and RSI is not overbought (< 65).
+2. SELL/SHORT: When short stage candle momentum is Bearish (Price < 9 EMA) verified by long stage trend (9 EMA < 21 EMA), and RSI is not oversold (> 35).
+3. CLOSE: If holding a position and short stage momentum breaks (Price crosses back over 9 EMA, or 9 EMA crosses 21 EMA).
+4. HOLD: If market is consolidating, choppy, or inside an unconfirmed transition range.
 
 OUTPUT FORMAT (STRICT JSON ONLY, NO MARKDOWN, NO OTHER TEXT):
 {{

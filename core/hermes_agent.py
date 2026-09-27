@@ -1,4 +1,4 @@
-﻿import time
+import time
 import logging
 import asyncio
 from backend.config import config
@@ -36,8 +36,8 @@ class HermesTradingAgent:
         market_snapshot = {
             "symbol": symbol,
             "price": ticker["price"],
-            "ema20": features.get("ema20"),
-            "ema50": features.get("ema50"),
+            "ema9": features.get("ema9"),
+            "ema21": features.get("ema21"),
             "rsi": features.get("rsi"),
             "high24h": features.get("high24h"),
             "low24h": features.get("low24h"),
