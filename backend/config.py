@@ -40,11 +40,11 @@ class HaGConfig(BaseModel):
         return keys
 
     TARGET_SYMBOL: str = "PAXGUSDT"
-    TIMEFRAME_FAST: str = "3m"
+    TIMEFRAME_FAST: str = "5m"
     TIMEFRAME_MACRO: str = "10m"
     ORDER_QTY: float = 0.01
     LEVERAGE: int = 5
-    FAST_INTERVAL_SECONDS: int = 180       # 3 Minutes (Gemini 3.7 Flash)
+    FAST_INTERVAL_SECONDS: int = 300       # 5 Minutes (Gemini 3.7 Flash)
     MACRO_INTERVAL_SECONDS: int = 600      # 10 Minutes (Gemini 3.8 Flash Superior)
     SUPERIOR_MODEL_NAME: str = "gemini-3.8-flash"
     FAST_MODEL_NAME: str = "gemini-3.7-flash"

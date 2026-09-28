@@ -24,16 +24,16 @@ class HermesTradingAgent:
         """
         Executes one autonomous cycle:
         - If is_macro=True: Uses M10 chart and Gemini 3.8 Flash (Superior macro reasoning).
-        - If is_macro=False: Uses M3 chart and Gemini 3.7 Flash (Fast 3-minute sentry).
+        - If is_macro=False: Uses M5 chart and Gemini 3.7 Flash with cascade (Fast 5-minute sentry).
         Follows user's Stage 1 & Stage 2 Framework:
-        - Stage 1: Buy (EMA9 cross 21 + RSI > 55 + Close > Prev Open). Sell (EMA9 cross 21 + RSI < 45 + Close < Prev Open).
+        - Stage 1: Buy (EMA9 cross 21 + RSI > 55 + Close > Resistance). Sell (EMA9 cross 21 + RSI < 45 + Close < Support).
         - Stage 2: Reversal Exit on opposite EMA cross, 4-hour hold limit, or continuation entries.
         """
         symbol = config.TARGET_SYMBOL
         timeframe = config.TIMEFRAME_MACRO if is_macro else config.TIMEFRAME_FAST
         model_tier = "superior" if is_macro else "fast"
         
-        # 1. Perception & Features on active timeframe (3m or 10m)
+        # 1. Perception & Features on active timeframe (5m or 10m)
         ticker = binance_adapter.fetch_ticker(symbol)
         candles = binance_adapter.fetch_candles(symbol, timeframe=timeframe, limit=50)
         features = extract_market_features(candles)
@@ -241,7 +241,7 @@ class HermesTradingAgent:
 
     async def run_loop(self):
         self.is_running = True
-        logger.info(f"HaG Autonomous Agent started. Sentry: {config.FAST_INTERVAL_SECONDS}s (3.7 Flash M3), Strategist: {config.MACRO_INTERVAL_SECONDS}s (3.8 Flash M10).")
+        logger.info(f"HaG Autonomous Agent started. Sentry: {config.FAST_INTERVAL_SECONDS}s (3.7 Flash M5), Strategist: {config.MACRO_INTERVAL_SECONDS}s (3.8 Flash M10).")
         while self.is_running:
             try:
                 now = time.time()
@@ -252,7 +252,7 @@ class HermesTradingAgent:
                     logger.info("Executing MACRO cycle with superior model (Gemini 3.8 Flash on M10)...")
                 else:
                     is_macro = False
-                    logger.info("Executing FAST SENTRY cycle (Gemini 3.7 Flash on M3)...")
+                    logger.info("Executing FAST SENTRY cycle (Gemini 3.7 Flash on M5)...")
 
                 cycle_data = await self.execute_cycle(is_macro=is_macro)
                 logger.info(f"Cycle completed [{cycle_data.get('timeframe')} | {cycle_data.get('tier')}]: {cycle_data.get('action') or cycle_data.get('decision', {}).get('action')}")
