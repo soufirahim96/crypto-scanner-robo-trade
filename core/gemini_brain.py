@@ -73,9 +73,18 @@ OUTPUT FORMAT (STRICT JSON ONLY, NO MARKDOWN, NO OTHER TEXT):
 """
         # Determine prioritized model list based on tier
         if model_tier == "superior":
-            models_to_try = [config.SUPERIOR_MODEL_NAME, config.FAST_MODEL_NAME]
+            models_to_try = [
+                config.SUPERIOR_MODEL_NAME,  # gemini-3.8-flash
+                config.FAST_MODEL_NAME,      # gemini-3.7-flash
+                "gemini-3.6-flash",
+                "gemini-3.5-flash-lite"
+            ]
         else:
-            models_to_try = [config.FAST_MODEL_NAME]
+            models_to_try = [
+                config.FAST_MODEL_NAME,      # gemini-3.7-flash
+                "gemini-3.6-flash",
+                "gemini-3.5-flash-lite"
+            ]
 
         for target_model in models_to_try:
             max_attempts = len(self.keys)
@@ -94,7 +103,17 @@ OUTPUT FORMAT (STRICT JSON ONLY, NO MARKDOWN, NO OTHER TEXT):
                         text = text[3:-3].strip()
                     
                     decision = json.loads(text)
-                    tier_label = "3.8 Superior" if "3.8" in target_model else "3.7 Fast"
+                    if "3.8" in target_model:
+                        tier_label = "3.8 Superior"
+                    elif "3.7" in target_model:
+                        tier_label = "3.7 Fast"
+                    elif "3.6" in target_model:
+                        tier_label = "3.6 Sentry"
+                    elif "3.5" in target_model:
+                        tier_label = "3.5 Lite Sentry"
+                    else:
+                        tier_label = target_model
+
                     decision["key_used"] = f"Account #{self.current_index + 1} ({tier_label})"
                     
                     # Round-robin: rotate to next account for subsequent cycle
