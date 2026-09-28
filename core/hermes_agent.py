@@ -63,24 +63,27 @@ class HermesTradingAgent:
             
             force_close = False
             close_reason = ""
+            is_ema_cross_reversal = False
             
             # Rule: Close all if floating hits -2%
             if floating_pnl < 0 and floating_loss_pct >= config.MAX_FLOATING_LOSS_PCT:
                 force_close = True
                 close_reason = f"Emergency cut: Floating loss -{floating_loss_pct*100:.2f}% reached -2% account limit."
                 
-            # Rule: 4-hour max holding limit exit
+            # Rule: 4-hour max holding limit exit (take profit first)
             elif holding_hours >= 4.0:
                 force_close = True
-                close_reason = f"4-Hour holding limit reached ({holding_hours:.1f}h). Closing active position to take profit/free margin."
+                close_reason = f"4-Hour holding limit reached ({holding_hours:.1f}h). Closing active position to take profit first."
                 
-            # Rule: Whenever new EMA9 cross with EMA21 occurs (opposite direction) -> exit active position first
+            # Rule: Whenever new EMA9 cross with EMA21 occurs (opposite direction) -> exit active position first before Stage 1
             elif current_pos["side"] == "LONG" and features.get("cross_below"):
                 force_close = True
-                close_reason = f"New bearish EMA9/21 cross on {timeframe}. Exiting active LONG position first."
+                is_ema_cross_reversal = True
+                close_reason = f"New bearish EMA9/21 cross on {timeframe}. Exiting active LONG position first before running Stage 1."
             elif current_pos["side"] == "SHORT" and features.get("cross_above"):
                 force_close = True
-                close_reason = f"New bullish EMA9/21 cross on {timeframe}. Exiting active SHORT position first."
+                is_ema_cross_reversal = True
+                close_reason = f"New bullish EMA9/21 cross on {timeframe}. Exiting active SHORT position first before running Stage 1."
                 
             # Rule: SL 100 ticks or TP 600 ticks check
             elif self.position_sl and self.position_tp:
@@ -120,12 +123,17 @@ class HermesTradingAgent:
                 self.position_sl = None
                 self.position_tp = None
                 
-                return {
-                    "timestamp": time.time(),
-                    "action": "CLOSE",
-                    "reason": close_reason,
-                    "account": account
-                }
+                if is_ema_cross_reversal:
+                    # User's Rule: Exit active position first BEFORE running stage 1 to make a new entry!
+                    current_pos = None
+                    account = binance_adapter.get_account_summary()
+                else:
+                    return {
+                        "timestamp": time.time(),
+                        "action": "CLOSE",
+                        "reason": close_reason,
+                        "account": binance_adapter.get_account_summary()
+                    }
 
         # ----------------------------------------------------
         # FILTER CHECKS: SPREAD & CANDLE GEGAR
@@ -158,6 +166,10 @@ class HermesTradingAgent:
             "cross_above": features.get("cross_above"),
             "cross_below": features.get("cross_below"),
             "rsi": features.get("rsi"),
+            "resistance": features.get("resistance"),
+            "support": features.get("support"),
+            "close_above_resistance": features.get("close_above_resistance"),
+            "close_below_support": features.get("close_below_support"),
             "prev_open": features.get("prev_open"),
             "close_above_prev_open": features.get("close_above_prev_open"),
             "close_below_prev_open": features.get("close_below_prev_open"),
