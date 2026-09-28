@@ -86,6 +86,11 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
     close_above_resistance = current_price > resistance
     close_below_support = current_price < support
     
+    # User's Updated Rule: Compare current close with previous candle opening
+    prev_open = float(candles[-2][1]) if len(candles) >= 2 else current_price
+    close_above_prev_open = current_price > prev_open
+    close_below_prev_open = current_price < prev_open
+    
     # Candle Gegar Filter (Violent candle range > 2.5x ATR)
     atr = calculate_atr(candles, 14)
     current_candle_range = highs[-1] - lows[-1]
@@ -106,6 +111,9 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
         "cross_above": cross_above,
         "cross_below": cross_below,
         "rsi": rsi,
+        "prev_open": round(prev_open, 2),
+        "close_above_prev_open": close_above_prev_open,
+        "close_below_prev_open": close_below_prev_open,
         "resistance": round(resistance, 2),
         "support": round(support, 2),
         "close_above_resistance": close_above_resistance,

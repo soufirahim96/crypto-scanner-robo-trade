@@ -13,31 +13,37 @@ class HermesTradingAgent:
     def __init__(self):
         self.is_running = False
         self.last_cycle_time = 0.0
+        self.last_macro_time = 0.0
         self.position_entry_time = None
         self.position_entry_price = None
         self.position_side = None
         self.position_sl = None
         self.position_tp = None
 
-    async def execute_cycle(self) -> dict:
+    async def execute_cycle(self, is_macro: bool = False) -> dict:
         """
-        Executes one full autonomous cycle following the 2-Stage Framework:
-        Stage 1: Logic Execution (Fresh EMA9/21 cross + RSI + Breakout, 1% risk, 100 SL / 600 TP)
-        Stage 2: Logic Confirmation (Position management: 4h exit, -2% stop, reversal exit; or continuation entry)
+        Executes one autonomous cycle:
+        - If is_macro=True: Uses M10 chart and Gemini 3.8 Flash (Superior macro reasoning).
+        - If is_macro=False: Uses M3 chart and Gemini 3.7 Flash (Fast 3-minute sentry).
+        Follows user's Stage 1 & Stage 2 Framework:
+        - Stage 1: Buy (EMA9 cross 21 + RSI > 55 + Close > Prev Open). Sell (EMA9 cross 21 + RSI < 45 + Close < Prev Open).
+        - Stage 2: Reversal Exit on opposite EMA cross, 4-hour hold limit, or continuation entries.
         """
         symbol = config.TARGET_SYMBOL
+        timeframe = config.TIMEFRAME_MACRO if is_macro else config.TIMEFRAME_FAST
+        model_tier = "superior" if is_macro else "fast"
         
-        # 1. Perception & Features on M10
+        # 1. Perception & Features on active timeframe (3m or 10m)
         ticker = binance_adapter.fetch_ticker(symbol)
-        candles = binance_adapter.fetch_candles(symbol, timeframe=config.TIMEFRAME, limit=50)
+        candles = binance_adapter.fetch_candles(symbol, timeframe=timeframe, limit=50)
         features = extract_market_features(candles)
         spread_info = binance_adapter.fetch_orderbook_spread(symbol)
         account = binance_adapter.get_account_summary()
         current_pos = account.get("activePosition")
         
         wallet_balance = account.get("walletBalance", 5000.0)
-        sl_distance = config.SL_TICKS * config.TICK_VALUE  # e.g., 100 * 0.10 = $10.00
-        tp_distance = config.TP_TICKS * config.TICK_VALUE  # e.g., 600 * 0.10 = $60.00
+        sl_distance = config.SL_TICKS * config.TICK_VALUE  # 100 * 0.10 = $10.00
+        tp_distance = config.TP_TICKS * config.TICK_VALUE  # 600 * 0.10 = $60.00
         
         # Calculate lot size based on 1% balance risk
         risk_capital = wallet_balance * config.RISK_PER_TRADE_PCT
@@ -66,15 +72,15 @@ class HermesTradingAgent:
             # Rule: 4-hour max holding limit exit
             elif holding_hours >= 4.0:
                 force_close = True
-                close_reason = f"4-Hour holding limit reached ({holding_hours:.1f}h). Closing active position to secure gains."
+                close_reason = f"4-Hour holding limit reached ({holding_hours:.1f}h). Closing active position to take profit/free margin."
                 
-            # Rule: EMA9 cross with EMA21 in opposite direction -> exit active position first
+            # Rule: Whenever new EMA9 cross with EMA21 occurs (opposite direction) -> exit active position first
             elif current_pos["side"] == "LONG" and features.get("cross_below"):
                 force_close = True
-                close_reason = "EMA9 crossed below EMA21. Exiting active LONG position first."
+                close_reason = f"New bearish EMA9/21 cross on {timeframe}. Exiting active LONG position first."
             elif current_pos["side"] == "SHORT" and features.get("cross_above"):
                 force_close = True
-                close_reason = "EMA9 crossed above EMA21. Exiting active SHORT position first."
+                close_reason = f"New bullish EMA9/21 cross on {timeframe}. Exiting active SHORT position first."
                 
             # Rule: SL 100 ticks or TP 600 ticks check
             elif self.position_sl and self.position_tp:
@@ -103,7 +109,7 @@ class HermesTradingAgent:
                     action="CLOSE",
                     confidence=1.0,
                     reasoning=close_reason,
-                    key_used="HERMES_STAGE_2"
+                    key_used=f"HERMES_{timeframe.upper()}"
                 )
                 log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], close_res.get("orderId"), "CLOSED", floating_pnl)
                 
@@ -131,7 +137,7 @@ class HermesTradingAgent:
             return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
 
         if features.get("candle_gegar"):
-            reason = "Filter active: Candle gegar detected (erratic violent volatility spike > 2.5x ATR). Entry withheld."
+            reason = f"Filter active: Candle gegar detected on {timeframe} (erratic volatility spike > 2.5x ATR). Entry withheld."
             log_thought(symbol, ticker["price"], features.get("rsi", 0.0), features.get("trend", "NEUTRAL"), "HOLD", 0.0, reason, "GEGAR_FILTER")
             return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
 
@@ -143,6 +149,7 @@ class HermesTradingAgent:
         
         market_snapshot = {
             "symbol": symbol,
+            "timeframe": timeframe,
             "price": ticker["price"],
             "ema9": features.get("ema9"),
             "ema21": features.get("ema21"),
@@ -151,10 +158,9 @@ class HermesTradingAgent:
             "cross_above": features.get("cross_above"),
             "cross_below": features.get("cross_below"),
             "rsi": features.get("rsi"),
-            "resistance": features.get("resistance"),
-            "support": features.get("support"),
-            "close_above_resistance": features.get("close_above_resistance"),
-            "close_below_support": features.get("close_below_support"),
+            "prev_open": features.get("prev_open"),
+            "close_above_prev_open": features.get("close_above_prev_open"),
+            "close_below_prev_open": features.get("close_below_prev_open"),
             "spread_pct": spread_pct,
             "candle_gegar": features.get("candle_gegar"),
             "current_position": current_pos["side"] if current_pos else "NONE",
@@ -162,7 +168,7 @@ class HermesTradingAgent:
             "floating_pnl": float_pnl
         }
         
-        decision = gemini_brain.evaluate_market(market_snapshot)
+        decision = gemini_brain.evaluate_market(market_snapshot, model_tier=model_tier)
         action = decision.get("action", "HOLD")
         confidence = decision.get("confidence", 0.0)
         reasoning = decision.get("reasoning", "")
@@ -213,6 +219,8 @@ class HermesTradingAgent:
 
         return {
             "timestamp": time.time(),
+            "timeframe": timeframe,
+            "tier": model_tier,
             "market": market_snapshot,
             "decision": decision,
             "trade": trade_result,
@@ -221,13 +229,23 @@ class HermesTradingAgent:
 
     async def run_loop(self):
         self.is_running = True
-        logger.info(f"HaG Autonomous Agent started. Monitoring {config.TARGET_SYMBOL} on {config.TIMEFRAME} every {config.EVALUATION_INTERVAL_SECONDS}s.")
+        logger.info(f"HaG Autonomous Agent started. Sentry: {config.FAST_INTERVAL_SECONDS}s (3.7 Flash M3), Strategist: {config.MACRO_INTERVAL_SECONDS}s (3.8 Flash M10).")
         while self.is_running:
             try:
-                cycle_data = await self.execute_cycle()
-                logger.info(f"Cycle completed: {cycle_data.get('action') or cycle_data.get('decision', {}).get('action')} | {cycle_data.get('reason') or cycle_data.get('decision', {}).get('reasoning')}")
+                now = time.time()
+                # Priority rule: If 10 minutes have elapsed since last macro evaluation, prioritize Gemini 3.8 Flash!
+                if (now - self.last_macro_time) >= config.MACRO_INTERVAL_SECONDS:
+                    is_macro = True
+                    self.last_macro_time = now
+                    logger.info("Executing MACRO cycle with superior model (Gemini 3.8 Flash on M10)...")
+                else:
+                    is_macro = False
+                    logger.info("Executing FAST SENTRY cycle (Gemini 3.7 Flash on M3)...")
+
+                cycle_data = await self.execute_cycle(is_macro=is_macro)
+                logger.info(f"Cycle completed [{cycle_data.get('timeframe')} | {cycle_data.get('tier')}]: {cycle_data.get('action') or cycle_data.get('decision', {}).get('action')}")
             except Exception as e:
                 logger.error(f"Error in HaG cycle: {e}")
-            await asyncio.sleep(config.EVALUATION_INTERVAL_SECONDS)
+            await asyncio.sleep(config.FAST_INTERVAL_SECONDS)
 
 hermes_agent = HermesTradingAgent()
