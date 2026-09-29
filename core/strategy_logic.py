@@ -49,9 +49,9 @@ def calculate_atr(candles: List[List[Any]], period: int = 14) -> float:
         return 1.0
     return sum(tr_list[-period:]) / min(len(tr_list), period)
 
-def calculate_adx(candles: List[List[Any]], period: int = 14) -> float:
+def calculate_adx(candles: List[List[Any]], period: int = 7) -> float:
     """
-    Calculates Welles Wilder's Average Directional Index (ADX) over specified period.
+    Calculates Welles Wilder's Average Directional Index (ADX) over specified period (default 7 for fast scalper response).
     Returns float rounded to 2 decimal places.
     """
     if len(candles) < period * 2:
@@ -136,7 +136,7 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
     cross_below = (ema9_prev >= ema21_prev) and (ema9 < ema21)
     
     rsi = calculate_rsi(closes, 14)
-    adx = calculate_adx(candles, 14)
+    adx = calculate_adx(candles, 7)
     
     # Swing Support & Resistance over preceding 14 candles (excluding current active candle)
     lookback = min(14, len(candles) - 1)

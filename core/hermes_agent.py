@@ -149,10 +149,10 @@ class HermesTradingAgent:
             log_thought(symbol, ticker["price"], features.get("rsi", 0.0), features.get("trend", "NEUTRAL"), "HOLD", 0.0, reason, "GEGAR_FILTER")
             return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
 
-        # ADX Trend Filter (Only make an entry if ADX > 23)
+        # ADX Trend Filter (Only make an entry if fast ADX(7) > 23)
         adx_val = features.get("adx", 25.0)
         if not current_pos and adx_val <= 23.0:
-            reason = f"Filter active: ADX is weak ({adx_val:.2f} <= 23.0). Market is ranging/choppy. Entry withheld."
+            reason = f"Filter active: Fast ADX(7) is weak ({adx_val:.2f} <= 23.0). Market is ranging/choppy. Entry withheld."
             log_thought(symbol, ticker["price"], features.get("rsi", 0.0), features.get("trend", "NEUTRAL"), "HOLD", 0.0, reason, "ADX_FILTER")
             return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
 
@@ -200,7 +200,7 @@ class HermesTradingAgent:
             symbol=symbol,
             price=ticker["price"],
             rsi=features.get("rsi", 0.0),
-            trend=f"{features.get('trend', 'UNKNOWN')} (ADX: {adx_val:.1f})",
+            trend=f"{features.get('trend', 'UNKNOWN')} (ADX7: {adx_val:.1f})",
             action=action,
             confidence=confidence,
             reasoning=reasoning,
