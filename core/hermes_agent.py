@@ -136,7 +136,7 @@ class HermesTradingAgent:
                     }
 
         # ----------------------------------------------------
-        # FILTER CHECKS: SPREAD & CANDLE GEGAR
+        # FILTER CHECKS: SPREAD, CANDLE GEGAR, & ADX TREND
         # ----------------------------------------------------
         spread_pct = spread_info.get("spread_pct", 0.0)
         if spread_pct > config.MAX_SPREAD_PCT:
@@ -147,6 +147,13 @@ class HermesTradingAgent:
         if features.get("candle_gegar"):
             reason = f"Filter active: Candle gegar detected on {timeframe} (erratic volatility spike > 2.5x ATR). Entry withheld."
             log_thought(symbol, ticker["price"], features.get("rsi", 0.0), features.get("trend", "NEUTRAL"), "HOLD", 0.0, reason, "GEGAR_FILTER")
+            return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
+
+        # ADX Trend Filter (Only make an entry if ADX > 23)
+        adx_val = features.get("adx", 25.0)
+        if not current_pos and adx_val <= 23.0:
+            reason = f"Filter active: ADX is weak ({adx_val:.2f} <= 23.0). Market is ranging/choppy. Entry withheld."
+            log_thought(symbol, ticker["price"], features.get("rsi", 0.0), features.get("trend", "NEUTRAL"), "HOLD", 0.0, reason, "ADX_FILTER")
             return {"timestamp": time.time(), "action": "HOLD", "reason": reason}
 
         # ----------------------------------------------------
@@ -166,6 +173,8 @@ class HermesTradingAgent:
             "cross_above": features.get("cross_above"),
             "cross_below": features.get("cross_below"),
             "rsi": features.get("rsi"),
+            "adx": adx_val,
+            "adx_trending": features.get("adx_trending", True),
             "resistance": features.get("resistance"),
             "support": features.get("support"),
             "close_above_resistance": features.get("close_above_resistance"),
@@ -191,34 +200,56 @@ class HermesTradingAgent:
             symbol=symbol,
             price=ticker["price"],
             rsi=features.get("rsi", 0.0),
-            trend=features.get("trend", "UNKNOWN"),
+            trend=f"{features.get('trend', 'UNKNOWN')} (ADX: {adx_val:.1f})",
             action=action,
             confidence=confidence,
             reasoning=reasoning,
             key_used=key_used
         )
-        
+
         # ----------------------------------------------------
-        # ACTION EXECUTION (MAX 1 TRADE AT A TIME)
+        # ACTION EXECUTION (MAX 1 TRADE AT A TIME, CLOSE OPPOSITE FIRST)
         # ----------------------------------------------------
         trade_result = None
-        if action == "BUY" and not current_pos:
-            trade_result = binance_adapter.place_order(symbol, "BUY", trade_qty, "MARKET")
-            self.position_entry_time = time.time()
-            self.position_entry_price = ticker["price"]
-            self.position_side = "LONG"
-            self.position_sl = round(ticker["price"] - sl_distance, 2)
-            self.position_tp = round(ticker["price"] + tp_distance, 2)
-            log_trade(symbol, "BUY", trade_qty, ticker["price"], trade_result.get("orderId"), "FILLED")
+        if action == "BUY":
+            if current_pos:
+                if current_pos["side"] == "LONG":
+                    # Same trend -> keep the position
+                    pass
+                elif current_pos["side"] == "SHORT":
+                    # Opposite position -> close all before making new entry
+                    close_res = binance_adapter.close_position(symbol)
+                    log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], close_res.get("orderId"), "CLOSED", current_pos.get("unrealizedProfit", 0.0))
+                    current_pos = None
+
+            if not current_pos:
+                trade_result = binance_adapter.place_order(symbol, "BUY", trade_qty, "MARKET")
+                self.position_entry_time = time.time()
+                self.position_entry_price = ticker["price"]
+                self.position_side = "LONG"
+                self.position_sl = round(ticker["price"] - sl_distance, 2)
+                self.position_tp = round(ticker["price"] + tp_distance, 2)
+                log_trade(symbol, "BUY", trade_qty, ticker["price"], trade_result.get("orderId"), "FILLED")
             
-        elif action == "SELL" and not current_pos:
-            trade_result = binance_adapter.place_order(symbol, "SELL", trade_qty, "MARKET")
-            self.position_entry_time = time.time()
-            self.position_entry_price = ticker["price"]
-            self.position_side = "SHORT"
-            self.position_sl = round(ticker["price"] + sl_distance, 2)
-            self.position_tp = round(ticker["price"] - tp_distance, 2)
-            log_trade(symbol, "SELL", trade_qty, ticker["price"], trade_result.get("orderId"), "FILLED")
+        elif action == "SELL":
+            if current_pos:
+                if current_pos["side"] == "SHORT":
+                    # Same trend -> keep the position
+                    pass
+                elif current_pos["side"] == "LONG":
+                    # Opposite position -> close all before making new entry
+                    close_res = binance_adapter.close_position(symbol)
+                    log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], close_res.get("orderId"), "CLOSED", current_pos.get("unrealizedProfit", 0.0))
+                    current_pos = None
+
+            if not current_pos:
+                trade_result = binance_adapter.place_order(symbol, "SELL", trade_qty, "MARKET")
+                self.position_entry_time = time.time()
+                self.position_entry_price = ticker["price"]
+                self.position_side = "SHORT"
+                self.position_sl = round(ticker["price"] + sl_distance, 2)
+                self.position_tp = round(ticker["price"] - tp_distance, 2)
+                log_trade(symbol, "SELL", trade_qty, ticker["price"], trade_result.get("orderId"), "FILLED")
             
         elif action == "CLOSE" and current_pos:
             trade_result = binance_adapter.close_position(symbol)

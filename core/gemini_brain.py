@@ -38,6 +38,7 @@ MARKET STATE ({timeframe}):
 - 21 EMA (Long-stage candle baseline): {market_snapshot.get('ema21')} (Previous: {market_snapshot.get('ema21_prev')})
 - EMA9/21 Fresh Cross: Cross Above = {market_snapshot.get('cross_above')}, Cross Below = {market_snapshot.get('cross_below')}
 - 14 RSI: {market_snapshot.get('rsi')}
+- 14 ADX (Average Directional Index): {market_snapshot.get('adx')} (Trending > 23: {market_snapshot.get('adx_trending')})
 - Swing Resistance: ${market_snapshot.get('resistance')} (Close Above Resistance: {market_snapshot.get('close_above_resistance')})
 - Swing Support: ${market_snapshot.get('support')} (Close Below Support: {market_snapshot.get('close_below_support')})
 - Orderbook Spread: {market_snapshot.get('spread_pct', 0.0):.4%}
@@ -54,18 +55,19 @@ STAGE 1 : LOGIC EXECUTION
    - SELL / SHORT: When EMA9 cross BELOW EMA21 + RSI < 45 + Close BELOW Support.
    - Auto execute with Stop Loss 100 ticks, Take Profit 600 ticks.
 3. Filter + Risk:
+   - Only make an entry if ADX (Average Directional Index) > 23.
    - Avoid entry during high spread (> 0.2%) & candle gegar (volatility spike > 2.5x ATR).
    - Max 1 trade at a time, lot follows 1% risk, close all if floating loss reaches -2% of balance.
 
 STAGE 2 : LOGIC CONFIRMATION & POSITION MANAGEMENT
 1. Check if there is an active position entry holding:
-   - If holding active position: Skip continuation entries (Manage active holding).
+   - If already have entry with the same trend: keep / hold the position (skip continuation entries).
    - REVERSAL EXIT: Whenever EMA9 cross with EMA21, exit all current active positions first before running Stage 1 to make a new entry.
    - 4-HOUR TIME EXIT: After every 4 hours (holding duration >= 4.0h), close current active holding so can take profit first.
    - EMERGENCY CUT: Close all if floating loss reaches -2% of balance.
-2. If DO NOT have an active entry + EMA9 does not have any crossing yet with EMA21 (continuation):
-   - If EMA9 > EMA21 + RSI > 55 + Close ABOVE Resistance -> make a LONG entry ("BUY").
-   - If EMA9 < EMA21 + RSI < 45 + Close BELOW Support -> make a SHORT entry ("SELL").
+2. If DO NOT have an active entry + EMA9 does not have any new crossing yet with EMA21 recently:
+   - If RSI > 55 + Close ABOVE Resistance + ADX > 23 -> make a LONG entry ("BUY").
+   - If RSI < 45 + Close BELOW Support + ADX > 23 -> make a SHORT entry ("SELL").
    - Otherwise -> "HOLD".
 
 OUTPUT FORMAT (STRICT JSON ONLY, NO MARKDOWN, NO OTHER TEXT):

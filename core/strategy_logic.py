@@ -49,6 +49,69 @@ def calculate_atr(candles: List[List[Any]], period: int = 14) -> float:
         return 1.0
     return sum(tr_list[-period:]) / min(len(tr_list), period)
 
+def calculate_adx(candles: List[List[Any]], period: int = 14) -> float:
+    """
+    Calculates Welles Wilder's Average Directional Index (ADX) over specified period.
+    Returns float rounded to 2 decimal places.
+    """
+    if len(candles) < period * 2:
+        return 25.0
+        
+    highs = [float(c[2]) for c in candles]
+    lows = [float(c[3]) for c in candles]
+    closes = [float(c[4]) for c in candles]
+    
+    tr_list = []
+    plus_dm = []
+    minus_dm = []
+    
+    for i in range(1, len(candles)):
+        h = highs[i]
+        l = lows[i]
+        prev_h = highs[i-1]
+        prev_l = lows[i-1]
+        prev_c = closes[i-1]
+        
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        tr_list.append(tr)
+        
+        up_move = h - prev_h
+        down_move = prev_l - l
+        
+        plus_dm.append(up_move if (up_move > down_move and up_move > 0) else 0.0)
+        minus_dm.append(down_move if (down_move > up_move and down_move > 0) else 0.0)
+        
+    if len(tr_list) < period:
+        return 25.0
+        
+    smooth_tr = sum(tr_list[:period])
+    smooth_plus = sum(plus_dm[:period])
+    smooth_minus = sum(minus_dm[:period])
+    
+    dx_list = []
+    p_di = (smooth_plus / smooth_tr * 100.0) if smooth_tr > 0 else 0.0
+    m_di = (smooth_minus / smooth_tr * 100.0) if smooth_tr > 0 else 0.0
+    di_sum = p_di + m_di
+    dx_list.append(abs(p_di - m_di) / di_sum * 100.0 if di_sum > 0 else 0.0)
+    
+    for i in range(period, len(tr_list)):
+        smooth_tr = smooth_tr - (smooth_tr / period) + tr_list[i]
+        smooth_plus = smooth_plus - (smooth_plus / period) + plus_dm[i]
+        smooth_minus = smooth_minus - (smooth_minus / period) + minus_dm[i]
+        p_di = (smooth_plus / smooth_tr * 100.0) if smooth_tr > 0 else 0.0
+        m_di = (smooth_minus / smooth_tr * 100.0) if smooth_tr > 0 else 0.0
+        di_sum = p_di + m_di
+        dx_list.append(abs(p_di - m_di) / di_sum * 100.0 if di_sum > 0 else 0.0)
+        
+    if len(dx_list) < period:
+        return round(sum(dx_list) / len(dx_list), 2)
+        
+    adx = sum(dx_list[:period]) / period
+    for i in range(period, len(dx_list)):
+        adx = (adx * (period - 1) + dx_list[i]) / period
+        
+    return round(adx, 2)
+
 def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
     """
     Standardizes raw OHLCV candles into actionable market features for the 2-Stage Framework.
@@ -73,6 +136,7 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
     cross_below = (ema9_prev >= ema21_prev) and (ema9 < ema21)
     
     rsi = calculate_rsi(closes, 14)
+    adx = calculate_adx(candles, 14)
     
     # Swing Support & Resistance over preceding 14 candles (excluding current active candle)
     lookback = min(14, len(candles) - 1)
@@ -111,6 +175,8 @@ def extract_market_features(candles: List[List[Any]]) -> Dict[str, Any]:
         "cross_above": cross_above,
         "cross_below": cross_below,
         "rsi": rsi,
+        "adx": adx,
+        "adx_trending": adx > 23.0,
         "prev_open": round(prev_open, 2),
         "close_above_prev_open": close_above_prev_open,
         "close_below_prev_open": close_below_prev_open,
