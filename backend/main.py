@@ -30,8 +30,8 @@ async def dashboard():
 @app.get("/api/state")
 async def get_state():
     try:
-        ticker = binance_adapter.fetch_ticker(config.TARGET_SYMBOL)
-        account = binance_adapter.get_account_summary()
+        ticker = await asyncio.to_thread(binance_adapter.fetch_ticker, config.TARGET_SYMBOL)
+        account = await asyncio.to_thread(binance_adapter.get_account_summary)
         thoughts = get_recent_thoughts(15)
         trades = get_recent_trades(15)
         return {
@@ -47,7 +47,7 @@ async def get_state():
 @app.post("/api/cycle/trigger")
 async def trigger_manual_cycle():
     try:
-        result = await hermes_agent.execute_cycle()
+        result = await asyncio.to_thread(hermes_agent.execute_cycle)
         return result
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})

@@ -20,7 +20,7 @@ class HermesTradingAgent:
         self.position_sl = None
         self.position_tp = None
 
-    async def execute_cycle(self, is_macro: bool = False) -> dict:
+    def execute_cycle(self, is_macro: bool = False) -> dict:
         """
         Executes one autonomous cycle:
         - If is_macro=True: Uses M10 chart and Gemini 3.8 Flash (Superior macro reasoning).
@@ -273,6 +273,8 @@ class HermesTradingAgent:
     async def run_loop(self):
         self.is_running = True
         logger.info(f"HaG Autonomous Agent started. Sentry: {config.FAST_INTERVAL_SECONDS}s (3.7 Flash M5), Strategist: {config.MACRO_INTERVAL_SECONDS}s (3.8 Flash M10).")
+        # Give Uvicorn 2 seconds to bind port 8000 and start web server instantly
+        await asyncio.sleep(2)
         while self.is_running:
             try:
                 now = time.time()
@@ -285,7 +287,8 @@ class HermesTradingAgent:
                     is_macro = False
                     logger.info("Executing FAST SENTRY cycle (Gemini 3.7 Flash on M5)...")
 
-                cycle_data = await self.execute_cycle(is_macro=is_macro)
+                # Run blocking network operations on a worker thread so FastAPI stays 100% responsive
+                cycle_data = await asyncio.to_thread(self.execute_cycle, is_macro)
                 logger.info(f"Cycle completed [{cycle_data.get('timeframe')} | {cycle_data.get('tier')}]: {cycle_data.get('action') or cycle_data.get('decision', {}).get('action')}")
             except Exception as e:
                 logger.error(f"Error in HaG cycle: {e}")
