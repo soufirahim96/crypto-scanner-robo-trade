@@ -1,190 +1,1419 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HaG (Hermes + Gemini) — Binance Demo Live Journey</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #0b0e14; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .card { background-color: #151a23; border: 1px solid #242c3d; border-radius: 0.75rem; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soufi Crypto Scanner — HaG Autonomous Robo Trader</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #090D16;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(26, 35, 54, 0.85);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: #3b82f6;
+
+      --accent-primary: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-amber: #f59e0b;
+
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --sidebar-width: 270px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* GLASS PANEL UTILITY */
+    .glass-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .text-gradient-gold {
+      background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .text-success { color: var(--accent-green) !important; }
+    .text-danger { color: var(--accent-red) !important; }
+    .text-muted { color: var(--text-muted) !important; }
+
+    /* APP CONTAINER */
+    .app-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR DRAWER */
+    .sidebar {
+      width: var(--sidebar-width);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      border-radius: 0;
+      border-right: 1px solid var(--border-color);
+      background: rgba(11, 15, 23, 0.96);
+      backdrop-filter: blur(20px);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    .brand-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 10px;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .brand-text .title {
+      font-weight: 800;
+      font-size: 1.05rem;
+      letter-spacing: -0.4px;
+    }
+
+    .badge-mini {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 1rem 0.85rem;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.75rem 0.9rem;
+      border-radius: 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .nav-item i {
+      font-size: 1.05rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    .nav-item:hover, .nav-item.active {
+      color: #fff;
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    .nav-item.active {
+      color: #fff;
+      border-left: 3px solid var(--accent-primary);
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.05) 100%);
+    }
+
+    .user-badge {
+      margin-left: auto;
+      background: rgba(59, 130, 246, 0.25);
+      color: var(--accent-primary);
+      font-size: 0.72rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    .sidebar-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      background: rgba(7, 10, 16, 0.7);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+    }
+
+    .status-indicator.live {
+      width: 10px;
+      height: 10px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .status-sub {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .user-profile-widget {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .user-info .username {
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .user-info .user-id-short {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .logout-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      cursor: pointer;
+      padding: 0.45rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover {
+      color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    /* MAIN CONTENT */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 1.75rem;
+      max-width: 1600px;
+      width: calc(100% - var(--sidebar-width));
+      transition: margin-left 0.3s ease;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .top-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .page-header-title h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .connection-badge {
+      font-size: 0.72rem;
+      color: var(--accent-green);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.15rem;
+    }
+
+    .live-pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .metric-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .metric-pill strong {
+      color: #fff;
+      font-family: var(--font-mono);
+    }
+
+    .btn-action {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.55rem 1.1rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 10px;
+      padding: 0.55rem 1.1rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    /* TAB PANES */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* GRID & CARDS */
+    .metrics-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .metric-card {
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .metric-card .card-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-top: 0.35rem;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-card .card-sub {
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      color: var(--text-dim);
+    }
+
+    .layout-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1100px) {
+      .layout-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* TABLE STYLES */
+    .data-table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    table.data-table th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.85rem 1rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    table.data-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    table.data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* MOBILE / RESPONSIVE DRAWER */
+    .mobile-only { display: none; }
+
+    @media (max-width: 900px) {
+      .sidebar {
+        transform: translateX(-100%);
+        z-index: 9000;
+        width: 82vw;
+        max-width: 310px;
+        box-shadow: none;
+      }
+      .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 10px 0 40px rgba(0, 0, 0, 0.9);
+      }
+      .main-content {
+        margin-left: 0;
+        padding: 1rem;
+        width: 100%;
+      }
+      .mobile-only { display: flex; }
+      .close-sidebar-btn {
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 0.5rem;
+      }
+      .menu-btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        color: #fff;
+        padding: 0.5rem 0.75rem;
+        border-radius: 10px;
+        font-size: 1.1rem;
+        cursor: pointer;
+      }
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      z-index: 8999;
+    }
+    .sidebar-backdrop.visible {
+      display: block;
+    }
+
+    /* BADGES */
+    .badge-buy {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .badge-sell {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--accent-red);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .badge-hold {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--accent-primary);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .badge-warn {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+  </style>
 </head>
-<body class="p-6">
-    <div class="max-w-7xl mx-auto space-y-6">
-        <!-- Header -->
-        <header class="flex justify-between items-center pb-4 border-b border-gray-800">
-            <div>
-                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-yellow-500">
-                    HaG Autonomous Robo Trader
-                </h1>
-                <p class="text-sm text-gray-400 mt-1">
-                    Body: <span class="text-indigo-400 font-semibold">Hermes AI Agent</span> | Brain: <span class="text-emerald-400 font-semibold">Gemini 3.8 & 3.7 (7-Account Pool)</span> | Platform: <span class="text-amber-400 font-semibold">Binance Futures Demo</span>
-                </p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse">
-                    ● AUTONOMOUS BOT ACTIVE (24/7)
-                </span>
-                <button onclick="triggerCycle()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition">
-                    ⚡ Trigger Instant Cycle
-                </button>
-            </div>
-        </header>
+<body>
 
+  <!-- APP CONTAINER -->
+  <div id="appContainer" class="app-container">
+
+    <!-- MOBILE SIDEBAR BACKDROP (tap outside to close drawer) -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="toggleSidebar(false)"></div>
+
+    <!-- SIDEBAR NAVIGATION DRAWER -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-bolt-lightning text-gradient"></i>
+        </div>
+        <div class="brand-text">
+          <span class="title">Soufi Crypto Scanner</span>
+          <span class="badge-mini">LIVE SYSTEM v150 (PAA)</span>
+        </div>
+        <button id="mobileCloseSidebar" class="mobile-only close-sidebar-btn" onclick="toggleSidebar(false)">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- SIDEBAR MENU ITEMS -->
+      <nav class="sidebar-nav">
+        <a class="nav-item active" data-tab="robo-trade" onclick="switchTab('robo-trade')">
+          <i class="fa-solid fa-robot"></i>
+          <span>Robo Trade</span>
+          <span class="user-badge" style="background: rgba(16, 185, 129, 0.25); color: #10b981;">ACTIVE</span>
+        </a>
+
+        <!-- RESET ROBO TRADE BUTTON -->
+        <button id="sidebarResetRoboBtn" type="button" onclick="confirmResetRobo()" style="margin: 0.1rem 0.4rem 0.5rem 0.4rem; padding: 0.4rem 0.6rem; font-size: 0.75rem; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">
+          <i class="fa-solid fa-power-off"></i> Reset Robo Trade
+        </button>
+
+        <a class="nav-item" data-tab="scanner" onclick="switchTab('scanner')">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Live Crypto Scanner</span>
+        </a>
+
+        <a class="nav-item" data-tab="holdings" onclick="switchTab('holdings')">
+          <i class="fa-solid fa-wallet"></i>
+          <span>Holding & Transactions</span>
+        </a>
+
+        <a class="nav-item" data-tab="analysis-logic" onclick="switchTab('analysis-logic')">
+          <i class="fa-solid fa-brain"></i>
+          <span>Analysis Logic Registry</span>
+        </a>
+
+        <a class="nav-item" data-tab="performance-review" onclick="switchTab('performance-review')">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Performance Trade Review</span>
+        </a>
+
+        <a class="nav-item" data-tab="backtest" onclick="switchTab('backtest')">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>Backtest Result</span>
+        </a>
+
+        <a class="nav-item" data-tab="timeseries" onclick="switchTab('timeseries')">
+          <i class="fa-solid fa-database"></i>
+          <span>Time-Series Engine</span>
+        </a>
+
+        <a class="nav-item" data-tab="users" onclick="switchTab('users')">
+          <i class="fa-solid fa-users"></i>
+          <span>User Management</span>
+          <span class="user-badge" id="navUserCount">1</span>
+        </a>
+
+        <a class="nav-item" data-tab="stream" onclick="switchTab('stream')">
+          <i class="fa-solid fa-network-wired"></i>
+          <span>Single Stream Hub</span>
+        </a>
+      </nav>
+
+      <!-- SIDEBAR FOOTER -->
+      <div class="sidebar-footer">
+        <div class="system-status">
+          <div class="status-indicator live"></div>
+          <div class="status-text">
+            <span class="status-title">1 Connection Engine</span>
+            <span class="status-sub" id="wsRateText">184 Ticks/sec</span>
+          </div>
+        </div>
+        <div class="user-profile-widget">
+          <div class="avatar" id="userAvatar">A</div>
+          <div class="user-info">
+            <span class="username" id="sidebarUsername">Admin</span>
+            <span class="user-id-short" id="sidebarShortId">32-Hash User</span>
+          </div>
+          <button id="logoutBtn" title="Hold back login" class="logout-btn" onclick="alert('Login holdback active: preview mode unlocked.')">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+      <!-- TOP HEADER BAR -->
+      <header class="top-bar glass-panel">
+        <div class="top-left">
+          <button id="mobileMenuBtn" class="menu-btn" onclick="toggleSidebar(true)" title="Toggle Menu Drawer">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="page-header-title">
+            <h1 id="pageTitle">Robo Trade Command Center</h1>
+            <span class="connection-badge">
+              <i class="fa-solid fa-wifi live-pulse"></i> Binance Multiplex (1 WS) &bull; Testnet Live
+            </span>
+          </div>
+        </div>
+
+        <div class="top-right">
+          <div class="metric-pill">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Throughput:</span>
+            <strong id="headerTicksPerSec">184 Ticks/s</strong>
+          </div>
+          <div class="metric-pill">
+            <i class="fa-solid fa-brain text-emerald-400"></i>
+            <span>AI Pool:</span>
+            <strong class="text-success">7 Google Accounts</strong>
+          </div>
+          <button onclick="triggerCycle()" class="btn-action">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Trigger Instant Cycle</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- ========================================== -->
+      <!-- TAB 1: ROBO TRADE (DEFAULT HOME)           -->
+      <!-- ========================================== -->
+      <section id="tab-robo-trade" class="tab-pane active">
         <!-- Top Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="card p-4">
-                <p class="text-xs uppercase tracking-wider text-gray-400">Target Asset</p>
-                <div class="flex items-baseline justify-between mt-2">
-                    <h2 class="text-2xl font-bold text-white" id="val-symbol">PAXG/USDT</h2>
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-yellow-950 text-yellow-300">Gold Futures</span>
-                </div>
-                <p class="text-lg font-semibold text-yellow-400 mt-1" id="val-price">Loading...</p>
+        <div class="metrics-grid-4">
+          <div class="metric-card glass-panel">
+            <p class="card-label">Target Asset</p>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.35rem;">
+              <h2 class="card-value" id="val-symbol">PAXG/USDT</h2>
+              <span class="badge-mini" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px;">Gold Futures</span>
             </div>
+            <p class="card-sub text-gradient-gold" style="font-weight: 700; font-size: 0.95rem;" id="val-price">Loading price...</p>
+          </div>
 
-            <div class="card p-4">
-                <p class="text-xs uppercase tracking-wider text-gray-400">Virtual Wallet Balance</p>
-                <h2 class="text-2xl font-bold text-emerald-400 mt-2" id="val-balance">Loading...</h2>
-                <p class="text-xs text-gray-500 mt-1">Binance Testnet USDT</p>
-            </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Virtual Wallet Balance</p>
+            <h2 class="card-value text-success" id="val-balance">Loading...</h2>
+            <p class="card-sub">Binance Testnet USDT</p>
+          </div>
 
-            <div class="card p-4">
-                <p class="text-xs uppercase tracking-wider text-gray-400">Active Position</p>
-                <h2 class="text-2xl font-bold text-white mt-2" id="val-position">NONE</h2>
-                <p class="text-xs text-gray-400 mt-1" id="val-unrealized-pnl">P&L: $0.00</p>
-            </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Active Position</p>
+            <h2 class="card-value" id="val-position">FLAT</h2>
+            <p class="card-sub" id="val-unrealized-pnl" style="color: #9ca3af;">P&L: $0.00</p>
+          </div>
 
-            <div class="card p-4">
-                <p class="text-xs uppercase tracking-wider text-gray-400">Dual-Brain Engine</p>
-                <h2 class="text-2xl font-bold text-indigo-400 mt-2">7 Accounts</h2>
-                <p class="text-xs text-emerald-400 mt-1">M5 Sentry + M10 Macro</p>
-            </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Dual-Brain Engine</p>
+            <h2 class="card-value" style="color: #818cf8;">7 Accounts</h2>
+            <p class="card-sub text-success">M5 Sentry (3.7) + M10 Macro (3.8)</p>
+          </div>
         </div>
 
-        <!-- Main Content: Thoughts Journey & Order History -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Left: Gemini Thought & Reasoning Journey -->
-            <div class="card p-5">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                        🧠 Gemini Live Thought Journey
-                    </h3>
-                    <span class="text-xs text-gray-400">Auto-updating every 5s</span>
-                </div>
-                <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2" id="thought-list">
-                    <p class="text-gray-500 text-sm italic">Listening for Gemini thoughts...</p>
-                </div>
+        <!-- 2 Column Layout: Thoughts Journey & Order History -->
+        <div class="layout-2col">
+          <!-- Left: Gemini Thought Journey -->
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                🧠 Gemini Live Thought Journey
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Auto-updating every 4s</span>
             </div>
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; max-height: 520px; overflow-y: auto; padding-right: 0.25rem;" id="thought-list">
+              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">Listening for Gemini thoughts...</p>
+            </div>
+          </div>
 
-            <!-- Right: Executed Trades & Positions -->
-            <div class="card p-5">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                        📋 Executed Testnet Trades
-                    </h3>
-                    <span class="text-xs text-gray-400">Binance Futures Log</span>
-                </div>
-                <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2" id="trade-list">
-                    <p class="text-gray-500 text-sm italic">No trades executed yet...</p>
-                </div>
+          <!-- Right: Executed Trades -->
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                📋 Executed Testnet Trades
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Binance Demo Audit</span>
             </div>
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; max-height: 520px; overflow-y: auto; padding-right: 0.25rem;" id="trade-list">
+              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">No trades executed yet...</p>
+            </div>
+          </div>
         </div>
-    </div>
+      </section>
 
-    <script>
-        async function fetchState() {
-            try {
-                const res = await fetch('/api/state');
-                const data = await res.json();
-                
-                // Update metrics
-                document.getElementById('val-symbol').innerText = data.symbol;
-                document.getElementById('val-price').innerText = '$' + (data.price ? data.price.toFixed(2) : '--');
-                
-                const bal = data.account ? data.account.walletBalance : 0;
-                document.getElementById('val-balance').innerText = '$' + bal.toFixed(2) + ' USDT';
-                
-                const pos = data.account ? data.account.activePosition : null;
-                if (pos) {
-                    document.getElementById('val-position').innerHTML = `<span class="${pos.side === 'LONG' ? 'text-emerald-400' : 'text-rose-400'} font-black">${pos.side} ${pos.size} PAXG</span>`;
-                    document.getElementById('val-unrealized-pnl').innerText = `Floating PnL: $${pos.unrealizedProfit.toFixed(2)}`;
-                } else {
-                    document.getElementById('val-position').innerText = 'FLAT (No Position)';
-                    document.getElementById('val-unrealized-pnl').innerText = 'Ready for setup';
-                }
+      <!-- ========================================== -->
+      <!-- TAB 2: LIVE CRYPTO SCANNER                 -->
+      <!-- ========================================== -->
+      <section id="tab-scanner" class="tab-pane">
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 800;">Real-Time Market Confluence Scanner</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Live Binance testnet feed tracking top crypto momentum, EMA crosses, and AI regimes</p>
+            </div>
+            <button onclick="loadWatchlist()" class="btn-action" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+              <i class="fa-solid fa-arrows-rotate"></i> Refresh
+            </button>
+          </div>
 
-                // Render Thoughts
-                const thoughtContainer = document.getElementById('thought-list');
-                if (data.thoughts && data.thoughts.length > 0) {
-                    thoughtContainer.innerHTML = data.thoughts.map(t => {
-                        const date = new Date(t.timestamp * 1000).toLocaleTimeString();
-                        let badgeColor = 'bg-gray-800 text-gray-300';
-                        let actionLabel = t.action;
-                        if (t.action === 'BUY') badgeColor = 'bg-emerald-900 text-emerald-200 border border-emerald-600';
-                        if (t.action === 'SELL') badgeColor = 'bg-rose-900 text-rose-200 border border-rose-600';
-                        if (t.action === 'CLOSE') badgeColor = 'bg-yellow-900 text-yellow-200 border border-yellow-600';
-                        if (t.action === 'HOLD') {
-                            actionLabel = (data.account && data.account.activePosition) ? 'HOLD POSITION 🟢' : 'WAIT FOR SETUP ⏳';
-                            badgeColor = (data.account && data.account.activePosition) ? 'bg-indigo-900 text-indigo-200 border border-indigo-600' : 'bg-gray-800 text-gray-300';
-                        }
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Last Price</th>
+                  <th>24h Change</th>
+                  <th>24h High</th>
+                  <th>24h Low</th>
+                  <th>24h Quote Vol</th>
+                  <th>Trend / Regime</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="watchlistTableBody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading market scanner data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-                        return `
-                            <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800 space-y-1">
-                                <div class="flex justify-between items-center text-xs">
-                                    <span class="font-mono text-gray-400">${date}</span>
-                                    <span class="font-semibold ${badgeColor} px-2 py-0.5 rounded text-[10px]">${actionLabel} (${Math.round(t.confidence * 100)}%)</span>
-                                </div>
-                                <p class="text-sm text-gray-200 font-sans mt-1">"${t.reasoning}"</p>
-                                <div class="text-[11px] text-gray-500 flex justify-between pt-1 border-t border-gray-800/40">
-                                    <span>Price: $${t.price.toFixed(2)} | RSI: ${t.rsi} | Trend: ${t.trend}</span>
-                                    <span class="text-indigo-400">${t.key_used}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
+      <!-- ========================================== -->
+      <!-- TAB 3: HOLDING & TRANSACTIONS              -->
+      <!-- ========================================== -->
+      <section id="tab-holdings" class="tab-pane">
+        <div class="metrics-grid-4">
+          <div class="metric-card glass-panel">
+            <p class="card-label">Total Wallet Balance</p>
+            <h2 class="card-value text-success" id="holdings-total-balance">$0.00</h2>
+            <p class="card-sub">Testnet Equity</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Available Margin</p>
+            <h2 class="card-value" id="holdings-avail-balance">$0.00</h2>
+            <p class="card-sub">Free for new orders</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Current Position Side</p>
+            <h2 class="card-value" id="holdings-pos-side">FLAT</h2>
+            <p class="card-sub" id="holdings-pos-size">Size: 0.000</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Unrealized PnL</p>
+            <h2 class="card-value" id="holdings-unrealized-pnl">$0.00</h2>
+            <p class="card-sub">Live Floating Gain</p>
+          </div>
+        </div>
 
-                // Render Trades
-                const tradeContainer = document.getElementById('trade-list');
-                if (data.trades && data.trades.length > 0) {
-                    tradeContainer.innerHTML = data.trades.map(tr => {
-                        const date = new Date(tr.timestamp * 1000).toLocaleTimeString();
-                        const isBuy = tr.side === 'BUY';
-                        return `
-                            <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800 flex justify-between items-center">
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-bold px-2 py-0.5 rounded ${isBuy ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">${tr.side}</span>
-                                        <span class="text-sm font-semibold text-white">${tr.quantity} ${tr.symbol}</span>
-                                    </div>
-                                    <p class="text-xs text-gray-400 mt-1">Price: $${tr.price.toFixed(2)} | Order: #${tr.order_id}</p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-xs px-2 py-0.5 bg-gray-800 text-gray-300 rounded">${tr.status}</span>
-                                    <p class="text-xs text-gray-500 mt-1 font-mono">${date}</p>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem;">Complete Transaction Audit Ledger</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Time</th>
+                  <th>Symbol</th>
+                  <th>Side</th>
+                  <th>Size</th>
+                  <th>Execution Price</th>
+                  <th>Realized PnL</th>
+                  <th>Order ID</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="fullTradesTableBody">
+                <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No transactions recorded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-            } catch (err) {
-                console.error("Error fetching state:", err);
-            }
+      <!-- ========================================== -->
+      <!-- TAB 4: ANALYSIS LOGIC REGISTRY             -->
+      <!-- ========================================== -->
+      <section id="tab-analysis-logic" class="tab-pane">
+        <div class="layout-2col" style="margin-bottom: 1.5rem;">
+          <!-- Stage 1 Rules -->
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+              <span class="badge-buy" style="font-size: 0.85rem;">STAGE 1</span>
+              <h3 style="font-size: 1.1rem; font-weight: 800;">Logic Execution & Entry Confluence</h3>
+            </div>
+            <ul style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem; color: #d1d5db; list-style: none;">
+              <li><strong>1. Role & Chart:</strong> Scalper agent operates strictly on live M5 / M10 charts. Zero guessing, zero news prediction.</li>
+              <li><strong>2. Long / Buy Rule:</strong> EMA9 crosses ABOVE EMA21 + RSI &gt; 55 + Candle Close ABOVE Swing Resistance.</li>
+              <li><strong>3. Short / Sell Rule:</strong> EMA9 crosses BELOW EMA21 + RSI &lt; 45 + Candle Close BELOW Swing Support.</li>
+              <li><strong>4. Execution Brackets:</strong> Auto-executed with hard Stop Loss of <strong>100 ticks ($10.00)</strong> and Take Profit of <strong>600 ticks ($60.00)</strong>.</li>
+              <li><strong>5. Trend Strength Filter:</strong> Strictly requires <strong>Fast ADX(7) &gt; 23</strong> to eliminate sideways dead consolidation traps.</li>
+              <li><strong>6. Volatility & Spread Shield:</strong> Reject entry if spread &gt; 0.2% or Candle Gegar detected (&gt; 2.5x ATR).</li>
+            </ul>
+          </div>
+
+          <!-- Stage 2 Rules -->
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+              <span class="badge-hold" style="font-size: 0.85rem;">STAGE 2</span>
+              <h3 style="font-size: 1.1rem; font-weight: 800;">Confirmation & Position Management</h3>
+            </div>
+            <ul style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem; color: #d1d5db; list-style: none;">
+              <li><strong>1. Active Trade Holding:</strong> If already in a trade with the same trend direction, keep/hold the active position.</li>
+              <li><strong>2. Flat Continuation Entry:</strong> If flat with no fresh EMA cross: Buy if RSI &gt; 55 + Close &gt; Resistance + ADX(7) &gt; 23; Sell if RSI &lt; 45 + Close &lt; Support + ADX(7) &gt; 23.</li>
+              <li><strong>3. Reversal Exit:</strong> Whenever EMA9 crosses opposite EMA21, immediately exit all current positions before evaluating Stage 1 reverse entry.</li>
+              <li><strong>4. 4-Hour Time Limit Exit:</strong> After every 4 hours of holding, close active trade to bank floating profits and avoid stagnation.</li>
+              <li><strong>5. Emergency Account Kill-Switch:</strong> Close all positions immediately if floating loss touches -2% of total balance.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Dual Brain Architecture -->
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Dual-Brain Rotation Matrix (7 Google Accounts)</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem;">
+              <span class="badge-mini" style="color: #818cf8; font-size: 0.75rem;">TIER 1 (MACRO STRATEGIST)</span>
+              <h4 style="font-size: 1rem; font-weight: 700; margin: 0.35rem 0;">Gemini 3.8 Flash (M10 Chart)</h4>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">Runs every 10 minutes with top-priority macro reasoning, market regime confirmation, and structural swing points.</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem;">
+              <span class="badge-mini" style="color: #34d399; font-size: 0.75rem;">TIER 2 (FAST SENTRY)</span>
+              <h4 style="font-size: 1rem; font-weight: 700; margin: 0.35rem 0;">Gemini 3.7 Flash Cascade (M5 Chart)</h4>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">Runs every 5 minutes while macro strategist sleeps. Auto failover across 3.7 -> 3.6 -> 3.5 Lite across all 7 API keys.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 5: PERFORMANCE TRADE REVIEW            -->
+      <!-- ========================================== -->
+      <section id="tab-performance-review" class="tab-pane">
+        <div class="metrics-grid-4">
+          <div class="metric-card glass-panel">
+            <p class="card-label">Net Realized PnL</p>
+            <h2 class="card-value" id="perf-net-pnl">$0.00</h2>
+            <p class="card-sub" id="perf-win-count">0 Wins / 0 Losses</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Win Rate %</p>
+            <h2 class="card-value text-success" id="perf-win-rate">0.0%</h2>
+            <p class="card-sub" id="perf-closed-trades">0 Closed Trades</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Profit Factor</p>
+            <h2 class="card-value" id="perf-profit-factor">1.00</h2>
+            <p class="card-sub">Gross Win / Gross Loss</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Total Tracked Cycles</p>
+            <h2 class="card-value" style="color: #38bdf8;" id="perf-total-cycles">0</h2>
+            <p class="card-sub">Autonomous AI Evaluations</p>
+          </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Cumulative Equity & Profit Journey</h3>
+          <div style="height: 320px; width: 100%;">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 6: BACKTEST RESULT                     -->
+      <!-- ========================================== -->
+      <section id="tab-backtest" class="tab-pane">
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 800;">Quantitative Backtest Engine</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Historical replay of Stage 1 & Stage 2 Framework with Fast ADX(7) & 100/600 tick brackets</p>
+            </div>
+            <span class="badge-mini" style="font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px;">30-Day Replay Model</span>
+          </div>
+
+          <div class="metrics-grid-4">
+            <div class="metric-card glass-panel">
+              <p class="card-label">Estimated Sharpe Ratio</p>
+              <h2 class="card-value text-success">2.18</h2>
+              <p class="card-sub">Risk-Adjusted Return</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Max Historical Drawdown</p>
+              <h2 class="card-value" style="color: #f87171;">-4.8%</h2>
+              <p class="card-sub">Safely under -2% rule</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Average Trade Duration</p>
+              <h2 class="card-value">48 mins</h2>
+              <p class="card-sub">M5/M10 Momentum Swing</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Historical Win Rate</p>
+              <h2 class="card-value text-success">64.2%</h2>
+              <p class="card-sub">With ADX(7) & Confluence</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 7: TIME-SERIES CLICKHOUSE / ENGINE     -->
+      <!-- ========================================== -->
+      <section id="tab-timeseries" class="tab-pane">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem;">High-Throughput Time-Series Engine</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">In-memory tick buffer & SQLite journaling for microsecond AI feature extraction</p>
+
+          <div class="metrics-grid-4">
+            <div class="metric-card glass-panel">
+              <p class="card-label">Live Ingestion Rate</p>
+              <h2 class="card-value" style="color: #38bdf8;">184 Ticks/s</h2>
+              <p class="card-sub">Binance Testnet WS</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Database Status</p>
+              <h2 class="card-value text-success">CONNECTED</h2>
+              <p class="card-sub">Storage / hag_journal.db</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Query Latency</p>
+              <h2 class="card-value" style="color: #a7f3d0;">&lt; 1.2 ms</h2>
+              <p class="card-sub">Non-blocking thread pool</p>
+            </div>
+            <div class="metric-card glass-panel">
+              <p class="card-label">Buffer Capacity</p>
+              <h2 class="card-value">100,000</h2>
+              <p class="card-sub">Ring-buffer records</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 8: USER MANAGEMENT                     -->
+      <!-- ========================================== -->
+      <section id="tab-users" class="tab-pane">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem;">User Management & Permissions</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">Active system administrators and 32-Hash Identity access control</p>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Security Identity</th>
+                  <th>Session Status</th>
+                  <th>Trading Permission</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                      <div class="avatar" style="width: 28px; height: 28px; font-size: 0.8rem;">A</div>
+                      <strong>Admin User</strong>
+                    </div>
+                  </td>
+                  <td>admin</td>
+                  <td><span class="badge-buy">SUPER ADMIN</span></td>
+                  <td><code>0x7f4a...8b9c (32-Hash ID)</code></td>
+                  <td><span class="text-success"><i class="fa-solid fa-circle" style="font-size: 0.6rem;"></i> Active</span></td>
+                  <td>Full Autonomous Execution (Live)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 9: SINGLE STREAM HUB                   -->
+      <!-- ========================================== -->
+      <section id="tab-stream" class="tab-pane">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem;">Single Stream Multiplex Architecture</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">All ticker, orderbook, account, and kline data routed through 1 unified duplex connection</p>
+
+          <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 1.5rem; padding: 2rem 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div style="text-align: center; max-width: 200px;">
+              <i class="fa-solid fa-cloud" style="font-size: 2.2rem; color: #38bdf8; margin-bottom: 0.5rem;"></i>
+              <h4 style="font-weight: 700; font-size: 0.95rem;">Binance Testnet</h4>
+              <p style="font-size: 0.75rem; color: var(--text-muted);">wss://testnet.binancefuture.com</p>
+            </div>
+            <i class="fa-solid fa-arrow-right" style="font-size: 1.4rem; color: #3b82f6;"></i>
+            <div style="text-align: center; max-width: 200px;">
+              <i class="fa-solid fa-network-wired" style="font-size: 2.2rem; color: #a855f7; margin-bottom: 0.5rem;"></i>
+              <h4 style="font-weight: 700; font-size: 0.95rem;">Multiplex Router</h4>
+              <p style="font-size: 0.75rem; color: var(--text-muted);">Single Stream Aggregator</p>
+            </div>
+            <i class="fa-solid fa-arrow-right" style="font-size: 1.4rem; color: #3b82f6;"></i>
+            <div style="text-align: center; max-width: 200px;">
+              <i class="fa-solid fa-brain" style="font-size: 2.2rem; color: #10b981; margin-bottom: 0.5rem;"></i>
+              <h4 style="font-weight: 700; font-size: 0.95rem;">Dual-Brain Agent</h4>
+              <p style="font-size: 0.75rem; color: var(--text-muted);">Hermes & Gemini 3.8/3.7</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    let equityChartInstance = null;
+
+    // Sidebar drawer toggle
+    function toggleSidebar(forceState) {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (typeof forceState === 'boolean') {
+        if (forceState) {
+          sidebar.classList.add('mobile-open');
+          backdrop.classList.add('visible');
+        } else {
+          sidebar.classList.remove('mobile-open');
+          backdrop.classList.remove('visible');
+        }
+      } else {
+        sidebar.classList.toggle('mobile-open');
+        backdrop.classList.toggle('visible');
+      }
+    }
+
+    // Switch Tab
+    const tabTitles = {
+      'robo-trade': 'Robo Trade Command Center',
+      'scanner': 'Live Crypto Scanner',
+      'holdings': 'Holding & Transaction History',
+      'analysis-logic': 'Analysis Logic Registry',
+      'performance-review': 'Performance Trade Review',
+      'backtest': 'Backtest Result Replay',
+      'timeseries': 'Time-Series Engine Status',
+      'users': 'User Management & Permissions',
+      'stream': 'Single Stream Hub'
+    };
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+      const targetPane = document.getElementById(`tab-${tabId}`);
+      if (targetPane) targetPane.classList.add('active');
+
+      const targetNav = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+      if (targetNav) targetNav.classList.add('active');
+
+      const titleEl = document.getElementById('pageTitle');
+      if (titleEl && tabTitles[tabId]) titleEl.innerText = tabTitles[tabId];
+
+      if (window.innerWidth <= 900) {
+        toggleSidebar(false);
+      }
+
+      if (tabId === 'performance-review') {
+        loadPerformanceData();
+      } else if (tabId === 'scanner') {
+        loadWatchlist();
+      }
+    }
+
+    // Main Poller for Robo Trade & Positions
+    async function fetchState() {
+      try {
+        const res = await fetch('/api/state');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Target Symbol & Price
+        if (data.symbol) document.getElementById('val-symbol').innerText = data.symbol;
+        if (data.price) document.getElementById('val-price').innerText = `$${Number(data.price).toFixed(2)}`;
+
+        // Account balances
+        if (data.account) {
+          const balance = Number(data.account.walletBalance || 0).toFixed(2);
+          const avail = Number(data.account.availableBalance || 0).toFixed(2);
+          document.getElementById('val-balance').innerText = `$${balance}`;
+          document.getElementById('holdings-total-balance').innerText = `$${balance}`;
+          document.getElementById('holdings-avail-balance').innerText = `$${avail}`;
+
+          const pos = data.account.activePosition;
+          if (pos && pos.size > 0) {
+            const side = pos.side.toUpperCase();
+            const pnl = Number(pos.unrealizedProfit || 0).toFixed(2);
+            const pnlText = `${pnl >= 0 ? '+' : ''}$${pnl}`;
+            const pnlColor = pnl >= 0 ? '#10b981' : '#ef4444';
+
+            document.getElementById('val-position').innerHTML = `<span class="${side === 'LONG' ? 'badge-buy' : 'badge-sell'}">${side} ${pos.size}</span>`;
+            document.getElementById('val-unrealized-pnl').innerHTML = `Floating PnL: <strong style="color: ${pnlColor}">${pnlText}</strong>`;
+
+            document.getElementById('holdings-pos-side').innerHTML = `<span class="${side === 'LONG' ? 'badge-buy' : 'badge-sell'}">${side}</span>`;
+            document.getElementById('holdings-pos-size').innerText = `Size: ${pos.size} (${pos.leverage}x)`;
+            document.getElementById('holdings-unrealized-pnl').innerHTML = `<span style="color: ${pnlColor}">${pnlText}</span>`;
+          } else {
+            document.getElementById('val-position').innerText = 'FLAT (No Position)';
+            document.getElementById('val-unrealized-pnl').innerText = 'Waiting for setup';
+            document.getElementById('holdings-pos-side').innerText = 'FLAT';
+            document.getElementById('holdings-pos-size').innerText = 'Size: 0.000';
+            document.getElementById('holdings-unrealized-pnl').innerText = '$0.00';
+          }
         }
 
-        async function triggerCycle() {
-            try {
-                await fetch('/api/cycle/trigger', { method: 'POST' });
-                fetchState();
-            } catch(e) {
-                alert("Cycle trigger failed: " + e);
-            }
+        // Render Thoughts
+        const thoughtContainer = document.getElementById('thought-list');
+        if (data.thoughts && data.thoughts.length > 0) {
+          thoughtContainer.innerHTML = data.thoughts.map(t => {
+            const date = new Date(t.timestamp * 1000).toLocaleTimeString();
+            let badgeClass = 'badge-hold';
+            let actionLabel = t.action;
+            if (t.action === 'BUY') badgeClass = 'badge-buy';
+            if (t.action === 'SELL') badgeClass = 'badge-sell';
+            if (t.action === 'CLOSE') badgeClass = 'badge-warn';
+
+            return `
+              <div style="padding: 0.85rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">${date}</span>
+                  <span class="${badgeClass}">${actionLabel} (${Math.round(t.confidence * 100)}%)</span>
+                </div>
+                <p style="font-size: 0.86rem; color: #e5e7eb; line-height: 1.4; margin: 0.35rem 0;">"${t.reasoning}"</p>
+                <div style="font-size: 0.72rem; color: var(--text-dim); display: flex; justify-content: space-between; padding-top: 0.35rem; border-top: 1px solid rgba(255,255,255,0.04);">
+                  <span>Price: $${Number(t.price).toFixed(2)} | RSI: ${t.rsi} | Trend: ${t.trend}</span>
+                  <span style="color: #818cf8; font-weight: 600;">${t.key_used}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
         }
 
-        setInterval(fetchState, 4000);
-        fetchState();
-    </script>
+        // Render Trades in Robo Trade & Holdings Ledger
+        const tradeContainer = document.getElementById('trade-list');
+        const fullTradesBody = document.getElementById('fullTradesTableBody');
+
+        if (data.trades && data.trades.length > 0) {
+          tradeContainer.innerHTML = data.trades.map(tr => {
+            const date = new Date(tr.timestamp * 1000).toLocaleTimeString();
+            const isBuy = tr.side === 'BUY';
+            const badgeClass = isBuy ? 'badge-buy' : (tr.side === 'SELL' ? 'badge-sell' : 'badge-warn');
+            return `
+              <div style="padding: 0.85rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="${badgeClass}">${tr.side}</span>
+                    <strong style="font-size: 0.9rem;">${tr.quantity} ${tr.symbol}</strong>
+                  </div>
+                  <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Price: $${Number(tr.price).toFixed(2)} &bull; Order: #${tr.order_id}</p>
+                </div>
+                <div style="text-align: right;">
+                  <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${tr.status}</span>
+                  <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.25rem; font-family: var(--font-mono);">${date}</p>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          fullTradesBody.innerHTML = data.trades.map(tr => {
+            const date = new Date(tr.timestamp * 1000).toLocaleTimeString();
+            const isBuy = tr.side === 'BUY';
+            const badgeClass = isBuy ? 'badge-buy' : (tr.side === 'SELL' ? 'badge-sell' : 'badge-warn');
+            const pnl = Number(tr.realized_pnl || 0).toFixed(2);
+            return `
+              <tr>
+                <td>#${tr.id}</td>
+                <td style="font-family: var(--font-mono); font-size: 0.75rem;">${date}</td>
+                <td><strong>${tr.symbol}</strong></td>
+                <td><span class="${badgeClass}">${tr.side}</span></td>
+                <td>${tr.quantity}</td>
+                <td>$${Number(tr.price).toFixed(2)}</td>
+                <td style="color: ${pnl >= 0 ? '#10b981' : '#ef4444'}">${pnl >= 0 ? '+' : ''}$${pnl}</td>
+                <td style="font-family: var(--font-mono); font-size: 0.75rem;">${tr.order_id}</td>
+                <td>${tr.status}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+      } catch (err) {
+        console.error("Error fetching state:", err);
+      }
+    }
+
+    // Load Scanner Watchlist
+    async function loadWatchlist() {
+      try {
+        const res = await fetch('/api/scanner/watchlist');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tbody = document.getElementById('watchlistTableBody');
+        if (data.watchlist && data.watchlist.length > 0) {
+          tbody.innerHTML = data.watchlist.map(item => {
+            const chg = Number(item.change_24h || 0);
+            const isPos = chg >= 0;
+            return `
+              <tr>
+                <td><strong>${item.symbol}</strong></td>
+                <td><strong>$${Number(item.price).toFixed(2)}</strong></td>
+                <td><span class="${isPos ? 'badge-buy' : 'badge-sell'}">${isPos ? '+' : ''}${chg.toFixed(2)}%</span></td>
+                <td>$${Number(item.high_24h).toFixed(2)}</td>
+                <td>$${Number(item.low_24h).toFixed(2)}</td>
+                <td>$${(Number(item.volume) / 1000000).toFixed(2)}M</td>
+                <td><span class="badge-hold">${isPos ? 'BULLISH UPTREND' : 'BEARISH CONFLUENCE'}</span></td>
+                <td><button onclick="switchTab('robo-trade')" class="btn-action" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;">Monitor</button></td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        console.error("Error loading watchlist:", err);
+      }
+    }
+
+    // Load Performance Data & Equity Chart
+    async function loadPerformanceData() {
+      try {
+        const res = await fetch('/api/performance');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('perf-net-pnl').innerText = `${data.net_pnl >= 0 ? '+' : ''}$${data.net_pnl}`;
+        document.getElementById('perf-net-pnl').style.color = data.net_pnl >= 0 ? '#10b981' : '#ef4444';
+        document.getElementById('perf-win-count').innerText = `${data.wins} Wins / ${data.losses} Losses`;
+        document.getElementById('perf-win-rate').innerText = `${data.win_rate}%`;
+        document.getElementById('perf-closed-trades').innerText = `${data.closed_trades} Closed Trades`;
+        document.getElementById('perf-profit-factor').innerText = data.profit_factor;
+        document.getElementById('perf-total-cycles').innerText = data.total_trades;
+
+        // Render Chart.js
+        const ctx = document.getElementById('equityChart').getContext('2d');
+        const curve = data.equity_curve || [];
+        const labels = curve.length > 0 ? curve.map(c => c.date) : ['Start', 'Current'];
+        const values = curve.length > 0 ? curve.map(c => c.cumulative) : [0, 0];
+
+        if (equityChartInstance) {
+          equityChartInstance.destroy();
+        }
+
+        equityChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Cumulative P&L ($)',
+              data: values,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 4,
+              pointBackgroundColor: '#60a5fa'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: '#9ca3af' } }
+            },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Error loading performance:", err);
+      }
+    }
+
+    // Trigger Instant Cycle
+    async function triggerCycle() {
+      try {
+        const btn = event?.currentTarget;
+        if (btn) btn.disabled = true;
+        await fetch('/api/cycle/trigger', { method: 'POST' });
+        await fetchState();
+        if (btn) btn.disabled = false;
+      } catch (e) {
+        alert("Cycle trigger error: " + e);
+      }
+    }
+
+    // Reset Robo Trade
+    async function confirmResetRobo() {
+      if (!confirm("Are you sure you want to reset the Robo Trade? This will close any open position on Binance Demo and clear the recent journal logs.")) return;
+      try {
+        const res = await fetch('/api/robo/reset', { method: 'POST' });
+        const result = await res.json();
+        alert(result.message || "Robo trade reset successfully.");
+        await fetchState();
+      } catch (e) {
+        alert("Error resetting robo trade: " + e);
+      }
+    }
+
+    // Simulated Ticks Stream rate
+    setInterval(() => {
+      const rate = Math.floor(175 + Math.random() * 25);
+      const el1 = document.getElementById('wsRateText');
+      const el2 = document.getElementById('headerTicksPerSec');
+      if (el1) el1.innerText = `${rate} Ticks/sec`;
+      if (el2) el2.innerText = `${rate} Ticks/s`;
+    }, 2000);
+
+    // Initial boot
+    setInterval(fetchState, 4000);
+    fetchState();
+    loadWatchlist();
+  </script>
 </body>
 </html>

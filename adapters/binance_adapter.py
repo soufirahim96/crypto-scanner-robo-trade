@@ -41,6 +41,24 @@ class BinanceTestnetAdapter(BaseBrokerAdapter):
             "price": float(data.get("price", 0.0))
         }
 
+    def fetch_watchlist(self) -> List[Dict[str, Any]]:
+        symbols = ["PAXGUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]
+        items = []
+        for s in symbols:
+            try:
+                data = self.exchange.fapiPublicGetTicker24hr({"symbol": s})
+                items.append({
+                    "symbol": s,
+                    "price": float(data.get("lastPrice", 0.0)),
+                    "change_24h": float(data.get("priceChangePercent", 0.0)),
+                    "high_24h": float(data.get("highPrice", 0.0)),
+                    "low_24h": float(data.get("lowPrice", 0.0)),
+                    "volume": float(data.get("quoteVolume", 0.0))
+                })
+            except Exception:
+                pass
+        return items
+
     def fetch_orderbook_spread(self, symbol: str) -> Dict[str, float]:
         sym = symbol.replace("/", "")
         book = self.exchange.fapiPublicGetTickerBookTicker({"symbol": sym})
