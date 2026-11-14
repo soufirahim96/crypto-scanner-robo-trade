@@ -385,23 +385,26 @@
       box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
     }
 
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      border-radius: 10px;
-      padding: 0.55rem 1.1rem;
-      font-weight: 700;
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s;
+    .btn-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
     }
 
-    .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.25);
+    /* INPUT CONTROLS */
+    .form-input {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.55rem 0.85rem;
+      color: #fff;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      outline: none;
+      width: 100%;
+    }
+    .form-input:focus {
+      border-color: var(--accent-primary);
     }
 
     /* TAB PANES */
@@ -594,7 +597,7 @@
   <!-- APP CONTAINER -->
   <div id="appContainer" class="app-container">
 
-    <!-- MOBILE SIDEBAR BACKDROP (tap outside to close drawer) -->
+    <!-- MOBILE SIDEBAR BACKDROP -->
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="toggleSidebar(false)"></div>
 
     <!-- SIDEBAR NAVIGATION DRAWER -->
@@ -724,7 +727,7 @@
       </header>
 
       <!-- ========================================== -->
-      <!-- TAB 1: ROBO TRADE (DEFAULT HOME)           -->
+      <!-- TAB 1: ROBO TRADE                          -->
       <!-- ========================================== -->
       <section id="tab-robo-trade" class="tab-pane active">
         <!-- Top Metrics Cards -->
@@ -740,7 +743,7 @@
 
           <div class="metric-card glass-panel">
             <p class="card-label">Virtual Wallet Balance</p>
-            <h2 class="card-value text-success" id="val-balance">Loading...</h2>
+            <h2 class="card-value text-success" id="val-balance">$0.00</h2>
             <p class="card-sub">Binance Testnet USDT</p>
           </div>
 
@@ -768,7 +771,11 @@
               <span style="font-size: 0.75rem; color: var(--text-muted);">Auto-updating every 4s</span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.85rem; max-height: 520px; overflow-y: auto; padding-right: 0.25rem;" id="thought-list">
-              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">Listening for Gemini thoughts...</p>
+              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic; text-align: center; padding: 2rem 0;">
+                <i class="fa-solid fa-satellite-dish text-gradient" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>
+                Robo trader is active and ready.<br>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Listening for live market trigger or click "Trigger Instant Cycle".</span>
+              </p>
             </div>
           </div>
 
@@ -781,7 +788,10 @@
               <span style="font-size: 0.75rem; color: var(--text-muted);">Binance Demo Audit</span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.85rem; max-height: 520px; overflow-y: auto; padding-right: 0.25rem;" id="trade-list">
-              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">No trades executed yet...</p>
+              <p style="color: var(--text-muted); font-size: 0.85rem; font-style: italic; text-align: center; padding: 2rem 0;">
+                <i class="fa-solid fa-check-circle" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block; color: var(--text-dim);"></i>
+                Clean ledger. No trades executed yet.
+              </p>
             </div>
           </div>
         </div>
@@ -792,14 +802,20 @@
       <!-- ========================================== -->
       <section id="tab-scanner" class="tab-pane">
         <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
             <div>
               <h2 style="font-size: 1.25rem; font-weight: 800;">Real-Time Market Confluence Scanner</h2>
               <p style="font-size: 0.85rem; color: var(--text-muted);">Live Binance testnet feed tracking top crypto momentum, EMA crosses, and AI regimes</p>
             </div>
-            <button onclick="loadWatchlist()" class="btn-action" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
-              <i class="fa-solid fa-arrows-rotate"></i> Refresh
-            </button>
+            <div style="display: flex; gap: 0.6rem;">
+              <button onclick="clearWatchlistTable()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.5rem 0.9rem; border-radius: 8px; font-size: 0.82rem; cursor: pointer;">
+                <i class="fa-solid fa-trash-can"></i> Clear Table
+              </button>
+              <button id="btnScanMarket" onclick="loadWatchlist()" class="btn-action">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Scan Live Market</span>
+              </button>
+            </div>
           </div>
 
           <div class="data-table-container">
@@ -817,7 +833,13 @@
                 </tr>
               </thead>
               <tbody id="watchlistTableBody">
-                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading market scanner data...</td></tr>
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-magnifying-glass-chart" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #3b82f6;"></i>
+                    No coins scanned yet.<br>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">Click <strong>"Scan Live Market"</strong> to query live Binance crypto pairs.</span>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -831,12 +853,12 @@
         <div class="metrics-grid-4">
           <div class="metric-card glass-panel">
             <p class="card-label">Total Wallet Balance</p>
-            <h2 class="card-value text-success" id="holdings-total-balance">$0.00</h2>
+            <h2 class="card-value text-success" id="holdings-total-balance">--</h2>
             <p class="card-sub">Testnet Equity</p>
           </div>
           <div class="metric-card glass-panel">
             <p class="card-label">Available Margin</p>
-            <h2 class="card-value" id="holdings-avail-balance">$0.00</h2>
+            <h2 class="card-value" id="holdings-avail-balance">--</h2>
             <p class="card-sub">Free for new orders</p>
           </div>
           <div class="metric-card glass-panel">
@@ -852,7 +874,12 @@
         </div>
 
         <div class="glass-panel" style="padding: 1.5rem;">
-          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem;">Complete Transaction Audit Ledger</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700;">Complete Transaction Audit Ledger</h3>
+            <button onclick="clearTransactionTable()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">
+              <i class="fa-solid fa-broom"></i> Clear View
+            </button>
+          </div>
           <div class="data-table-container">
             <table class="data-table">
               <thead>
@@ -869,7 +896,13 @@
                 </tr>
               </thead>
               <tbody id="fullTradesTableBody">
-                <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No transactions recorded.</td></tr>
+                <tr>
+                  <td colspan="9" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #8b5cf6;"></i>
+                    No transaction records found.<br>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">Executed trades and order history will automatically stream here.</span>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -880,53 +913,97 @@
       <!-- TAB 4: ANALYSIS LOGIC REGISTRY             -->
       <!-- ========================================== -->
       <section id="tab-analysis-logic" class="tab-pane">
-        <div class="layout-2col" style="margin-bottom: 1.5rem;">
-          <!-- Stage 1 Rules -->
-          <div class="glass-panel" style="padding: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
-              <span class="badge-buy" style="font-size: 0.85rem;">STAGE 1</span>
-              <h3 style="font-size: 1.1rem; font-weight: 800;">Logic Execution & Entry Confluence</h3>
+        <!-- ADMIN CREATION CARD / RULE BUILDER INTERFACE -->
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(245, 158, 11, 0.35);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-plus-circle text-gradient"></i> Define Analysis Logic & Assign AI Bot
+              </h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Configure custom confluence rules, timeframe scopes, and assign them to specific Gemini sub-agents.
+              </p>
             </div>
-            <ul style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem; color: #d1d5db; list-style: none;">
-              <li><strong>1. Role & Chart:</strong> Scalper agent operates strictly on live M5 / M10 charts. Zero guessing, zero news prediction.</li>
-              <li><strong>2. Long / Buy Rule:</strong> EMA9 crosses ABOVE EMA21 + RSI &gt; 55 + Candle Close ABOVE Swing Resistance.</li>
-              <li><strong>3. Short / Sell Rule:</strong> EMA9 crosses BELOW EMA21 + RSI &lt; 45 + Candle Close BELOW Swing Support.</li>
-              <li><strong>4. Execution Brackets:</strong> Auto-executed with hard Stop Loss of <strong>100 ticks ($10.00)</strong> and Take Profit of <strong>600 ticks ($60.00)</strong>.</li>
-              <li><strong>5. Trend Strength Filter:</strong> Strictly requires <strong>Fast ADX(7) &gt; 23</strong> to eliminate sideways dead consolidation traps.</li>
-              <li><strong>6. Volatility & Spread Shield:</strong> Reject entry if spread &gt; 0.2% or Candle Gegar detected (&gt; 2.5x ATR).</li>
-            </ul>
+            <span class="badge-mini" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.3rem 0.65rem; border-radius: 6px;">
+              <i class="fa-solid fa-sliders"></i> RULE REGISTRY ENGINE
+            </span>
           </div>
 
-          <!-- Stage 2 Rules -->
-          <div class="glass-panel" style="padding: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
-              <span class="badge-hold" style="font-size: 0.85rem;">STAGE 2</span>
-              <h3 style="font-size: 1.1rem; font-weight: 800;">Confirmation & Position Management</h3>
+          <form id="addRuleForm" onsubmit="submitNewRule(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem; align-items: end;">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Logic Name</label>
+              <input type="text" id="ruleLogicName" class="form-input" placeholder="e.g. EMA9/21 + RSI55 Rejection" required>
             </div>
-            <ul style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.88rem; color: #d1d5db; list-style: none;">
-              <li><strong>1. Active Trade Holding:</strong> If already in a trade with the same trend direction, keep/hold the active position.</li>
-              <li><strong>2. Flat Continuation Entry:</strong> If flat with no fresh EMA cross: Buy if RSI &gt; 55 + Close &gt; Resistance + ADX(7) &gt; 23; Sell if RSI &lt; 45 + Close &lt; Support + ADX(7) &gt; 23.</li>
-              <li><strong>3. Reversal Exit:</strong> Whenever EMA9 crosses opposite EMA21, immediately exit all current positions before evaluating Stage 1 reverse entry.</li>
-              <li><strong>4. 4-Hour Time Limit Exit:</strong> After every 4 hours of holding, close active trade to bank floating profits and avoid stagnation.</li>
-              <li><strong>5. Emergency Account Kill-Switch:</strong> Close all positions immediately if floating loss touches -2% of total balance.</li>
-            </ul>
-          </div>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Target Timeframe Scope</label>
+              <select id="ruleTargetScope" class="form-input">
+                <option value="M5 Sentry">M5 Sentry (Fast Execution)</option>
+                <option value="M10 Macro">M10 Macro (Superior Trend)</option>
+                <option value="M5/M10 Dual">M5 / M10 Dual Confluence</option>
+                <option value="H1 Swing">H1 Swing Bias</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Assigned AI Agent</label>
+              <select id="ruleAssignedAgent" class="form-input">
+                <option value="Hermes Scalper Core">Hermes Scalper Core</option>
+                <option value="Gemini 3.8 Flash (Superior)">Gemini 3.8 Flash (Superior)</option>
+                <option value="Gemini 3.7 Flash (Fast)">Gemini 3.7 Flash (Fast Sentry)</option>
+                <option value="ADX Volatility Sentinel">ADX Volatility Sentinel</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Rule Classification</label>
+              <select id="ruleType" class="form-input">
+                <option value="MOMENTUM_CONFLUENCE">Momentum Confluence</option>
+                <option value="VOLATILITY_FILTER">Volatility / Gegar Filter</option>
+                <option value="BREAKOUT_CONFIRMATION">Breakout Confirmation</option>
+                <option value="REVERSAL_EXIT">Reversal Exit Strategy</option>
+              </select>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Technical Conditions & Description</label>
+              <input type="text" id="ruleDescription" class="form-input" placeholder="e.g. ADX(7) > 23 AND RSI > 55 with candle close above swing resistance" required>
+            </div>
+            <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.4rem;">
+              <button type="submit" class="btn-action">
+                <i class="fa-solid fa-plus"></i> Register New Logic Rule
+              </button>
+            </div>
+          </form>
         </div>
 
-        <!-- Dual Brain Architecture -->
+        <!-- ANALYSIS LOGIC REGISTRY TABLE -->
         <div class="glass-panel" style="padding: 1.5rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem;">Dual-Brain Rotation Matrix (7 Google Accounts)</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem;">
-              <span class="badge-mini" style="color: #818cf8; font-size: 0.75rem;">TIER 1 (MACRO STRATEGIST)</span>
-              <h4 style="font-size: 1rem; font-weight: 700; margin: 0.35rem 0;">Gemini 3.8 Flash (M10 Chart)</h4>
-              <p style="font-size: 0.82rem; color: var(--text-muted);">Runs every 10 minutes with top-priority macro reasoning, market regime confirmation, and structural swing points.</p>
-            </div>
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem;">
-              <span class="badge-mini" style="color: #34d399; font-size: 0.75rem;">TIER 2 (FAST SENTRY)</span>
-              <h4 style="font-size: 1rem; font-weight: 700; margin: 0.35rem 0;">Gemini 3.7 Flash Cascade (M5 Chart)</h4>
-              <p style="font-size: 0.82rem; color: var(--text-muted);">Runs every 5 minutes while macro strategist sleeps. Auto failover across 3.7 -> 3.6 -> 3.5 Lite across all 7 API keys.</p>
-            </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700;">Registered Institutional Analysis Rules</h3>
+            <button onclick="clearAnalysisLogicTable()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">
+              <i class="fa-solid fa-trash-can"></i> Clear All Rules
+            </button>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Rule ID</th>
+                  <th>Logic Name</th>
+                  <th>Scope</th>
+                  <th>Assigned Agent</th>
+                  <th>Classification</th>
+                  <th>Technical Description</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="analysisLogicTableBody">
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-brain" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #06b6d4;"></i>
+                    No custom analysis logic rules registered.<br>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">Use the form above to define and assign custom institutional logic to your AI agents.</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -948,7 +1025,7 @@
           </div>
           <div class="metric-card glass-panel">
             <p class="card-label">Profit Factor</p>
-            <h2 class="card-value" id="perf-profit-factor">1.00</h2>
+            <h2 class="card-value" id="perf-profit-factor">--</h2>
             <p class="card-sub">Gross Win / Gross Loss</p>
           </div>
           <div class="metric-card glass-panel">
@@ -959,7 +1036,12 @@
         </div>
 
         <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Cumulative Equity & Profit Journey</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700;">Cumulative Equity & Profit Journey</h3>
+            <button onclick="clearPerformanceData()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">
+              <i class="fa-solid fa-rotate-left"></i> Reset View
+            </button>
+          </div>
           <div style="height: 320px; width: 100%;">
             <canvas id="equityChart"></canvas>
           </div>
@@ -970,42 +1052,126 @@
       <!-- TAB 6: BACKTEST RESULT                     -->
       <!-- ========================================== -->
       <section id="tab-backtest" class="tab-pane">
-        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <!-- BACKTEST SIMULATION STUDIO INTERFACE -->
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(0, 240, 255, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
             <div>
-              <h2 style="font-size: 1.25rem; font-weight: 800;">Quantitative Backtest Engine</h2>
-              <p style="font-size: 0.85rem; color: var(--text-muted);">Historical replay of Stage 1 & Stage 2 Framework with Fast ADX(7) & 100/600 tick brackets</p>
+              <h2 style="font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-clock-rotate-left text-gradient"></i> Quantitative Backtest Simulation Studio
+              </h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Simulate historical execution of Stage 1 & 2 logic against historical Binance candles with zero risk.
+              </p>
             </div>
-            <span class="badge-mini" style="font-size: 0.8rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px;">30-Day Replay Model</span>
+            <span class="badge-mini" style="background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.4); padding: 0.35rem 0.75rem; border-radius: 6px;">
+              <i class="fa-solid fa-flask"></i> QUANT SIMULATOR
+            </span>
           </div>
 
-          <div class="metrics-grid-4">
-            <div class="metric-card glass-panel">
-              <p class="card-label">Estimated Sharpe Ratio</p>
-              <h2 class="card-value text-success">2.18</h2>
-              <p class="card-sub">Risk-Adjusted Return</p>
+          <!-- Parameter Controls -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Asset</label>
+              <select id="btSymbol" class="form-input">
+                <option value="PAXGUSDT">PAXGUSDT (Gold Futures)</option>
+                <option value="BTCUSDT">BTCUSDT (Bitcoin)</option>
+                <option value="ETHUSDT">ETHUSDT (Ethereum)</option>
+                <option value="SOLUSDT">SOLUSDT (Solana)</option>
+              </select>
             </div>
-            <div class="metric-card glass-panel">
-              <p class="card-label">Max Historical Drawdown</p>
-              <h2 class="card-value" style="color: #f87171;">-4.8%</h2>
-              <p class="card-sub">Safely under -2% rule</p>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Timeframe</label>
+              <select id="btTimeframe" class="form-input">
+                <option value="5m">5-Minute (M5 Sentry)</option>
+                <option value="10m">10-Minute (M10 Macro)</option>
+                <option value="1h">1-Hour (H1 Swing)</option>
+              </select>
             </div>
-            <div class="metric-card glass-panel">
-              <p class="card-label">Average Trade Duration</p>
-              <h2 class="card-value">48 mins</h2>
-              <p class="card-sub">M5/M10 Momentum Swing</p>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Historical Lookback</label>
+              <select id="btPeriod" class="form-input">
+                <option value="7">7 Days</option>
+                <option value="30">30 Days</option>
+                <option value="90">90 Days</option>
+              </select>
             </div>
-            <div class="metric-card glass-panel">
-              <p class="card-label">Historical Win Rate</p>
-              <h2 class="card-value text-success">64.2%</h2>
-              <p class="card-sub">With ADX(7) & Confluence</p>
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem;">Strategy Preset</label>
+              <select id="btStrategy" class="form-input">
+                <option value="hag_v1">EMA9/21 + RSI + Fast ADX(7) &gt; 23</option>
+                <option value="raw_cross">Raw EMA Cross (No ADX)</option>
+              </select>
             </div>
+            <div>
+              <button id="btnRunBacktest" onclick="executeBacktestSimulation()" class="btn-action" style="width: 100%;">
+                <i class="fa-solid fa-play"></i> Run Simulation
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulation Summary Metrics -->
+        <div class="metrics-grid-4">
+          <div class="metric-card glass-panel">
+            <p class="card-label">Estimated Net Profit</p>
+            <h2 class="card-value" id="bt-net-profit">--</h2>
+            <p class="card-sub" id="bt-trade-count">0 Simulated Trades</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Sharpe Ratio</p>
+            <h2 class="card-value text-success" id="bt-sharpe">--</h2>
+            <p class="card-sub">Risk-Adjusted Return</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Max Drawdown</p>
+            <h2 class="card-value" style="color: #f87171;" id="bt-drawdown">--</h2>
+            <p class="card-sub">Peak-to-Trough Decline</p>
+          </div>
+          <div class="metric-card glass-panel">
+            <p class="card-label">Win Rate %</p>
+            <h2 class="card-value text-success" id="bt-win-rate">--</h2>
+            <p class="card-sub" id="bt-wins-losses">0 Wins / 0 Losses</p>
+          </div>
+        </div>
+
+        <!-- Backtest Trade Results Table -->
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700;">Simulated Trade Execution Ledger</h3>
+            <button onclick="clearBacktestData()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">
+              <i class="fa-solid fa-trash-can"></i> Clear Results
+            </button>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Trade #</th>
+                  <th>Timestamp</th>
+                  <th>Symbol</th>
+                  <th>Side</th>
+                  <th>Entry Price</th>
+                  <th>Exit Price</th>
+                  <th>Simulated PnL</th>
+                  <th>Return %</th>
+                </tr>
+              </thead>
+              <tbody id="backtestTableBody">
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-clock-rotate-left" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #f59e0b;"></i>
+                    No backtest simulation executed yet.<br>
+                    <span style="font-size: 0.78rem; color: var(--text-dim);">Configure parameters above and click <strong>"Run Simulation"</strong> to backtest against historical Binance candles.</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
       <!-- ========================================== -->
-      <!-- TAB 7: TIME-SERIES CLICKHOUSE / ENGINE     -->
+      <!-- TAB 7: TIME-SERIES ENGINE                  -->
       <!-- ========================================== -->
       <section id="tab-timeseries" class="tab-pane">
         <div class="glass-panel" style="padding: 1.5rem;">
@@ -1020,13 +1186,13 @@
             </div>
             <div class="metric-card glass-panel">
               <p class="card-label">Database Status</p>
-              <h2 class="card-value text-success">CONNECTED</h2>
+              <h2 class="card-value text-success">READY</h2>
               <p class="card-sub">Storage / hag_journal.db</p>
             </div>
             <div class="metric-card glass-panel">
               <p class="card-label">Query Latency</p>
               <h2 class="card-value" style="color: #a7f3d0;">&lt; 1.2 ms</h2>
-              <p class="card-sub">Non-blocking thread pool</p>
+              <p class="card-sub">Non-blocking worker thread</p>
             </div>
             <div class="metric-card glass-panel">
               <p class="card-label">Buffer Capacity</p>
@@ -1163,8 +1329,8 @@
 
       if (tabId === 'performance-review') {
         loadPerformanceData();
-      } else if (tabId === 'scanner') {
-        loadWatchlist();
+      } else if (tabId === 'analysis-logic') {
+        fetchAnalysisLogicRegistry();
       }
     }
 
@@ -1202,14 +1368,14 @@
             document.getElementById('holdings-unrealized-pnl').innerHTML = `<span style="color: ${pnlColor}">${pnlText}</span>`;
           } else {
             document.getElementById('val-position').innerText = 'FLAT (No Position)';
-            document.getElementById('val-unrealized-pnl').innerText = 'Waiting for setup';
+            document.getElementById('val-unrealized-pnl').innerText = 'Ready for setup';
             document.getElementById('holdings-pos-side').innerText = 'FLAT';
             document.getElementById('holdings-pos-size').innerText = 'Size: 0.000';
             document.getElementById('holdings-unrealized-pnl').innerText = '$0.00';
           }
         }
 
-        // Render Thoughts
+        // Render Thoughts (if any exist)
         const thoughtContainer = document.getElementById('thought-list');
         if (data.thoughts && data.thoughts.length > 0) {
           thoughtContainer.innerHTML = data.thoughts.map(t => {
@@ -1236,7 +1402,7 @@
           }).join('');
         }
 
-        // Render Trades in Robo Trade & Holdings Ledger
+        // Render Trades in Robo Trade & Holdings Ledger (if any exist)
         const tradeContainer = document.getElementById('trade-list');
         const fullTradesBody = document.getElementById('fullTradesTableBody');
 
@@ -1288,13 +1454,20 @@
       }
     }
 
-    // Load Scanner Watchlist
+    // 1. Live Crypto Scanner: Scan On Demand
     async function loadWatchlist() {
+      const btn = document.getElementById('btnScanMarket');
+      const tbody = document.getElementById('watchlistTableBody');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';
+      }
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; color: #3b82f6;"></i> Fetching live Binance testnet pairs...</td></tr>`;
+
       try {
         const res = await fetch('/api/scanner/watchlist');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("Network response failed");
         const data = await res.json();
-        const tbody = document.getElementById('watchlistTableBody');
         if (data.watchlist && data.watchlist.length > 0) {
           tbody.innerHTML = data.watchlist.map(item => {
             const chg = Number(item.change_24h || 0);
@@ -1307,37 +1480,157 @@
                 <td>$${Number(item.high_24h).toFixed(2)}</td>
                 <td>$${Number(item.low_24h).toFixed(2)}</td>
                 <td>$${(Number(item.volume) / 1000000).toFixed(2)}M</td>
-                <td><span class="badge-hold">${isPos ? 'BULLISH UPTREND' : 'BEARISH CONFLUENCE'}</span></td>
+                <td><span class="badge-hold">${isPos ? 'BULLISH MOMENTUM' : 'BEARISH ALIGNMENT'}</span></td>
                 <td><button onclick="switchTab('robo-trade')" class="btn-action" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;">Monitor</button></td>
               </tr>
             `;
           }).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">No coin data returned from exchange.</td></tr>`;
         }
       } catch (err) {
-        console.error("Error loading watchlist:", err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #ef4444;">Failed to fetch live scanner: ${err}</td></tr>`;
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan Live Market';
+        }
       }
     }
 
-    // Load Performance Data & Equity Chart
+    function clearWatchlistTable() {
+      const tbody = document.getElementById('watchlistTableBody');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+            <i class="fa-solid fa-magnifying-glass-chart" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #3b82f6;"></i>
+            Table cleared.<br>
+            <span style="font-size: 0.78rem; color: var(--text-dim);">Click <strong>"Scan Live Market"</strong> to refresh live market pairs.</span>
+          </td>
+        </tr>
+      `;
+    }
+
+    function clearTransactionTable() {
+      const tbody = document.getElementById('fullTradesTableBody');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+            <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #8b5cf6;"></i>
+            View cleared. New transaction events will stream here.
+          </td>
+        </tr>
+      `;
+    }
+
+    // 2. Analysis Logic Registry Functions
+    async function fetchAnalysisLogicRegistry() {
+      const tbody = document.getElementById("analysisLogicTableBody");
+      if (!tbody) return;
+
+      try {
+        const res = await fetch("/api/ai/analysis_logic");
+        const data = await res.json();
+        if (data.rules && data.rules.length > 0) {
+          tbody.innerHTML = data.rules.map(r => `
+            <tr>
+              <td><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">${r.id}</strong></td>
+              <td><strong style="color: #fff;">${r.logic_name}</strong></td>
+              <td><span class="badge-mini" style="background: rgba(59,130,246,0.15); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">${r.target_scope}</span></td>
+              <td><strong style="color: #f59e0b;">${r.assigned_agent}</strong></td>
+              <td><span class="badge-mini" style="background: rgba(16,185,129,0.15); color: #34d399; padding: 2px 6px; border-radius: 4px;">${r.rule_type}</span></td>
+              <td style="font-size: 0.8rem; color: #d1d5db;">${r.description}</td>
+              <td>
+                <button onclick="deleteAnalysisRule('${r.id}')" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 0.25rem 0.55rem; font-size: 0.72rem; cursor: pointer;">
+                  <i class="fa-solid fa-trash"></i> Delete
+                </button>
+              </td>
+            </tr>
+          `).join("");
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                <i class="fa-solid fa-brain" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #06b6d4;"></i>
+                No custom analysis logic rules registered.<br>
+                <span style="font-size: 0.78rem; color: var(--text-dim);">Use the form above to define and assign custom institutional logic to your AI agents.</span>
+              </td>
+            </tr>
+          `;
+        }
+      } catch (e) {
+        console.error("Failed to fetch analysis logic registry:", e);
+      }
+    }
+
+    async function submitNewRule(event) {
+      event.preventDefault();
+      const payload = {
+        logic_name: document.getElementById('ruleLogicName').value,
+        target_scope: document.getElementById('ruleTargetScope').value,
+        assigned_agent: document.getElementById('ruleAssignedAgent').value,
+        rule_type: document.getElementById('ruleType').value,
+        description: document.getElementById('ruleDescription').value
+      };
+
+      try {
+        const res = await fetch("/api/ai/analysis_logic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          document.getElementById('ruleLogicName').value = '';
+          document.getElementById('ruleDescription').value = '';
+          await fetchAnalysisLogicRegistry();
+        }
+      } catch (e) {
+        alert("Failed to register rule: " + e);
+      }
+    }
+
+    async function deleteAnalysisRule(ruleId) {
+      try {
+        await fetch(`/api/ai/analysis_logic/${ruleId}`, { method: "DELETE" });
+        await fetchAnalysisLogicRegistry();
+      } catch (e) {
+        alert("Failed to delete rule: " + e);
+      }
+    }
+
+    function clearAnalysisLogicTable() {
+      const tbody = document.getElementById("analysisLogicTableBody");
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+            <i class="fa-solid fa-brain" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #06b6d4;"></i>
+            Registry cleared.<br>
+            <span style="font-size: 0.78rem; color: var(--text-dim);">Click "+ Register New Logic Rule" above to add new rules.</span>
+          </td>
+        </tr>
+      `;
+    }
+
+    // 3. Performance Review Functions
     async function loadPerformanceData() {
       try {
         const res = await fetch('/api/performance');
         if (!res.ok) return;
         const data = await res.json();
 
-        document.getElementById('perf-net-pnl').innerText = `${data.net_pnl >= 0 ? '+' : ''}$${data.net_pnl}`;
+        document.getElementById('perf-net-pnl').innerText = `${data.net_pnl >= 0 ? '+' : ''}$${data.net_pnl.toFixed(2)}`;
         document.getElementById('perf-net-pnl').style.color = data.net_pnl >= 0 ? '#10b981' : '#ef4444';
         document.getElementById('perf-win-count').innerText = `${data.wins} Wins / ${data.losses} Losses`;
         document.getElementById('perf-win-rate').innerText = `${data.win_rate}%`;
         document.getElementById('perf-closed-trades').innerText = `${data.closed_trades} Closed Trades`;
-        document.getElementById('perf-profit-factor').innerText = data.profit_factor;
+        document.getElementById('perf-profit-factor').innerText = data.closed_trades > 0 ? data.profit_factor : '--';
         document.getElementById('perf-total-cycles').innerText = data.total_trades;
 
         // Render Chart.js
         const ctx = document.getElementById('equityChart').getContext('2d');
         const curve = data.equity_curve || [];
-        const labels = curve.length > 0 ? curve.map(c => c.date) : ['Start', 'Current'];
-        const values = curve.length > 0 ? curve.map(c => c.cumulative) : [0, 0];
+        const labels = curve.length > 0 ? curve.map(c => c.date) : ['00:00:00'];
+        const values = curve.length > 0 ? curve.map(c => c.cumulative) : [0];
 
         if (equityChartInstance) {
           equityChartInstance.destroy();
@@ -1375,6 +1668,125 @@
       }
     }
 
+    function clearPerformanceData() {
+      document.getElementById('perf-net-pnl').innerText = '$0.00';
+      document.getElementById('perf-net-pnl').style.color = '#fff';
+      document.getElementById('perf-win-count').innerText = '0 Wins / 0 Losses';
+      document.getElementById('perf-win-rate').innerText = '0.0%';
+      document.getElementById('perf-closed-trades').innerText = '0 Closed Trades';
+      document.getElementById('perf-profit-factor').innerText = '--';
+      document.getElementById('perf-total-cycles').innerText = '0';
+
+      if (equityChartInstance) {
+        equityChartInstance.destroy();
+        const ctx = document.getElementById('equityChart').getContext('2d');
+        equityChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['00:00:00'],
+            datasets: [{
+              label: 'Cumulative P&L ($)',
+              data: [0],
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.05)',
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#9ca3af' } } },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+            }
+          }
+        });
+      }
+    }
+
+    // 4. Backtest Simulation Functions
+    async function executeBacktestSimulation() {
+      const btn = document.getElementById('btnRunBacktest');
+      const tbody = document.getElementById('backtestTableBody');
+      const payload = {
+        symbol: document.getElementById('btSymbol').value,
+        timeframe: document.getElementById('btTimeframe').value,
+        period_days: document.getElementById('btPeriod').value
+      };
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running Sim...';
+      }
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 0.6rem; display: block; color: #f59e0b;"></i> Replaying historical klines & evaluating Stage 1/2 confluence...</td></tr>`;
+
+      try {
+        const res = await fetch("/api/backtest/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          document.getElementById('bt-net-profit').innerText = `${data.net_profit >= 0 ? '+' : ''}$${data.net_profit}`;
+          document.getElementById('bt-net-profit').style.color = data.net_profit >= 0 ? '#10b981' : '#ef4444';
+          document.getElementById('bt-trade-count').innerText = `${data.total_trades} Simulated Trades`;
+          document.getElementById('bt-sharpe').innerText = data.sharpe_ratio;
+          document.getElementById('bt-drawdown').innerText = data.max_drawdown;
+          document.getElementById('bt-win-rate').innerText = `${data.win_rate}%`;
+          document.getElementById('bt-wins-losses').innerText = `${data.wins} Wins / ${data.losses} Losses`;
+
+          if (data.trades && data.trades.length > 0) {
+            tbody.innerHTML = data.trades.map(t => {
+              const date = new Date(t.timestamp * 1000).toLocaleString();
+              const isWin = t.pnl >= 0;
+              return `
+                <tr>
+                  <td>#${t.id}</td>
+                  <td style="font-family: var(--font-mono); font-size: 0.75rem;">${date}</td>
+                  <td><strong>${t.symbol}</strong></td>
+                  <td><span class="${t.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${t.side}</span></td>
+                  <td>$${Number(t.entry_price).toFixed(2)}</td>
+                  <td>$${Number(t.exit_price).toFixed(2)}</td>
+                  <td style="color: ${isWin ? '#10b981' : '#ef4444'}; font-weight: 700;">${isWin ? '+' : ''}$${t.pnl}</td>
+                  <td><span class="${isWin ? 'badge-buy' : 'badge-sell'}">${isWin ? '+' : ''}${t.return_pct}%</span></td>
+                </tr>
+              `;
+            }).join("");
+          }
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #ef4444;">Backtest failed: ${err}</td></tr>`;
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Simulation';
+        }
+      }
+    }
+
+    function clearBacktestData() {
+      document.getElementById('bt-net-profit').innerText = '--';
+      document.getElementById('bt-net-profit').style.color = '#fff';
+      document.getElementById('bt-trade-count').innerText = '0 Simulated Trades';
+      document.getElementById('bt-sharpe').innerText = '--';
+      document.getElementById('bt-drawdown').innerText = '--';
+      document.getElementById('bt-win-rate').innerText = '--';
+      document.getElementById('bt-wins-losses').innerText = '0 Wins / 0 Losses';
+
+      document.getElementById('backtestTableBody').innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+            <i class="fa-solid fa-clock-rotate-left" style="font-size: 2rem; margin-bottom: 0.6rem; display: block; color: #f59e0b;"></i>
+            Backtest table cleared.<br>
+            <span style="font-size: 0.78rem; color: var(--text-dim);">Configure parameters above and click <strong>"Run Simulation"</strong> to execute.</span>
+          </td>
+        </tr>
+      `;
+    }
+
     // Trigger Instant Cycle
     async function triggerCycle() {
       try {
@@ -1396,6 +1808,7 @@
         const result = await res.json();
         alert(result.message || "Robo trade reset successfully.");
         await fetchState();
+        clearPerformanceData();
       } catch (e) {
         alert("Error resetting robo trade: " + e);
       }
@@ -1413,7 +1826,6 @@
     // Initial boot
     setInterval(fetchState, 4000);
     fetchState();
-    loadWatchlist();
   </script>
 </body>
 </html>
