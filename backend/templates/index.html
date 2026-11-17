@@ -735,16 +735,16 @@
           <div class="metric-card glass-panel">
             <p class="card-label">Target Asset</p>
             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.35rem;">
-              <h2 class="card-value" id="val-symbol">PAXG/USDT</h2>
-              <span class="badge-mini" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px;">Gold Futures</span>
+              <h2 class="card-value" id="val-symbol">MCLF2027</h2>
+              <span class="badge-mini" style="background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">Jan 2027 (3M)</span>
             </div>
-            <p class="card-sub text-gradient-gold" style="font-weight: 700; font-size: 0.95rem;" id="val-price">Loading price...</p>
+            <p class="card-sub text-gradient" style="font-weight: 700; font-size: 0.95rem;" id="val-price">Loading price...</p>
           </div>
 
           <div class="metric-card glass-panel">
             <p class="card-label">Virtual Wallet Balance</p>
-            <h2 class="card-value text-success" id="val-balance">$0.00</h2>
-            <p class="card-sub">Binance Testnet USDT</p>
+            <h2 class="card-value text-success" id="val-balance">$5,000.00</h2>
+            <p class="card-sub">In-Memory Paper Capital</p>
           </div>
 
           <div class="metric-card glass-panel">
@@ -757,6 +757,34 @@
             <p class="card-label">Dual-Brain Engine</p>
             <h2 class="card-value" style="color: #818cf8;">7 Accounts</h2>
             <p class="card-sub text-success">M5 Sentry (3.7) + M10 Macro (3.8)</p>
+          </div>
+        </div>
+
+        <!-- TRADINGVIEW LIVE CANDLESTICK CHART CONTAINER (WTI MICRO CRUDE OIL) -->
+        <div class="glass-panel" style="padding: 1rem 1.25rem; margin-bottom: 1.5rem; border: 1px solid rgba(59, 130, 246, 0.35);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-chart-candlestick text-gradient"></i> WTI Micro Crude Oil (MCL) Live TradingView Chart
+              </h3>
+              <span class="badge-mini" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+                <i class="fa-solid fa-bolt"></i> 100% FREE STREAM &bull; ZERO DB STORAGE
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Active Contract:</span>
+              <select id="tvContractSelector" onchange="switchTradingViewChart(this.value)" class="form-input" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; width: auto; font-weight: 600;">
+                <option value="NYMEX:MCLF2027" selected>MCLF2027 (Jan 2027 - 3M Contract)</option>
+                <option value="NYMEX:MCL1!">MCL1! (Active Micro WTI Continuous)</option>
+                <option value="NYMEX:CL1!">CL1! (Standard WTI Continuous)</option>
+                <option value="BINANCE:PAXGUSDT">PAXGUSDT (Gold Futures Demo)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- EMBEDDED TRADINGVIEW WIDGET (Direct CDN, Zero Server Memory/DB Footprint) -->
+          <div class="tradingview-widget-container" style="height: 480px; width: 100%; border-radius: 12px; overflow: hidden; background: #0b0e14;">
+            <div id="tradingview_chart_frame" style="height: 100%; width: 100%;"></div>
           </div>
         </div>
 
@@ -1342,8 +1370,19 @@
         const data = await res.json();
 
         // Target Symbol & Price
-        if (data.symbol) document.getElementById('val-symbol').innerText = data.symbol;
-        if (data.price) document.getElementById('val-price').innerText = `$${Number(data.price).toFixed(2)}`;
+        if (data.symbol) {
+          document.getElementById('val-symbol').innerText = data.symbol;
+          const subEl = document.querySelector('#val-symbol + span');
+          if (subEl) {
+            subEl.innerText = data.symbol.includes("MCL") ? "WTI Futures (Jan 27)" : "Gold Futures";
+            subEl.style.background = data.symbol.includes("MCL") ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)";
+            subEl.style.color = data.symbol.includes("MCL") ? "#34d399" : "#fbbf24";
+          }
+        }
+        if (data.price) {
+          const unit = (data.symbol && data.symbol.includes("MCL")) ? "/ bbl" : "";
+          document.getElementById('val-price').innerText = `$${Number(data.price).toFixed(2)} ${unit}`;
+        }
 
         // Account balances
         if (data.account) {
@@ -1823,9 +1862,70 @@
       if (el2) el2.innerText = `${rate} Ticks/s`;
     }, 2000);
 
+    // ----------------------------------------------------
+    // TRADINGVIEW LIVE CANDLESTICK CHART WIDGET LOADER
+    // ----------------------------------------------------
+    let currentTvSymbol = "NYMEX:MCLF2027";
+
+    function loadTradingViewScript() {
+      if (typeof TradingView === 'undefined') {
+        const s = document.createElement('script');
+        s.src = 'https://s3.tradingview.com/tv.js';
+        s.async = true;
+        s.onload = () => createTradingViewWidget(currentTvSymbol);
+        document.head.appendChild(s);
+      } else {
+        createTradingViewWidget(currentTvSymbol);
+      }
+    }
+
+    function createTradingViewWidget(symbol) {
+      if (typeof TradingView === 'undefined') return;
+      const container = document.getElementById('tradingview_chart_frame');
+      if (!container) return;
+      container.innerHTML = '';
+
+      new TradingView.widget({
+        "autosize": true,
+        "symbol": symbol,
+        "interval": "5",
+        "timezone": "Asia/Kuala_Lumpur",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#0b0e14",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "hide_side_toolbar": false,
+        "container_id": "tradingview_chart_frame",
+        "studies": [
+          "MASimple@tv-basicstudies",
+          "RSI@tv-basicstudies"
+        ]
+      });
+    }
+
+    async function switchTradingViewChart(symbol) {
+      currentTvSymbol = symbol;
+      createTradingViewWidget(symbol);
+
+      const backendSymbol = symbol.includes("PAXG") ? "PAXGUSDT" : "MCLF2027";
+      try {
+        await fetch('/api/asset/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: backendSymbol })
+        });
+        await fetchState();
+      } catch (e) {
+        console.error("Asset switch error:", e);
+      }
+    }
+
     // Initial boot
     setInterval(fetchState, 4000);
     fetchState();
+    loadTradingViewScript();
   </script>
 </body>
 </html>

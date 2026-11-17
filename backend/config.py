@@ -39,7 +39,8 @@ class HaGConfig(BaseModel):
             ]
         return keys
 
-    TARGET_SYMBOL: str = "PAXGUSDT"
+    TARGET_SYMBOL: str = os.getenv("TARGET_SYMBOL", "MCLF2027")
+    MCL_CONTRACT: str = "MCLF27"
     TIMEFRAME_FAST: str = "5m"
     TIMEFRAME_MACRO: str = "10m"
     ORDER_QTY: float = 0.01

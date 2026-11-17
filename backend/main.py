@@ -9,6 +9,13 @@ from backend.config import config
 from core.hermes_agent import hermes_agent
 from core.journal import get_recent_thoughts, get_recent_trades, get_performance_stats, reset_journal
 from adapters.binance_adapter import binance_adapter
+from adapters.mcl_tradingview_adapter import mcl_adapter
+
+def get_active_broker(symbol: str = None):
+    sym = symbol or config.TARGET_SYMBOL
+    if "MCL" in sym:
+        return mcl_adapter
+    return binance_adapter
 
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -20,7 +27,7 @@ async def lifespan(app: FastAPI):
     hermes_agent.is_running = False
     task.cancel()
 
-app = FastAPI(title="HaG Autonomous Trading Bot (Binance Demo)", lifespan=lifespan)
+app = FastAPI(title="HaG Autonomous Trading Bot (WTI Micro Crude & Binance Demo)", lifespan=lifespan)
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
@@ -30,8 +37,9 @@ async def dashboard():
 @app.get("/api/state")
 async def get_state():
     try:
-        ticker = await asyncio.to_thread(binance_adapter.fetch_ticker, config.TARGET_SYMBOL)
-        account = await asyncio.to_thread(binance_adapter.get_account_summary)
+        broker = get_active_broker()
+        ticker = await asyncio.to_thread(broker.fetch_ticker, config.TARGET_SYMBOL)
+        account = await asyncio.to_thread(broker.get_account_summary)
         thoughts = get_recent_thoughts(25)
         trades = get_recent_trades(25)
         return {
@@ -63,16 +71,27 @@ async def get_performance():
 @app.post("/api/robo/reset")
 async def reset_robo_trade():
     try:
-        close_res = await asyncio.to_thread(binance_adapter.close_position, config.TARGET_SYMBOL)
+        broker = get_active_broker()
+        close_res = await asyncio.to_thread(broker.close_position, config.TARGET_SYMBOL)
         reset_journal()
         hermes_agent.position_entry_time = None
         hermes_agent.position_entry_price = None
         hermes_agent.position_side = None
         hermes_agent.position_sl = None
         hermes_agent.position_tp = None
-        return {"status": "success", "message": "Robo trade reset, position closed, and journal wiped."}
+        return {"status": "success", "message": "Robo trade reset, position closed, and journal wiped clean."}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
+
+@app.post("/api/asset/select")
+async def select_asset(request: Request):
+    try:
+        data = await request.json()
+        new_symbol = data.get("symbol", "MCLF2027")
+        config.TARGET_SYMBOL = new_symbol
+        return {"status": "success", "symbol": config.TARGET_SYMBOL}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/api/cycle/trigger")
 async def trigger_manual_cycle():

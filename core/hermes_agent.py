@@ -6,6 +6,12 @@ from core.strategy_logic import extract_market_features
 from core.gemini_brain import gemini_brain
 from core.journal import log_thought, log_trade
 from adapters.binance_adapter import binance_adapter
+from adapters.mcl_tradingview_adapter import mcl_adapter
+
+def get_broker(symbol: str):
+    if "MCL" in symbol:
+        return mcl_adapter
+    return binance_adapter
 
 logger = logging.getLogger("HaG.Agent")
 
@@ -34,22 +40,25 @@ class HermesTradingAgent:
         model_tier = "superior" if is_macro else "fast"
         
         # 1. Perception & Features on active timeframe (5m or 10m)
-        ticker = binance_adapter.fetch_ticker(symbol)
-        candles = binance_adapter.fetch_candles(symbol, timeframe=timeframe, limit=50)
+        broker = get_broker(symbol)
+        is_mcl = "MCL" in symbol
+        ticker = broker.fetch_ticker(symbol)
+        candles = broker.fetch_candles(symbol, timeframe=timeframe, limit=50)
         features = extract_market_features(candles)
-        spread_info = binance_adapter.fetch_orderbook_spread(symbol)
-        account = binance_adapter.get_account_summary()
+        spread_info = broker.fetch_orderbook_spread(symbol)
+        account = broker.get_account_summary()
         current_pos = account.get("activePosition")
         
         wallet_balance = account.get("walletBalance", 5000.0)
-        sl_distance = config.SL_TICKS * config.TICK_VALUE  # 100 * 0.10 = $10.00
-        tp_distance = config.TP_TICKS * config.TICK_VALUE  # 600 * 0.10 = $60.00
+        tick_val = 0.01 if is_mcl else config.TICK_VALUE
+        sl_distance = config.SL_TICKS * tick_val  # MCL: 100 * 0.01 = $1.00; PAXG: 100 * 0.10 = $10.00
+        tp_distance = config.TP_TICKS * tick_val  # MCL: 600 * 0.01 = $6.00; PAXG: 600 * 0.10 = $60.00
         
-        # Calculate lot size based on 1% balance risk
+        # Calculate lot size based on 1% balance risk (1 contract for MCL = 100 barrels)
         risk_capital = wallet_balance * config.RISK_PER_TRADE_PCT
-        calc_qty = risk_capital / sl_distance if sl_distance > 0 else 0.01
-        max_notional_qty = (wallet_balance * config.LEVERAGE * 0.8) / ticker["price"] if ticker["price"] > 0 else 0.01
-        trade_qty = round(max(0.001, min(calc_qty, max_notional_qty)), 3)
+        calc_qty = risk_capital / sl_distance if sl_distance > 0 else 1.0
+        max_notional_qty = (wallet_balance * config.LEVERAGE * 0.8) / ticker["price"] if ticker["price"] > 0 else 1.0
+        trade_qty = 1.0 if is_mcl else round(max(0.001, min(calc_qty, max_notional_qty)), 3)
         
         # ----------------------------------------------------
         # STAGE 2: ACTIVE POSITION MANAGEMENT (IF IN POSITION)
@@ -218,12 +227,12 @@ class HermesTradingAgent:
                     pass
                 elif current_pos["side"] == "SHORT":
                     # Opposite position -> close all before making new entry
-                    close_res = binance_adapter.close_position(symbol)
+                    close_res = broker.close_position(symbol)
                     log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], close_res.get("orderId"), "CLOSED", current_pos.get("unrealizedProfit", 0.0))
                     current_pos = None
 
             if not current_pos:
-                trade_result = binance_adapter.place_order(symbol, "BUY", trade_qty, "MARKET")
+                trade_result = broker.place_order(symbol, "BUY", trade_qty, "MARKET")
                 self.position_entry_time = time.time()
                 self.position_entry_price = ticker["price"]
                 self.position_side = "LONG"
@@ -238,12 +247,12 @@ class HermesTradingAgent:
                     pass
                 elif current_pos["side"] == "LONG":
                     # Opposite position -> close all before making new entry
-                    close_res = binance_adapter.close_position(symbol)
+                    close_res = broker.close_position(symbol)
                     log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], close_res.get("orderId"), "CLOSED", current_pos.get("unrealizedProfit", 0.0))
                     current_pos = None
 
             if not current_pos:
-                trade_result = binance_adapter.place_order(symbol, "SELL", trade_qty, "MARKET")
+                trade_result = broker.place_order(symbol, "SELL", trade_qty, "MARKET")
                 self.position_entry_time = time.time()
                 self.position_entry_price = ticker["price"]
                 self.position_side = "SHORT"
@@ -252,7 +261,7 @@ class HermesTradingAgent:
                 log_trade(symbol, "SELL", trade_qty, ticker["price"], trade_result.get("orderId"), "FILLED")
             
         elif action == "CLOSE" and current_pos:
-            trade_result = binance_adapter.close_position(symbol)
+            trade_result = broker.close_position(symbol)
             log_trade(symbol, "CLOSE", current_pos["size"], ticker["price"], trade_result.get("orderId"), "CLOSED", current_pos.get("unrealizedProfit", 0.0))
             self.position_entry_time = None
             self.position_entry_price = None
